@@ -3,13 +3,13 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-    apiKey: "AIzaSyC10YYOzbVqIBUG9pAyIJkHMeYeeJAPEY",
-        authDomain: "nfitness360-35df5.firebaseapp.com",
-        projectId: "nfitness360-35df5",
-        storageBucket: "nfitness360-35df5.firebasestorage.app",
-        messagingSenderId: "746556814888",
-        appId: "1:746556814888:web:fa2cc4566f608ffb71671d"
-      };
+  apiKey: "AIzaSyC10YYOzbVqIBUG9pAyIJkHMeYeeJAPEY",
+  authDomain: "nfitness360-35df5.firebaseapp.com",
+  projectId: "nfitness360-35df5",
+  storageBucket: "nfitness360-35df5.firebasestorage.app",
+  messagingSenderId: "746556814888",
+  appId: "1:746556814888:web:fa2cc4566f608ffb71671d"
+};
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
