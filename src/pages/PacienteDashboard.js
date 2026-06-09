@@ -4,7 +4,7 @@ import { signOut } from 'firebase/auth';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 
-const CALENDLY_URL = 'https://calendly.com/nfitness360';
+const CALENDLY_URL = 'https://calendly.com/nutnfitness360';
 
 export default function PacienteDashboard() {
   const { user } = useAuth();
