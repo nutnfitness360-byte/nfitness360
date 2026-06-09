@@ -25,10 +25,8 @@ export default function Agenda({ isNutri }) {
   const [selMotivo, setSelMotivo] = useState(null);
   const [notas, setNotas] = useState('');
   const [saving, setSaving] = useState(false);
-
-  // Form nutriologa
   const [nPaciente, setNPaciente] = useState('');
-  const [nFecha, setNFecha] = useState(selDate);
+  const [nFecha, setNFecha] = useState(toKey(hoy));
   const [nHora, setNHora] = useState('09:00');
   const [nMotivo, setNMotivo] = useState(MOTIVOS[0]);
   const [nNotas, setNNotas] = useState('');
@@ -48,14 +46,14 @@ export default function Agenda({ isNutri }) {
   const citaDates = new Set(citas.map(c => c.fecha));
 
   const confirmarCita = async () => {
-    if (!selHora || !selMotivo) return;
+    if (!selHora || !selMotivo) { alert('Selecciona hora y motivo'); return; }
     setSaving(true);
     try {
       await addDoc(collection(db, 'citas'), {
         fecha: selDate,
         hora: selHora,
         motivo: selMotivo,
-        notas,
+        notas: notas,
         estado: 'pendiente',
         pacienteEmail: user.email,
         pacienteNombre: user.displayName || user.email.split('@')[0],
@@ -65,12 +63,12 @@ export default function Agenda({ isNutri }) {
       setSelHora(null);
       setSelMotivo(null);
       setNotas('');
-    } catch(e) { console.error(e); }
+    } catch(e) { alert('Error: ' + e.message); }
     setSaving(false);
   };
 
   const crearCitaNutri = async () => {
-    if (!nPaciente || !nFecha || !nHora) return;
+    if (!nPaciente || !nFecha || !nHora) { alert('Completa todos los campos'); return; }
     setSaving(true);
     try {
       await addDoc(collection(db, 'citas'), {
@@ -84,7 +82,9 @@ export default function Agenda({ isNutri }) {
         creadoEn: Timestamp.now()
       });
       setShowModal(false);
-    } catch(e) { console.error(e); }
+      setNPaciente('');
+      setNNotas('');
+    } catch(e) { alert('Error: ' + e.message); }
     setSaving(false);
   };
 
@@ -110,18 +110,17 @@ export default function Agenda({ isNutri }) {
     <div>
       <div className="card">
         <div className="cal-nav">
-          <button onClick={() => setView(v => { let m=v.m-1,y=v.y; if(m<0){m=11;y--;} return {y,m}; })}>‹</button>
+          <button onClick={() => setView(v => { let m=v.m-1,y=v.y; if(m<0){m=11;y--;} return {y,m}; })}>&#x2039;</button>
           <span className="month">{MESES[view.m]} {view.y}</span>
-          <button onClick={() => setView(v => { let m=v.m+1,y=v.y; if(m>11){m=0;y++;} return {y,m}; })}>›</button>
+          <button onClick={() => setView(v => { let m=v.m+1,y=v.y; if(m>11){m=0;y++;} return {y,m}; })}>&#x203a;</button>
         </div>
         <div className="cal-grid">
           {DIAS.map(d => <div key={d} className="cal-lbl">{d}</div>)}
           {renderCal()}
         </div>
-
         <div className="section-label">{fmtDate(selDate)}</div>
         {citasDia.length === 0
-          ? <div className="empty-state">Sin citas este día</div>
+          ? <div className="empty-state">Sin citas este dia</div>
           : citasDia.map(c => (
             <div className="cita-item" key={c.id}>
               <div className="cita-hora">{c.hora}</div>
@@ -133,7 +132,6 @@ export default function Agenda({ isNutri }) {
             </div>
           ))
         }
-
         <button className="btn-primary" onClick={() => setShowModal(true)}>
           + {isNutri ? 'Nueva cita' : 'Agendar cita'}
         </button>
@@ -167,20 +165,25 @@ export default function Agenda({ isNutri }) {
                 <div className="section-label">Horarios disponibles — {fmtDate(selDate)}</div>
                 <div className="horario-grid">
                   {HORARIOS.map(h => (
-                    <button key={h} className={`horario-slot${horasOcupadas.has(h)?' ocupado':selHora===h?' selected':''}`}
-                      onClick={() => !horasOcupadas.has(h) && setSelHora(h)}>{h}</button>
+                    <button key={h}
+                      className={`horario-slot${horasOcupadas.has(h)?' ocupado':selHora===h?' selected':''}`}
+                      onClick={() => { if(!horasOcupadas.has(h)) setSelHora(h); }}>{h}</button>
                   ))}
                 </div>
                 <div className="section-label">Motivo de consulta</div>
                 <div className="motivos-grid">
                   {MOTIVOS.map(m => (
-                    <button key={m} className={`motivo-btn${selMotivo===m?' selected':''}`} onClick={() => setSelMotivo(m)}>{m}</button>
+                    <button key={m}
+                      className={`motivo-btn${selMotivo===m?' selected':''}`}
+                      onClick={() => setSelMotivo(m)}>{m}</button>
                   ))}
                 </div>
-                <div className="fg"><label>Notas (opcional)</label><textarea value={notas} onChange={e=>setNotas(e.target.value)} placeholder="Cuéntanos tu objetivo..." /></div>
+                <div className="fg"><label>Notas (opcional)</label><textarea value={notas} onChange={e=>setNotas(e.target.value)} placeholder="Cuentanos tu objetivo..." /></div>
                 <div className="btn-row">
                   <button className="btn-cancel" onClick={() => setShowModal(false)}>Cancelar</button>
-                  <button className="btn-save" onClick={confirmarCita} disabled={saving || !selHora || !selMotivo}>{saving ? 'Guardando...' : 'Confirmar cita'}</button>
+                  <button className="btn-save" onClick={confirmarCita} disabled={saving || !selHora || !selMotivo}>
+                    {saving ? 'Guardando...' : 'Confirmar cita'}
+                  </button>
                 </div>
               </>
             )}
