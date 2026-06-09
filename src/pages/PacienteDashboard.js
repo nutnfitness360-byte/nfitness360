@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase/config';
-import { signOut } from 'firebase/auth';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import Topbar from '../components/Topbar';
+import PerfilPaciente from '../components/PerfilPaciente';
 
 const CALENDLY_URL = 'https://calendly.com/nutnfitness360';
 
@@ -10,29 +11,23 @@ export default function PacienteDashboard() {
   const { user } = useAuth();
   const [tab, setTab] = useState('inicio');
   const [citas, setCitas] = useState([]);
-  const [showCalendly, setShowCalendly] = useState(false);
-  
 
   useEffect(() => {
     const q = query(collection(db,'citas'), where('pacienteEmail','==',user.email));
     return onSnapshot(q, snap => setCitas(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.fecha.localeCompare(b.fecha))));
   }, [user]);
 
-  // Cargar el script de Calendly
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://assets.calendly.com/assets/external/widget.css';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
-
     const script = document.createElement('script');
     script.src = 'https://assets.calendly.com/assets/external/widget.js';
     script.async = true;
     document.body.appendChild(script);
-
     return () => {
-      document.head.removeChild(link);
-      document.body.removeChild(script);
+      try { document.head.removeChild(link); document.body.removeChild(script); } catch(e) {}
     };
   }, []);
 
@@ -40,10 +35,7 @@ export default function PacienteDashboard() {
     if (window.Calendly) {
       window.Calendly.initPopupWidget({
         url: CALENDLY_URL,
-        prefill: {
-          name: user.displayName || '',
-          email: user.email || ''
-        }
+        prefill: { name: user.displayName || '', email: user.email || '' }
       });
     } else {
       window.open(CALENDLY_URL, '_blank');
@@ -65,17 +57,20 @@ export default function PacienteDashboard() {
     { id:'planes', label:'Mi plan', icon:<svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg> },
   ];
 
-  return (
-    <div className="app">
-      <div className="topbar">
-        <div>
-          <div className="topbar-logo">N Fitness 360®</div>
-          <div className="topbar-role">Mi cuenta</div>
-        </div>
-        <div className="avatar" onClick={() => signOut(auth)} title="Cerrar sesion">
-          {nombre.slice(0,2).toUpperCase()}
+  if (tab === 'perfil') {
+    return (
+      <div className="app">
+        <Topbar role="paciente" user={user} onPerfil={() => setTab('perfil')} />
+        <div className="content">
+          <PerfilPaciente onBack={() => setTab('inicio')} />
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <Topbar role="paciente" user={user} onPerfil={() => setTab('perfil')} />
 
       <div className="content">
         {tab === 'inicio' && (
@@ -100,11 +95,9 @@ export default function PacienteDashboard() {
                 <div className="empty-state">No tienes citas proximas</div>
               )}
             </div>
-
             <button className="btn-primary" onClick={abrirCalendly}>
               + Agendar nueva cita
             </button>
-
             {citas.length > 0 && (
               <div className="card" style={{marginTop:'0.875rem'}}>
                 <div className="card-title">Mis citas</div>
@@ -133,7 +126,7 @@ export default function PacienteDashboard() {
               Ver disponibilidad y agendar
             </button>
             <div style={{marginTop:'1rem',fontSize:'11px',color:'var(--stone)',textAlign:'center'}}>
-              Powered by Calendly · Los correos de confirmacion se envian automaticamente
+              Los correos de confirmacion se envian automaticamente
             </div>
           </div>
         )}
