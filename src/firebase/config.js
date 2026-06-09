@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC10YYOzbVqIBUG9pAyIJkHMeYeeJAPEY",
+    apiKey: "AIzaSyANnYbxOqa_bThJT_06_hP_fqATKHE_MwI",
   authDomain: "nfitness360-35df5.firebaseapp.com",
   projectId: "nfitness360-35df5",
   storageBucket: "nfitness360-35df5.firebasestorage.app",
