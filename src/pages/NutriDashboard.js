@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db } from '../firebase/config';
-import { signOut } from 'firebase/auth';
+import { db } from '../firebase/config';
 import { collection, query, onSnapshot, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import Agenda from '../components/Agenda';
+import Topbar from '../components/Topbar';
 
 function initials(name) { return name ? name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : 'NU'; }
 
@@ -72,13 +72,7 @@ export default function NutriDashboard() {
 
   return (
     <div className="app">
-      <div className="topbar">
-        <div>
-          <div className="topbar-logo">N Fitness 360®</div>
-          <div className="topbar-role">Panel nutrióloga</div>
-        </div>
-        <div className="avatar" onClick={() => signOut(auth)}>{initials(user?.displayName)}</div>
-      </div>
+      <Topbar role="nutriologa" user={user} onPerfil={() => setTab('perfil')} />
 
       <div className="content">
         {tab === 'inicio' && (
@@ -98,9 +92,7 @@ export default function NutriDashboard() {
             </div>
           </>
         )}
-
         {tab === 'agenda' && <Agenda isNutri={true} />}
-
         {tab === 'pendientes' && (
           <div className="card">
             <div className="card-title">
@@ -113,12 +105,11 @@ export default function NutriDashboard() {
             }
           </div>
         )}
-
         {tab === 'pacientes' && (
           <div className="card">
             <div className="card-title">Mis pacientes</div>
             {pacientesUnicos.length === 0
-              ? <div className="empty-state">No hay pacientes registrados aún</div>
+              ? <div className="empty-state">No hay pacientes registrados aun</div>
               : pacientesUnicos.map(nombre => {
                   const citasPac = citas.filter(c => c.pacienteNombre === nombre);
                   return (
