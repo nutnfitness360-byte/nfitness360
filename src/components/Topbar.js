@@ -2,14 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { auth } from '../firebase/config';
 import { signOut } from 'firebase/auth';
 
-const LOGO = '/Logo_gold_Registrado__2089_x_604_px_.png';
+const LOGO = '/logo.png';
 
 export default function Topbar({ role, user, onPerfil }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
-    const handleClick = (e) => {
+    const LOGO = '/logo.png';
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setMenuOpen(false);
       }
