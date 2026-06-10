@@ -13,7 +13,7 @@ export default function PerfilPaciente({ onBack }) {
   const handleFoto = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 500000) { setMsg('La imagen debe ser menor a 500KB'); return; }
+        if (file.size > 5000000) { setMsg('La imagen debe ser menor a 5MB'); return; }
 
     setSaving(true);
     setMsg('');
