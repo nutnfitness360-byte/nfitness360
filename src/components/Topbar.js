@@ -9,9 +9,9 @@ export default function Topbar({ role, user, onPerfil }) {
   const menuRef = useRef(null);
 
   useEffect(() => {
-    const LOGO = '/logo.png';
+  
       if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setMenuOpen(false);
+        
       }
     };
     document.addEventListener('mousedown', handleClick);
