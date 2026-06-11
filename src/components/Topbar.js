@@ -9,10 +9,12 @@ export default function Topbar({ role, user, onPerfil }) {
   const menuRef = useRef(null);
 
   useEffect(() => {
+        const handleClick = (e) => {
   
       if (menuRef.current && !menuRef.current.contains(e.target)) {
-        
+                setMenuOpen(false);
       }
+        };
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
