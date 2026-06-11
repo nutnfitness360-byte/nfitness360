@@ -4,6 +4,7 @@ import { collection, query, onSnapshot, orderBy, doc, updateDoc } from 'firebase
 import { useAuth } from '../context/AuthContext';
 import Agenda from '../components/Agenda';
 import Topbar from '../components/Topbar';
+import Pacientes from '../components/Pacientes';
 
 function initials(name) { return name ? name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : 'NU'; }
 
@@ -105,27 +106,7 @@ export default function NutriDashboard() {
             }
           </div>
         )}
-        {tab === 'pacientes' && (
-          <div className="card">
-            <div className="card-title">Mis pacientes</div>
-            {pacientesUnicos.length === 0
-              ? <div className="empty-state">No hay pacientes registrados aun</div>
-              : pacientesUnicos.map(nombre => {
-                  const citasPac = citas.filter(c => c.pacienteNombre === nombre);
-                  return (
-                    <div className="pac-item" key={nombre}>
-                      <div className="pac-avatar">{initials(nombre)}</div>
-                      <div style={{flex:1}}>
-                        <div className="pac-nombre">{nombre}</div>
-                        <div className="pac-detalle">Paciente activo</div>
-                      </div>
-                      <div className="pac-citas">{citasPac.length} cita{citasPac.length !== 1 ? 's' : ''}</div>
-                    </div>
-                  );
-                })
-            }
-          </div>
-        )}
+        {tab === 'pacientes' && <Pacientes />}
       </div>
 
       <nav className="bottomnav">
