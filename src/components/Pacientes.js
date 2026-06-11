@@ -1,122 +1,289 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, query, onSnapshot, orderBy, doc, updateDoc } from 'firebase/firestore';
-import { useAuth } from '../context/AuthContext';
-import Agenda from '../components/Agenda';
-import Topbar from '../components/Topbar';
-import Pacientes from '../components/Pacientes';
+import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 
-function initials(name) { return name ? name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : 'NU'; }
+/* ===== utilidades ===== */
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MESES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const fmtMes = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} ${MESES[d.getMonth()]}`; };
+const fmtFecha = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} de ${MESES_L[d.getMonth()]} de ${d.getFullYear()}`; };
+const initials = (n) => n ? n.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase() : 'NU';
+const last = (a) => (a && a.length ? a[a.length - 1] : null);
+const hoyISO = () => new Date().toISOString().slice(0, 10);
 
-export default function NutriDashboard() {
-  const { user } = useAuth();
-  const [tab, setTab] = useState('inicio');
-  const [citas, setCitas] = useState([]);
+/* ===== mini gráfica de línea (SVG, sin librerías) ===== */
+function Linea({ data, field, color, unit }) {
+  const valid = (data || []).filter(d => typeof d[field] === 'number');
+  if (valid.length === 0) return <div style={{ fontSize: 12, color: 'var(--stone)', padding: '14px 0', textAlign: 'center' }}>Sin mediciones aún</div>;
+  const w = 300, h = 120, pad = 26;
+  const vals = valid.map(d => d[field]);
+  const min = Math.min(...vals), max = Math.max(...vals), span = (max - min) || 1;
+  const n = valid.length;
+  const X = (i) => n === 1 ? w / 2 : pad + (i * (w - 2 * pad)) / (n - 1);
+  const Y = (v) => h - pad - ((v - min) / span) * (h - 2 * pad);
+  const pts = valid.map((d, i) => `${X(i)},${Y(d[field])}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+      <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="var(--border)" strokeWidth="1" />
+      {valid.length > 1 && <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />}
+      {valid.map((d, i) => <circle key={i} cx={X(i)} cy={Y(d[field])} r="3.5" fill={color} />)}
+      {valid.map((d, i) => (
+        <text key={'x' + i} x={X(i)} y={h - pad + 14} fontSize="8.5" fill="var(--stone)" textAnchor="middle">{fmtMes(d.fecha)}</text>
+      ))}
+      <text x={pad - 4} y={Y(max) + 3} fontSize="9" fill="var(--stone)" textAnchor="end">{max}{unit}</text>
+      {min !== max && <text x={pad - 4} y={Y(min) + 3} fontSize="9" fill="var(--stone)" textAnchor="end">{min}{unit}</text>}
+    </svg>
+  );
+}
 
-  const hoy = new Date();
-  const hoyKey = hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
+/* ===== componente principal ===== */
+export default function Pacientes() {
+  const [pacientes, setPacientes] = useState([]);
+  const [selId, setSelId] = useState(null);
+  const [nuevo, setNuevo] = useState(false);
+  const [form, setForm] = useState({ nombre: '', edad: '', sexo: 'Femenino', estatura: '', objetivo: '', contacto: '' });
+  const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' });
+  const [plan, setPlan] = useState({ nombre: '', fecha: hoyISO(), link: '' });
+  const [openMed, setOpenMed] = useState(false);
+  const [openPlan, setOpenPlan] = useState(false);
+  const [err, setErr] = useState('');
 
   useEffect(() => {
-    const q = query(collection(db, 'citas'), orderBy('fecha','asc'));
-    return onSnapshot(q, snap => setCitas(snap.docs.map(d => ({id:d.id,...d.data()}))));
+    const q = query(collection(db, 'pacientes'), orderBy('codigo', 'asc'));
+    return onSnapshot(q, snap => setPacientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      e => setErr('No se pudieron cargar los pacientes: ' + e.message));
   }, []);
 
-  const cambiarEstado = async (id, nuevoEstado) => {
-    try {
-      await updateDoc(doc(db, 'citas', id), { estado: nuevoEstado });
-    } catch(e) { alert('Error: ' + e.message); }
+  const sel = pacientes.find(p => p.id === selId);
+
+  const nextCodigo = () => {
+    let mx = 0;
+    pacientes.forEach(p => { const m = /NF-(\d+)/.exec(p.codigo || ''); if (m) mx = Math.max(mx, +m[1]); });
+    return 'NF-' + String(mx + 1).padStart(4, '0');
   };
 
-  const citasHoy = citas.filter(c => c.fecha === hoyKey).sort((a,b)=>a.hora.localeCompare(b.hora));
-  const pendientes = citas.filter(c => c.estado === 'pendiente').length;
-  const pacientesUnicos = [...new Set(citas.map(c => c.pacienteNombre))].filter(Boolean);
+  const crearPaciente = async () => {
+    if (!form.nombre.trim()) { setErr('Escribe el nombre del paciente.'); return; }
+    try {
+      await addDoc(collection(db, 'pacientes'), {
+        codigo: nextCodigo(),
+        nombre: form.nombre.trim(),
+        edad: form.edad, sexo: form.sexo, estatura: form.estatura,
+        objetivo: form.objetivo, contacto: form.contacto,
+        inicio: hoyISO(), mediciones: [], planes: [], creado: Date.now(),
+      });
+      setForm({ nombre: '', edad: '', sexo: 'Femenino', estatura: '', objetivo: '', contacto: '' });
+      setNuevo(false); setErr('');
+    } catch (e) { setErr('No se pudo crear: ' + e.message); }
+  };
 
-  const CitaItem = ({ c, mostrarBotones }) => (
-    <div style={{borderBottom:'0.5px solid var(--border)',paddingBottom:'0.75rem',marginBottom:'0.75rem'}}>
-      <div className="cita-item" style={{paddingBottom:0,marginBottom:0,borderBottom:'none'}}>
-        <div className="cita-hora">{c.hora}</div>
-        <div style={{flex:1}}>
-          <div className="cita-nombre">{c.pacienteNombre}</div>
-          <div className="cita-motivo">{c.motivo} · {c.fecha}</div>
-        </div>
-        <span className={`badge b-${c.estado==='confirmada'?'confirm':c.estado==='cancelada'?'cancel':'pending'}`}>{c.estado}</span>
-      </div>
-      {mostrarBotones && c.estado === 'pendiente' && (
-        <div style={{display:'flex',gap:'8px',marginTop:'8px',marginLeft:'56px'}}>
-          <button onClick={() => cambiarEstado(c.id, 'confirmada')}
-            style={{padding:'5px 14px',background:'var(--sage)',border:'none',borderRadius:'8px',fontSize:'11px',fontWeight:'600',color:'#fff',cursor:'pointer',fontFamily:'var(--font)'}}>
-            Confirmar
-          </button>
-          <button onClick={() => cambiarEstado(c.id, 'cancelada')}
-            style={{padding:'5px 14px',background:'transparent',border:'1px solid #e0a0a0',borderRadius:'8px',fontSize:'11px',fontWeight:'600',color:'#c0392b',cursor:'pointer',fontFamily:'var(--font)'}}>
-            Cancelar
-          </button>
-        </div>
-      )}
-      {mostrarBotones && c.estado === 'confirmada' && (
-        <div style={{marginTop:'6px',marginLeft:'56px'}}>
-          <button onClick={() => cambiarEstado(c.id, 'cancelada')}
-            style={{padding:'5px 14px',background:'transparent',border:'1px solid #e0a0a0',borderRadius:'8px',fontSize:'11px',fontWeight:'600',color:'#c0392b',cursor:'pointer',fontFamily:'var(--font)'}}>
-            Cancelar cita
-          </button>
-        </div>
-      )}
-    </div>
-  );
+  const addMedicion = async () => {
+    if (!med.fecha || !med.peso) { setErr('Fecha y peso son necesarios.'); return; }
+    const nm = { fecha: med.fecha, peso: +med.peso, grasa: +med.grasa || 0, musculo: +med.musculo || 0 };
+    const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), { mediciones: arr });
+      setMed({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' }); setOpenMed(false); setErr('');
+    } catch (e) { setErr('No se pudo guardar: ' + e.message); }
+  };
 
-  const tabs = [
-    { id:'inicio', label:'Inicio', icon:<svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg> },
-    { id:'agenda', label:'Agenda', icon:<svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg> },
-    { id:'pendientes', label:'Pendientes', icon:<svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg> },
-    { id:'pacientes', label:'Pacientes', icon:<svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg> },
-  ];
+  const addPlan = async () => {
+    if (!plan.nombre.trim()) { setErr('Escribe el nombre del plan.'); return; }
+    const arr = [...(sel.planes || []), { nombre: plan.nombre.trim(), fecha: plan.fecha || hoyISO(), link: plan.link.trim() }];
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), { planes: arr });
+      setPlan({ nombre: '', fecha: hoyISO(), link: '' }); setOpenPlan(false); setErr('');
+    } catch (e) { setErr('No se pudo guardar: ' + e.message); }
+  };
 
-  return (
-    <div className="app">
-      <Topbar role="nutriologa" user={user} onPerfil={() => setTab('perfil')} />
+  const removePlan = async (i) => {
+    const arr = (sel.planes || []).filter((_, k) => k !== i);
+    try { await updateDoc(doc(db, 'pacientes', sel.id), { planes: arr }); } catch (e) { setErr(e.message); }
+  };
 
-      <div className="content">
-        {tab === 'inicio' && (
-          <>
-            <div className="stats">
-              <div className="stat"><div className="stat-num">{pacientesUnicos.length}</div><div className="stat-lbl">Pacientes</div></div>
-              <div className="stat"><div className="stat-num">{citasHoy.length}</div><div className="stat-lbl">Citas hoy</div></div>
-              <div className="stat"><div className="stat-num" style={{color: pendientes > 0 ? '#c0392b' : 'var(--dark)'}}>{pendientes}</div><div className="stat-lbl">Por confirmar</div></div>
-              <div className="stat"><div className="stat-num">{citas.length}</div><div className="stat-lbl">Total citas</div></div>
+  const S = styles;
+
+  /* ----- VISTA: dashboard de un paciente ----- */
+  if (sel) {
+    const m = last(sel.mediciones);
+    return (
+      <div>
+        <button style={S.back} onClick={() => { setSelId(null); setErr(''); }}>← Pacientes</button>
+        {err && <div style={S.err}>{err}</div>}
+
+        <div className="card">
+          <div style={S.headRow}>
+            <div className="pac-avatar">{initials(sel.nombre)}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--dark)' }}>{sel.nombre}</div>
+              <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 2 }}>{sel.codigo} · {sel.objetivo || 'sin objetivo'}</div>
             </div>
-            <div className="card">
-              <div className="card-title">Citas de hoy</div>
-              {citasHoy.length === 0
-                ? <div className="empty-state">Sin citas programadas para hoy</div>
-                : citasHoy.map(c => <CitaItem key={c.id} c={c} mostrarBotones={true} />)
-              }
-            </div>
-          </>
-        )}
-        {tab === 'agenda' && <Agenda isNutri={true} />}
-        {tab === 'pendientes' && (
-          <div className="card">
-            <div className="card-title">
-              Citas por confirmar
-              {pendientes > 0 && <span style={{marginLeft:'8px',background:'#fef0f0',color:'#c0392b',fontSize:'10px',padding:'2px 8px',borderRadius:'20px',fontWeight:'700'}}>{pendientes}</span>}
-            </div>
-            {citas.filter(c => c.estado === 'pendiente').length === 0
-              ? <div className="empty-state">No hay citas pendientes</div>
-              : citas.filter(c => c.estado === 'pendiente').map(c => <CitaItem key={c.id} c={c} mostrarBotones={true} />)
-            }
           </div>
-        )}
-        {tab === 'pacientes' && <Pacientes />}
-      </div>
+        </div>
 
-      <nav className="bottomnav">
-        {tabs.map(t => (
-          <button key={t.id} className={`nav-item${tab===t.id?' active':''}`} onClick={() => setTab(t.id)}>
-            {t.icon}
-            <span>{t.label}</span>
-          </button>
-        ))}
-      </nav>
+        <div className="card">
+          <div className="card-title">Información general</div>
+          <div style={S.infoGrid}>
+            <Info l="Edad" v={sel.edad ? sel.edad + ' años' : '—'} />
+            <Info l="Sexo" v={sel.sexo || '—'} />
+            <Info l="Estatura" v={sel.estatura ? sel.estatura + ' cm' : '—'} />
+            <Info l="Inicio" v={sel.inicio ? fmtFecha(sel.inicio) : '—'} />
+            <Info l="Contacto" v={sel.contacto || '—'} />
+            <Info l="Peso actual" v={m ? m.peso + ' kg' : '—'} />
+            <Info l="% grasa" v={m ? m.grasa + '%' : '—'} />
+            <Info l="Masa muscular" v={m ? m.musculo + ' kg' : '—'} />
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={S.titleRow}>
+            <div className="card-title" style={{ margin: 0 }}>Seguimiento</div>
+            <button style={S.smallBtn} onClick={() => setOpenMed(v => !v)}>{openMed ? 'Cancelar' : '+ Medición'}</button>
+          </div>
+          {openMed && (
+            <div style={S.formRow}>
+              <Field l="Fecha"><input type="date" style={S.inp} value={med.fecha} onChange={e => setMed({ ...med, fecha: e.target.value })} /></Field>
+              <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={med.peso} onChange={e => setMed({ ...med, peso: e.target.value })} /></Field>
+              <Field l="% grasa"><input style={S.inp} inputMode="decimal" value={med.grasa} onChange={e => setMed({ ...med, grasa: e.target.value })} /></Field>
+              <Field l="Músculo (kg)"><input style={S.inp} inputMode="decimal" value={med.musculo} onChange={e => setMed({ ...med, musculo: e.target.value })} /></Field>
+              <button style={S.saveBtn} onClick={addMedicion}>Guardar</button>
+            </div>
+          )}
+          <div style={S.chartGrid}>
+            <ChartCard title="Peso" unit=" kg" valor={m ? m.peso : null}><Linea data={sel.mediciones} field="peso" color="var(--gold)" unit="" /></ChartCard>
+            <ChartCard title="% de grasa" unit="%" valor={m ? m.grasa : null}><Linea data={sel.mediciones} field="grasa" color="var(--stone)" unit="" /></ChartCard>
+            <ChartCard title="Masa muscular" unit=" kg" valor={m ? m.musculo : null}><Linea data={sel.mediciones} field="musculo" color="var(--sage)" unit="" /></ChartCard>
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={S.titleRow}>
+            <div className="card-title" style={{ margin: 0 }}>Planes</div>
+            <button style={S.smallBtn} onClick={() => setOpenPlan(v => !v)}>{openPlan ? 'Cancelar' : '+ Plan'}</button>
+          </div>
+          <div style={S.note}>El reporte (PDF) se guarda en Google Drive y aquí se registra su enlace.</div>
+          {openPlan && (
+            <div style={S.formRow}>
+              <Field l="Nombre del plan"><input style={S.inp} value={plan.nombre} onChange={e => setPlan({ ...plan, nombre: e.target.value })} placeholder="Plan · 2200 kcal" /></Field>
+              <Field l="Fecha"><input type="date" style={S.inp} value={plan.fecha} onChange={e => setPlan({ ...plan, fecha: e.target.value })} /></Field>
+              <Field l="Enlace de Drive"><input style={S.inp} value={plan.link} onChange={e => setPlan({ ...plan, link: e.target.value })} placeholder="https://drive.google.com/…" /></Field>
+              <button style={S.saveBtn} onClick={addPlan}>Guardar</button>
+            </div>
+          )}
+          {(!sel.planes || sel.planes.length === 0)
+            ? <div className="empty-state">Aún no hay planes para este paciente.</div>
+            : sel.planes.map((pl, i) => (
+              <div key={i} style={S.planRow}>
+                <div style={S.planIcon}>PDF</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{pl.nombre}</div>
+                  <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{pl.fecha ? fmtFecha(pl.fecha) : ''}</div>
+                </div>
+                {pl.link
+                  ? <a href={pl.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>
+                  : <span style={{ fontSize: 11, color: 'var(--stone)', fontStyle: 'italic' }}>Sin enlace</span>}
+                <button style={S.rm} onClick={() => removePlan(i)} title="Quitar">×</button>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    );
+  }
+
+  /* ----- VISTA: lista de pacientes ----- */
+  return (
+    <div>
+      <div style={S.titleRow}>
+        <div className="card-title" style={{ margin: 0, fontSize: 16 }}>Pacientes</div>
+        <button style={S.smallBtn} onClick={() => setNuevo(v => !v)}>{nuevo ? 'Cancelar' : '+ Nuevo paciente'}</button>
+      </div>
+      {err && <div style={S.err}>{err}</div>}
+
+      {nuevo && (
+        <div className="card">
+          <div className="card-title">Nuevo paciente</div>
+          <div style={S.formGrid}>
+            <Field l="Nombre"><input style={S.inp} value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} /></Field>
+            <Field l="Edad"><input style={S.inp} inputMode="numeric" value={form.edad} onChange={e => setForm({ ...form, edad: e.target.value })} /></Field>
+            <Field l="Sexo">
+              <select style={S.inp} value={form.sexo} onChange={e => setForm({ ...form, sexo: e.target.value })}>
+                <option>Femenino</option><option>Masculino</option>
+              </select>
+            </Field>
+            <Field l="Estatura (cm)"><input style={S.inp} inputMode="numeric" value={form.estatura} onChange={e => setForm({ ...form, estatura: e.target.value })} /></Field>
+            <Field l="Objetivo"><input style={S.inp} value={form.objetivo} onChange={e => setForm({ ...form, objetivo: e.target.value })} placeholder="Aumento de músculo" /></Field>
+            <Field l="Contacto"><input style={S.inp} value={form.contacto} onChange={e => setForm({ ...form, contacto: e.target.value })} placeholder="correo o teléfono" /></Field>
+          </div>
+          <button style={{ ...S.saveBtn, marginTop: 12 }} onClick={crearPaciente}>Guardar paciente</button>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="card-title">Mis pacientes ({pacientes.length})</div>
+        {pacientes.length === 0
+          ? <div className="empty-state">No hay pacientes registrados aún. Usa “+ Nuevo paciente”.</div>
+          : pacientes.map(p => {
+            const m = last(p.mediciones);
+            return (
+              <div className="pac-item" key={p.id} onClick={() => setSelId(p.id)}>
+                <div className="pac-avatar">{initials(p.nombre)}</div>
+                <div style={{ flex: 1 }}>
+                  <div className="pac-nombre">{p.nombre}</div>
+                  <div className="pac-detalle">{p.codigo} · {p.objetivo || 'sin objetivo'}</div>
+                </div>
+                <div className="pac-citas">{m ? m.peso + ' kg' : '—'}</div>
+              </div>
+            );
+          })
+        }
+      </div>
     </div>
   );
 }
+
+/* ===== piezas pequeñas ===== */
+function Info({ l, v }) {
+  return <div style={styles.infoCell}><div style={styles.infoLbl}>{l}</div><div style={styles.infoVal}>{v}</div></div>;
+}
+function Field({ l, children }) {
+  return <label style={styles.field}><span style={styles.fieldLbl}>{l}</span>{children}</label>;
+}
+function ChartCard({ title, unit, valor, children }) {
+  return (
+    <div style={styles.chartCard}>
+      <div style={styles.chartTop}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dark)' }}>{title}</span>
+        <span style={{ fontFamily: 'var(--font-display), serif', fontSize: 22, color: 'var(--dark)' }}>{valor != null ? valor : '—'}<span style={{ fontSize: 11, color: 'var(--stone)' }}>{unit}</span></span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+const styles = {
+  back: { background: 'transparent', border: 'none', color: 'var(--stone)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 12 },
+  err: { background: '#fef0f0', color: '#c0392b', fontSize: 12.5, padding: '10px 12px', borderRadius: 10, marginBottom: 12 },
+  headRow: { display: 'flex', alignItems: 'center', gap: 12 },
+  titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  infoGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 },
+  infoCell: { background: 'var(--cream)', borderRadius: 10, padding: '9px 11px' },
+  infoLbl: { fontSize: 9.5, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: 3 },
+  infoVal: { fontSize: 13, color: 'var(--dark)', fontWeight: 600 },
+  chartGrid: { display: 'grid', gridTemplateColumns: '1fr', gap: 12 },
+  chartCard: { border: '0.5px solid var(--border)', borderRadius: 12, padding: '10px 12px', background: '#fff' },
+  chartTop: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 },
+  field: { display: 'flex', flexDirection: 'column', gap: 5 },
+  fieldLbl: { fontSize: 9.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' },
+  fieldsWrap: {},
+  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 },
+  formRow: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, background: 'var(--cream)', borderRadius: 10, padding: 12, marginBottom: 12, alignItems: 'end' },
+  inp: { border: '0.5px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', width: '100%' },
+  saveBtn: { background: 'var(--gold)', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
+  smallBtn: { background: '#fff', color: 'var(--dark)', border: '0.5px solid var(--border)', padding: '7px 13px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
+  note: { fontSize: 11.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 },
+  planRow: { display: 'flex', alignItems: 'center', gap: 12, border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 8 },
+  planIcon: { width: 36, height: 36, borderRadius: 8, background: 'var(--dark)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 },
+  openBtn: { background: 'var(--gold)', color: '#fff', textDecoration: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' },
+  rm: { background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 19, cursor: 'pointer', lineHeight: 1, padding: '0 4px' },
+};
