@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
+import { buildReportHTML } from '../report/reporteHTML';
 
 /* ============================================================
    NFITNESS 360 — Menús por tiempo de comida
@@ -99,6 +100,7 @@ export default function Menus({ patient, onBack }) {
     return DEFAULT_TIEMPOS.map((d, m) => nuevoTiempo(d, dist[m]));
   });
   const [status, setStatus] = useState(plan.menus ? 'guardado' : 'nuevo');
+  const [rep, setRep] = useState('');
 
   const touch = () => setStatus('nuevo');
   const setT = (idx, patch) => { setTiempos(ts => ts.map((t, i) => i === idx ? { ...t, ...patch } : t)); touch(); };
@@ -126,6 +128,29 @@ export default function Menus({ patient, onBack }) {
     setStatus('guardando');
     try { await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos } }); setStatus('guardado'); }
     catch (e) { setStatus('error'); }
+  };
+
+  const generarReporte = async () => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setRep('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    setRep('Guardando menús y generando reporte…');
+    try {
+      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos } });
+      setStatus('guardado');
+      const html = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos });
+      const filename = 'Reporte_' + String(patient.nombre || 'paciente').replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
+      setRep('Subiendo a Drive…');
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'savePlan', patient: patient.nombre, filename, html }), redirect: 'follow',
+      });
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      if (data.ok && data.link) {
+        const nuevo = { nombre: 'Reporte ' + new Date().toLocaleDateString('es-MX'), fecha: new Date().toISOString().slice(0, 10), link: data.link };
+        await updateDoc(doc(db, 'pacientes', patient.id), { planes: [...(patient.planes || []), nuevo] });
+        setRep('Reporte subido a Drive y registrado en Planes ✓');
+      } else { setRep('Error: ' + (data.error || 'no se recibió enlace.')); }
+    } catch (e) { setRep('No se pudo generar/subir: ' + e.message); }
   };
 
   // balance: suma por grupo de todos los tiempos vs total del plan
@@ -218,12 +243,12 @@ export default function Menus({ patient, onBack }) {
 
       <div style={S.actions}>
         <div style={S.footerInfo}>
-          {status === 'guardado' && 'Menús guardados.'}
-          {status === 'guardando' && 'Guardando…'}
-          {status === 'error' && 'No se pudo guardar.'}
-          {status === 'nuevo' && 'Cambios sin guardar.'}
+          {rep || (status === 'guardado' && 'Menús guardados.') || (status === 'guardando' && 'Guardando…') || (status === 'error' && 'No se pudo guardar.') || (status === 'nuevo' && 'Cambios sin guardar.')}
         </div>
-        <button style={S.primaryBtn} className="nf-primary" onClick={guardar}>Guardar menús</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button style={S.reportBtn} className="nf-tpl2" onClick={generarReporte}>Generar reporte PDF</button>
+          <button style={S.primaryBtn} className="nf-primary" onClick={guardar}>Guardar menús</button>
+        </div>
       </div>
     </div>
   );
@@ -267,6 +292,7 @@ const styles = {
   actions: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '2px 2px 8px' },
   footerInfo: { fontSize: 12.5, color: T.inkSoft },
   primaryBtn: { background: T.amber, color: '#211C17', border: 'none', padding: '12px 24px', borderRadius: 11, fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: mono },
+  reportBtn: { background: T.pine, color: '#fff', border: 'none', padding: '12px 20px', borderRadius: 11, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: mono },
   empty: { background: T.mint, border: `1px solid ${T.line}`, borderRadius: 12, padding: '18px', fontSize: 13.5, color: T.ink, lineHeight: 1.6 },
 };
 
