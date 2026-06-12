@@ -67,12 +67,13 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos }) {
 
   // equivalencias por tiempo
   const head = `<tr><th class="l">Grupo</th>${tiempos.map(t => `<th>${esc(t.nombre)}</th>`).join('')}<th>Total</th></tr>`;
-  const rows = usados.map(g => {
+  const rowsArr = usados.map(g => {
     const cells = tiempos.map(t => { const n = num((t.eq || [])[g]); return `<td>${n || '—'}</td>`; }).join('');
     const tot = tiempos.reduce((a, t) => a + num((t.eq || [])[g]), 0);
     return `<tr><td class="l">${GSHORT[g]}</td>${cells}<td class="tt">${tot}</td></tr>`;
-  }).join('');
-  const eqPage = `<div class="page">
+  });
+  const rows = rowsArr.length ? rowsArr.join('') : `<tr><td class="l" colspan="${tiempos.length + 2}" style="text-align:center;color:${SOFT};padding:28px;font-weight:600;">Calcula y guarda el plan (con sus equivalentes) antes de generar el reporte.</td></tr>`;
+  const eqPage = `<div class="page last">
     <div class="ptitle">EQUIVALENCIAS POR TIEMPO</div>
     <table class="eqt">${head}${rows}</table>
     <img class="corner" src="${LOGO}"/>
@@ -83,6 +84,8 @@ ${FONT_CSS}
 @page{size:A4 landscape;margin:0;}
 *{box-sizing:border-box;} body{margin:0;font-family:'Montserrat','Helvetica Neue',Arial,sans-serif;color:${INK};-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 .page{width:297mm;height:210mm;padding:13mm 15mm;background:${CREAM};position:relative;page-break-after:always;overflow:hidden;}
+.page.last{page-break-after:auto;}
+.page:last-child{page-break-after:auto;}
 .corner{position:absolute;right:14mm;bottom:9mm;height:18px;}
 .cover{display:flex;flex-direction:column;align-items:center;justify-content:center;}
 .cdate{position:absolute;top:34mm;font-size:15px;letter-spacing:6px;color:${SOFT};}
