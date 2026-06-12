@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import Plan from './Plan';
+import Menus from './Menus';
 import InBodyModal from './InBodyModal';
 
 /* ===== utilidades ===== */
@@ -130,6 +131,9 @@ export default function Pacientes() {
         : { peso: m ? m.peso : '', talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: m ? m.grasa : '', tmb: (m && m.tmb) || '' };
       return <Plan patient={sel} pdata={pdata} onBack={() => setSub('dash')} />;
     }
+    if (sub === 'menus') {
+      return <Menus patient={sel} onBack={() => setSub('dash')} />;
+    }
     return (
       <div>
         <button style={S.back} onClick={() => { setSelId(null); setErr(''); }}>← Pacientes</button>
@@ -189,6 +193,19 @@ export default function Pacientes() {
           {sel.plan && sel.plan.totales
             ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Plan guardado: <b>{sel.plan.totales.kcal} kcal</b> · {fmtFecha(sel.plan.fecha)}</div>
             : <div className="empty-state">Aún no hay cálculo de plan.</div>}
+        </div>
+
+        <div className="card">
+          <div style={S.titleRow}>
+            <div className="card-title" style={{ margin: 0 }}>Menús por tiempo de comida</div>
+            <button style={S.smallBtn} onClick={() => setSub('menus')} disabled={!(sel.plan && sel.plan.eq)}>Abrir menús</button>
+          </div>
+          <div style={S.note}>Reparte los equivalentes del plan en los tiempos de comida y arma las opciones de menú.</div>
+          {!(sel.plan && sel.plan.eq)
+            ? <div className="empty-state">Primero calcula y guarda el plan.</div>
+            : (sel.plan.menus && sel.plan.menus.tiempos
+              ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>{sel.plan.menus.tiempos.length} tiempos de comida configurados.</div>
+              : <div className="empty-state">Aún no hay menús generados.</div>)}
         </div>
 
         <div className="card">
