@@ -36,6 +36,7 @@ export default function Plan({ patient, pdata, onBack }) {
   const peso = num(pdata.peso), talla = num(pdata.talla), edad = num(pdata.edad);
   const esHombre = pdata.sexo === 'Masculino';
   const grasa = num(pdata.grasa);
+  const tmb = num(pdata.tmb);
 
   const mifflin = peso && talla && edad ? (10 * peso + 6.25 * talla - 5 * edad) + (esHombre ? 5 : -161) : NaN;
   const hb = peso && talla && edad
@@ -107,6 +108,7 @@ export default function Plan({ patient, pdata, onBack }) {
       <div className="card">
         <div className="card-title">Gasto energético estimado</div>
         <div style={S.eGrid}>
+          {tmb > 0 && <EnergyCard label="InBody · TMB" value={tmb} />}
           <EnergyCard label="Mifflin-St Jeor" value={mifflin} />
           <EnergyCard label="Harris-Benedict" value={hb} />
           <EnergyCard label="Cunningham" value={cunningham} />
