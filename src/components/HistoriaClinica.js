@@ -62,6 +62,7 @@ function baseSeed() {
         { parametro: "Vitamina D", resultado: "", referencia: "" },
       ],
       observaciones: "",
+      analisis: [],
     },
     suplementacion: {
       items: [
@@ -212,7 +213,9 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
   });
   const [active, setActive] = useState("datos");
   const [status, setStatus] = useState("guardado");
+  const [anaStatus, setAnaStatus] = useState("");
   const sectionRefs = useRef({});
+  const analisisInput = useRef(null);
 
   /* ---- sección activa según scroll ---- */
   useEffect(() => {
@@ -247,15 +250,42 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
       ...d, [sec]: { ...d[sec], [listKey]: d[sec][listKey].filter((_, i) => i !== idx) },
     }));
 
-  const setDieta = useCallback((idx, value) => {
+  const setDietaCampo = useCallback((idx, key, value) => {
     setData((d) => ({
       ...d,
       dietetica: {
         ...d.dietetica,
-        dieta: d.dietetica.dieta.map((r, i) => (i === idx ? { ...r, alimentos: value } : r)),
+        dieta: d.dietetica.dieta.map((r, i) => (i === idx ? { ...r, [key]: value } : r)),
       },
     }));
   }, []);
+
+  const subirAnalisis = async (file) => {
+    if (!file) return;
+    const nombre = (data.datos.nombre || "").trim();
+    if (!nombre) { setAnaStatus('Escribe el nombre del paciente (apartado 1) antes de subir el análisis.'); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setAnaStatus('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    setAnaStatus('Subiendo análisis a Drive…');
+    try {
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result).split(',')[1]);
+        r.onerror = rej; r.readAsDataURL(file);
+      });
+      const filename = /\.pdf$/i.test(file.name || '') ? file.name : ((file.name || 'analisis') + '.pdf');
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveAnalisis', patient: nombre, filename, pdfBase64: b64 }), redirect: 'follow',
+      });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      if (d.ok && d.link) {
+        const nuevo = { nombre: filename, fecha: new Date().toLocaleDateString('es-MX'), link: d.link };
+        setData((prev) => ({ ...prev, bioquimica: { ...prev.bioquimica, analisis: [...(prev.bioquimica.analisis || []), nuevo] } }));
+        setAnaStatus('Análisis subido a Drive ✓');
+      } else { setAnaStatus('Error: ' + (d.error || 'no se recibió enlace.')); }
+    } catch (e) { setAnaStatus('No se pudo subir: ' + e.message); }
+  };
 
   const guardar = () => {
     if (typeof onSave !== "function") return;
@@ -320,7 +350,16 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
         </div>
 
         <nav style={styles.tabs}>
-          {SECTIONS.map((s) => (
+          {SECTIONS.slice(0, 5).map((s) => (
+            <button key={s.id} onClick={() => scrollTo(s.id)} className="nf-tab"
+              style={{ ...styles.tab, ...(active === s.id ? styles.tabOn : null) }}>
+              <span style={{ ...styles.tabNum, ...(active === s.id ? styles.tabNumOn : null) }}>{s.n}</span>
+              {s.label}
+            </button>
+          ))}
+        </nav>
+        <nav style={{ ...styles.tabs, marginTop: 6 }}>
+          {SECTIONS.slice(5).map((s) => (
             <button key={s.id} onClick={() => scrollTo(s.id)} className="nf-tab"
               style={{ ...styles.tab, ...(active === s.id ? styles.tabOn : null) }}>
               <span style={{ ...styles.tabNum, ...(active === s.id ? styles.tabNumOn : null) }}>{s.n}</span>
@@ -437,10 +476,30 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
               </div>
             ))}
           </div>
-          <button style={styles.addBtn}
-            onClick={() => addRow("bioquimica", "filas", { parametro: "", resultado: "", referencia: "" })}>
-            + Agregar parámetro
-          </button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 4 }}>
+            <button style={styles.addBtn}
+              onClick={() => addRow("bioquimica", "filas", { parametro: "", resultado: "", referencia: "" })}>
+              + Agregar parámetro
+            </button>
+            <button style={styles.uploadBtn} onClick={() => analisisInput.current && analisisInput.current.click()}>
+              Cargar análisis (PDF)
+            </button>
+            <input ref={analisisInput} type="file" accept="application/pdf" style={{ display: "none" }}
+              onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; subirAnalisis(f); }} />
+          </div>
+          {anaStatus && <div style={styles.anaStatus}>{anaStatus}</div>}
+          {(data.bioquimica.analisis || []).length > 0 && (
+            <div style={styles.anaList}>
+              {(data.bioquimica.analisis || []).map((a, i) => (
+                <div key={i} style={styles.anaItem}>
+                  <span style={{ flex: 1, fontSize: 13, color: T.ink }}>{a.nombre} · {a.fecha}</span>
+                  {a.link && <a href={a.link} target="_blank" rel="noreferrer" style={styles.anaLink}>Abrir</a>}
+                  <button style={styles.rowDel} title="Quitar de la lista"
+                    onClick={() => setData((prev) => ({ ...prev, bioquimica: { ...prev.bioquimica, analisis: prev.bioquimica.analisis.filter((_, k) => k !== i) } }))}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
           <Field label="Observaciones / interpretación" full style={{ marginTop: 16 }}>
             <textarea style={styles.textarea} rows={2} value={data.bioquimica.observaciones}
               placeholder="Notas sobre los estudios…"
@@ -571,12 +630,18 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           <div style={styles.tableWrap}>
             {data.dietetica.dieta.map((r, i) => (
               <div key={i} style={styles.dietRow}>
-                <div style={styles.dietMomento}>{r.momento}</div>
+                <input style={styles.dietMomentoInput} value={r.momento} placeholder="Tiempo"
+                  onChange={(e) => setDietaCampo(i, "momento", e.target.value)} />
                 <textarea style={styles.dietCell} rows={1} value={r.alimentos}
-                  placeholder="Alimentos y bebidas…" onChange={(e) => setDieta(i, e.target.value)} />
+                  placeholder="Alimentos y bebidas…" onChange={(e) => setDietaCampo(i, "alimentos", e.target.value)} />
+                <button style={styles.dietDel} title="Quitar tiempo"
+                  onClick={() => removeRow("dietetica", "dieta", i)}>×</button>
               </div>
             ))}
           </div>
+          <button style={styles.addBtn} onClick={() => addRow("dietetica", "dieta", { momento: "", alimentos: "" })}>
+            + Agregar tiempo
+          </button>
 
           <Grid style={{ marginTop: 18 }}>
             <Field label="Hora en que despierta">
@@ -768,8 +833,15 @@ const styles = {
   cellInput: { border: "none", borderRight: `1px solid ${T.lineSoft}`, padding: "10px 12px", fontSize: 13.5, background: "transparent", fontFamily: "inherit", color: T.ink, width: "100%", boxSizing: "border-box" },
   rowDel: { border: "none", background: "transparent", color: T.inkSoft, fontSize: 18, cursor: "pointer", lineHeight: 1 },
   addBtn: { marginTop: 12, background: T.mint, color: T.pine, border: "none", padding: "9px 14px", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" },
-  dietRow: { display: "grid", gridTemplateColumns: "130px 1fr", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "stretch" },
+  uploadBtn: { marginTop: 12, background: T.pine, color: "#fff", border: "none", padding: "9px 14px", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer" },
+  anaStatus: { marginTop: 10, fontSize: 12.5, color: T.inkSoft },
+  anaList: { marginTop: 10, display: "flex", flexDirection: "column", gap: 6 },
+  anaItem: { display: "flex", alignItems: "center", gap: 10, background: "#FBF8F4", border: `1px solid ${T.lineSoft}`, borderRadius: 8, padding: "8px 12px" },
+  anaLink: { background: T.amber, color: "#211C17", textDecoration: "none", padding: "5px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700 },
+  dietRow: { display: "grid", gridTemplateColumns: "150px 1fr 34px", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "stretch" },
   dietMomento: { background: "#F7FAF7", padding: "12px 14px", fontSize: 13, fontWeight: 700, color: T.pine, borderRight: `1px solid ${T.lineSoft}`, display: "flex", alignItems: "center" },
+  dietMomentoInput: { background: "#F7FAF7", padding: "12px 14px", fontSize: 13, fontWeight: 700, color: T.pine, borderRight: `1px solid ${T.lineSoft}`, border: "none", borderRadius: 0, fontFamily: "inherit", boxSizing: "border-box", width: "100%" },
+  dietDel: { border: "none", background: "transparent", color: T.inkSoft, fontSize: 18, cursor: "pointer", lineHeight: 1, alignSelf: "center" },
   dietCell: { border: "none", padding: "11px 13px", fontSize: 13.5, background: "transparent", fontFamily: "inherit", color: T.ink, resize: "vertical", lineHeight: 1.5, minHeight: 42 },
   footer: { position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 980, margin: "0 auto", background: "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)", borderTop: `1px solid ${T.line}`, padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 },
   footerInfo: { fontSize: 12.5, color: T.inkSoft },
