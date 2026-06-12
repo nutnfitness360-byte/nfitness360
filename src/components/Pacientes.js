@@ -45,7 +45,7 @@ export default function Pacientes() {
   const [selId, setSelId] = useState(null);
   const [sub, setSub] = useState('dash');
   const [nuevo, setNuevo] = useState(false);
-  const [form, setForm] = useState({ nombre: '', edad: '', sexo: 'Femenino', estatura: '', objetivo: '', contacto: '' });
+  const [form, setForm] = useState({ nombre: '', edad: '', sexo: 'Femenino', estatura: '', objetivo: '', contacto: '', correo: '' });
   const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' });
   const [plan, setPlan] = useState({ nombre: '', fecha: hoyISO(), link: '' });
   const [openMed, setOpenMed] = useState(false);
@@ -75,10 +75,10 @@ export default function Pacientes() {
         codigo: nextCodigo(),
         nombre: form.nombre.trim(),
         edad: form.edad, sexo: form.sexo, estatura: form.estatura,
-        objetivo: form.objetivo, contacto: form.contacto,
+        objetivo: form.objetivo, contacto: form.contacto, correo: form.correo.trim().toLowerCase(),
         inicio: hoyISO(), mediciones: [], planes: [], creado: Date.now(),
       });
-      setForm({ nombre: '', edad: '', sexo: 'Femenino', estatura: '', objetivo: '', contacto: '' });
+      setForm({ nombre: '', edad: '', sexo: 'Femenino', estatura: '', objetivo: '', contacto: '', correo: '' });
       setNuevo(false); setErr('');
     } catch (e) { setErr('No se pudo crear: ' + e.message); }
   };
@@ -162,6 +162,8 @@ export default function Pacientes() {
             <Info l="Masa muscular" v={m ? m.musculo + ' kg' : '—'} />
           </div>
         </div>
+
+        <CorreoVinculo patient={sel} key={'cv-' + sel.id} />
 
         <div className="card">
           <div style={S.titleRow}>
@@ -274,7 +276,8 @@ export default function Pacientes() {
             </Field>
             <Field l="Estatura (cm)"><input style={S.inp} inputMode="numeric" value={form.estatura} onChange={e => setForm({ ...form, estatura: e.target.value })} /></Field>
             <Field l="Objetivo"><input style={S.inp} value={form.objetivo} onChange={e => setForm({ ...form, objetivo: e.target.value })} placeholder="Aumento de músculo" /></Field>
-            <Field l="Contacto"><input style={S.inp} value={form.contacto} onChange={e => setForm({ ...form, contacto: e.target.value })} placeholder="correo o teléfono" /></Field>
+            <Field l="Contacto"><input style={S.inp} value={form.contacto} onChange={e => setForm({ ...form, contacto: e.target.value })} placeholder="teléfono" /></Field>
+            <Field l="Correo (cuenta del paciente)"><input style={S.inp} value={form.correo} onChange={e => setForm({ ...form, correo: e.target.value })} placeholder="correo con el que inicia sesión" /></Field>
           </div>
           <button style={{ ...S.saveBtn, marginTop: 12 }} onClick={crearPaciente}>Guardar paciente</button>
         </div>
@@ -306,6 +309,29 @@ export default function Pacientes() {
 /* ===== piezas pequeñas ===== */
 function Info({ l, v }) {
   return <div style={styles.infoCell}><div style={styles.infoLbl}>{l}</div><div style={styles.infoVal}>{v}</div></div>;
+}
+
+function CorreoVinculo({ patient }) {
+  const [v, setV] = useState(patient.correo || '');
+  const [st, setSt] = useState('');
+  const save = async () => {
+    setSt('Guardando…');
+    try { await updateDoc(doc(db, 'pacientes', patient.id), { correo: v.trim().toLowerCase() }); setSt('Vínculo guardado ✓'); }
+    catch (e) { setSt('Error: ' + e.message); }
+  };
+  return (
+    <div className="card">
+      <div className="card-title">Vínculo con la cuenta del paciente</div>
+      <div style={{ fontSize: 12, color: 'var(--stone)', marginBottom: 10, lineHeight: 1.5 }}>
+        El paciente verá su plan al iniciar sesión con este correo (debe ser el mismo de su cuenta de Google).
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input style={{ ...styles.inp, flex: 1, minWidth: 200 }} value={v} onChange={e => setV(e.target.value)} placeholder="correo@gmail.com" />
+        <button style={styles.smallBtn} onClick={save}>Guardar correo</button>
+      </div>
+      {st && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{st}</div>}
+    </div>
+  );
 }
 function Field({ l, children }) {
   return <label style={styles.field}><span style={styles.fieldLbl}>{l}</span>{children}</label>;
