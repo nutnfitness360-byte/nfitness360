@@ -147,7 +147,7 @@ export default function Menus({ patient, onBack }) {
       });
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (data.ok && data.link) {
-        const nuevo = { nombre: 'Plan nutricional ' + new Date().toLocaleDateString('es-MX'), fecha: new Date().toISOString().slice(0, 10), link: data.link };
+        const nuevo = { nombre: 'Plan nutricional ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt, fecha: new Date().toISOString().slice(0, 10), link: data.link };
         await updateDoc(doc(db, 'pacientes', patient.id), { planes: [...(patient.planes || []), nuevo] });
         setRep('Reporte subido a Drive y registrado en Planes ✓');
       } else { setRep('Error: ' + (data.error || 'no se recibió enlace.')); }
