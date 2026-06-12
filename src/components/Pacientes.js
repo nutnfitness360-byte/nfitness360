@@ -198,7 +198,7 @@ export default function Pacientes() {
         <div className="card">
           <div style={S.titleRow}>
             <div className="card-title" style={{ margin: 0 }}>Menús por tiempo de comida</div>
-            <button style={S.smallBtn} onClick={() => setSub('menus')} disabled={!(sel.plan && sel.plan.eq)}>Abrir menús</button>
+            <button style={S.smallBtn} onClick={() => setSub('menus')}>Abrir menús</button>
           </div>
           <div style={S.note}>Reparte los equivalentes del plan en los tiempos de comida y arma las opciones de menú.</div>
           {!(sel.plan && sel.plan.eq)
