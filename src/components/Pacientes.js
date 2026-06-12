@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import Plan from './Plan';
+import InBodyModal from './InBodyModal';
 
 /* ===== utilidades ===== */
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -48,6 +49,8 @@ export default function Pacientes() {
   const [plan, setPlan] = useState({ nombre: '', fecha: hoyISO(), link: '' });
   const [openMed, setOpenMed] = useState(false);
   const [openPlan, setOpenPlan] = useState(false);
+  const [inbodyOpen, setInbodyOpen] = useState(false);
+  const [inbody, setInbody] = useState(null);
   const [err, setErr] = useState('');
 
   useEffect(() => {
@@ -103,13 +106,28 @@ export default function Pacientes() {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { planes: arr }); } catch (e) { setErr(e.message); }
   };
 
+  const onInBody = async (data) => {
+    const peso = parseFloat(data.peso);
+    if (isFinite(peso)) {
+      const nm = { fecha: data.fecha || hoyISO(), peso, grasa: parseFloat(data.grasa) || 0, musculo: parseFloat(data.mme) || 0, grasaKg: parseFloat(data.grasaKg) || 0, tmb: parseFloat(data.tmb) || 0 };
+      const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
+      try { await updateDoc(doc(db, 'pacientes', sel.id), { mediciones: arr }); }
+      catch (e) { setErr('No se pudo guardar la medición: ' + e.message); }
+    }
+    setInbody({ peso: data.peso, grasa: data.grasa, mme: data.mme, tmb: data.tmb, fecha: data.fecha });
+    setInbodyOpen(false);
+    setSub('plan');
+  };
+
   const S = styles;
 
   /* ----- VISTA: dashboard de un paciente ----- */
   if (sel) {
     const m = last(sel.mediciones);
     if (sub === 'plan') {
-      const pdata = { peso: m ? m.peso : '', talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: m ? m.grasa : '' };
+      const pdata = inbody
+        ? { peso: inbody.peso || (m ? m.peso : ''), talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: inbody.grasa || (m ? m.grasa : ''), tmb: inbody.tmb || '' }
+        : { peso: m ? m.peso : '', talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: m ? m.grasa : '', tmb: (m && m.tmb) || '' };
       return <Plan patient={sel} pdata={pdata} onBack={() => setSub('dash')} />;
     }
     return (
@@ -165,7 +183,7 @@ export default function Pacientes() {
         <div className="card">
           <div style={S.titleRow}>
             <div className="card-title" style={{ margin: 0 }}>Plan nutricional</div>
-            <button style={S.smallBtn} onClick={() => setSub('plan')}>Abrir cálculo</button>
+            <button style={S.smallBtn} onClick={() => setInbodyOpen(true)}>Abrir cálculo</button>
           </div>
           <div style={S.note}>Calcula los equivalentes (SMAE) y los macros del plan a partir de los datos del paciente.</div>
           {sel.plan && sel.plan.totales
@@ -204,6 +222,15 @@ export default function Pacientes() {
             ))
           }
         </div>
+
+        {inbodyOpen && (
+          <InBodyModal
+            patient={sel}
+            onClose={() => setInbodyOpen(false)}
+            onDesdeCero={() => { setInbody(null); setInbodyOpen(false); setSub('plan'); }}
+            onInBody={onInBody}
+          />
+        )}
       </div>
     );
   }
@@ -243,7 +270,7 @@ export default function Pacientes() {
           : pacientes.map(p => {
             const m = last(p.mediciones);
             return (
-              <div className="pac-item" key={p.id} onClick={() => { setSelId(p.id); setSub('dash'); }}>
+              <div className="pac-item" key={p.id} onClick={() => { setSelId(p.id); setSub('dash'); setInbody(null); }}>
                 <div className="pac-avatar">{initials(p.nombre)}</div>
                 <div style={{ flex: 1 }}>
                   <div className="pac-nombre">{p.nombre}</div>
