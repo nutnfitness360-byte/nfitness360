@@ -160,7 +160,7 @@ export default function Menus({ patient, onBack }) {
 
       <div style={S.toolbar}>
         <button style={S.toolBtn} onClick={redistribuir}>Redistribuir equivalentes</button>
-        <button style={{ ...S.toolBtn, ...S.iaBtn }} disabled title="Disponible al conectar la IA (Capa 2)">Generar menús con IA ✦</button>
+        <button style={{ ...S.toolBtn, ...S.iaBtn }} onClick={generarIA} disabled title="Disponible al conectar la IA (Capa 2)">Generar menús con IA ✦</button>
       </div>
       <div style={S.iaNote}>La generación automática de los platillos con IA se activa al conectar la API (Sonnet 4.6). Por ahora puedes escribir las opciones a mano; el reparto de equivalentes ya es automático.</div>
 
