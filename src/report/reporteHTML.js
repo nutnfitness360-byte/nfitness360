@@ -11,6 +11,25 @@ const TAUPE = '#8E837B', TAUPE2 = '#978C87', TAN = '#CDA788', CREAM = '#EEE4DA',
 
 const GSHORT = ['Cereales', 'Cereales c/grasa', 'Leguminosas', 'Verdura', 'Fruta', 'P. animal MB', 'P. animal B', 'P. animal M', 'P. animal A', 'Leche desc.', 'Leche semi', 'Leche entera', 'Leche c/az.', 'Grasas', 'Grasas c/prot', 'Azúcares', 'Az. c/grasa', 'Libres'];
 
+const EQUIV_DB = {
+  Cereales: ["Alegría (20g)", "Amaranto (21g)", "Arroz cocido (45g)", "Avena cocida (165g)", "Avena en hojuela (20g)", "Camote cocido (70g)", "Cereal sin azúcar (15g)", "Elote desgranado (80g)", "Hot cake/waffle (40g)", "Pan árabe (25g)", "Pan de caja (27g)", "Papa cocida (68g)", "Pasta (50g)", "Quinoa (20g)", "Tortilla de maíz (30g)", "Tortilla de harina (20g)", "Tostada de maíz (20g)", "Palomitas naturales (20g)"],
+  Frutas: ["Blueberries (100g)", "Durazno (130g)", "Fresa entera (200g)", "Guayaba (125g)", "Kiwi (110g)", "Mandarina (128g)", "Mango (110g)", "Manzana (100g)", "Melón picado (160g)", "Naranja (152g)", "Papaya picada (140g)", "Pera (80g)", "Piña picada (124g)", "Plátano (54g)", "Sandía picada (160g)", "Uva (90g)"],
+  Grasas: ["Aceite (5g)", "Aceitunas (25g)", "Aguacate (55g)", "Mantequilla/Ghee (6g)", "Almendra (12g)", "Cacahuates (20g)", "Nuez (10g)", "Pistache (13g)", "Leche almendra/coco (300ml)"],
+  Lácteos: ["Jocoque (75g)", "Leche light (240ml)", "Yogurt griego (200g)"],
+  Proteínas: ["Huevo (50g)", "Clara de huevo (2 pzas)", "Pechuga de pavo (40g)", "Atún en agua (35g)", "Bistec de res (30g)", "Cecina (30g)", "Camarón cocido (35g)", "Filete de pescado (40g)", "Arrachera (30g)", "Queso panela (30g)", "Queso Oaxaca (30g)", "Queso de cabra (30g)", "Salmón (30g)", "Milanesa de pollo (30g)", "Requesón (36g)", "Queso cottage (50g)"],
+  Verduras: ["Espinaca", "Calabaza", "Brócoli", "Jitomate", "Pepino", "Lechuga", "Nopal", "Zanahoria", "Pimiento", "Chayote", "Betabel", "Espárragos"],
+  Legumbres: ["Frijoles (85g)", "Lentejas (90g)", "Garbanzo (80g)", "Haba (85g)", "Alubia (90g)", "Humus (75g)", "Soya texturizada (30g)"],
+};
+const ICONS = {
+  Cereales: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="M12 9c0-2.2 1.6-3.8 3.8-3.8C15.8 7.4 14.2 9 12 9Z"/><path d="M12 9c0-2.2-1.6-3.8-3.8-3.8C8.2 7.4 9.8 9 12 9Z"/><path d="M12 14c0-1.8 1.4-3.1 3.2-3.1C15.2 12.7 13.8 14 12 14Z"/><path d="M12 14c0-1.8-1.4-3.1-3.2-3.1C8.8 12.7 10.2 14 12 14Z"/></svg>',
+  Frutas: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8c-3-2-7 0-7 5s4 8 7 6c3 2 7-1 7-6s-4-7-7-5Z"/><path d="M12 8V4.5"/><path d="M12 5c1.2-1.4 3-1.4 4-1-.3 1.7-2 2.4-4 2"/></svg>',
+  Grasas: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.2c3 0 6 3 6 8s-2.7 9.6-6 9.6-6-4.6-6-9.6 3-8 6-8Z"/><circle cx="12" cy="13.5" r="2.4"/></svg>',
+  "Lácteos": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3.5h6v1.8l1.4 3V19a1 1 0 0 1-1 1H8.6a1 1 0 0 1-1-1V8.3L9 5.3Z"/><path d="M7.6 11h8.8"/></svg>',
+  "Proteínas": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5c2.5-3.5 8-4.5 12-1.8 1.4 1 2.4 1.8 4 1.8-1.6 0-2.6.8-4 1.8-4 2.7-9.5 1.7-12-1.8Z"/><path d="M18 10.6l2.2-1.6M18 14.4l2.2 1.6"/><circle cx="8" cy="11.4" r="0.7" fill="currentColor" stroke="none"/></svg>',
+  Verduras: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-7"/><path d="M12 14c-4 0-7-2.2-7-6.2 3-1 6.2 0 7 3.2 0.8-3.2 4-4.2 7-3.2 0 4-3 6.2-7 6.2Z"/></svg>',
+  Legumbres: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 7.5c2.4 0 4.2 1.6 4.2 3.8S16.4 15.3 14 15.3c-2.6 0-4.4-1.7-4.4-3.9S11.4 7.5 14 7.5Z"/><path d="M8.5 9.5C6.7 9.5 5.3 10.7 5.3 12.3S6.7 15 8.5 15c.9 0 1.6-.4 2.2-1"/></svg>',
+};
+
 const PLATE = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4.4"/></svg>';
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -73,9 +92,19 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos }) {
     return `<tr><td class="l">${GSHORT[g]}</td>${cells}<td class="tt">${tot}</td></tr>`;
   });
   const rows = rowsArr.length ? rowsArr.join('') : `<tr><td class="l" colspan="${tiempos.length + 2}" style="text-align:center;color:${SOFT};padding:28px;font-weight:600;">Calcula y guarda el plan (con sus equivalentes) antes de generar el reporte.</td></tr>`;
-  const eqPage = `<div class="page last">
+  const eqPage = `<div class="page">
     <div class="ptitle">EQUIVALENCIAS POR TIEMPO</div>
     <table class="eqt">${head}${rows}</table>
+    <img class="corner" src="${LOGO}"/>
+  </div>`;
+
+  // Página de referencia: base de equivalencias de alimentos (1 ración = 1 equivalente)
+  const refCols = Object.entries(EQUIV_DB).map(([grp, items]) =>
+    `<div class="gcol"><div class="gcirc">${ICONS[grp] || ''}</div><div class="glabel">${esc(grp)}</div><ul>${items.map(it => `<li>${esc(it)}</li>`).join('')}</ul></div>`
+  ).join('');
+  const refPage = `<div class="page last">
+    <div class="ptitle">EQUIVALENCIAS · 1 RACIÓN EQUIVALE A:</div>
+    <div class="gwrap" style="grid-template-columns:repeat(${Object.keys(EQUIV_DB).length},1fr);">${refCols}</div>
     <img class="corner" src="${LOGO}"/>
   </div>`;
 
@@ -111,9 +140,14 @@ ${FONT_CSS}
 .ptitle{font-size:28px;font-weight:800;letter-spacing:5px;color:${TAUPE};margin-bottom:8mm;}
 .eqt{width:100%;border-collapse:collapse;font-size:13px;} .eqt th{background:${TAUPE2};color:#fff;padding:11px 8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:center;} .eqt th.l{text-align:left;padding-left:16px;}
 .eqt td{padding:9px 8px;text-align:center;border-bottom:1px solid ${LINE};background:#fff;font-size:13px;} .eqt td.l{text-align:left;font-weight:700;padding-left:16px;} .eqt td.tt{font-weight:800;color:${TAUPE};background:#FBF7F2;}
+.gwrap{display:grid;gap:10px;} .gcol{display:flex;flex-direction:column;align-items:center;}
+.gcirc{width:58px;height:58px;border-radius:50%;background:#fff;border:2px solid ${TAN};display:flex;align-items:center;justify-content:center;color:${TAUPE};margin-bottom:7px;}
+.glabel{background:${TAUPE2};color:#fff;font-size:10.5px;letter-spacing:1px;font-weight:700;text-transform:uppercase;padding:5px;text-align:center;width:100%;margin-bottom:7px;}
+.gcol ul{margin:0;padding-left:15px;align-self:flex-start;} .gcol li{font-size:9.5px;color:${SOFT};line-height:1.65;}
 </style></head><body>
 <div class="page cover"><div class="cdate">${esc(fechaLarga())}</div><img class="clogo" src="${LOGO}"/><div class="cname">${esc(nom)}</div></div>
 ${menuPages.join('')}
 ${eqPage}
+${refPage}
 </body></html>`;
 }
