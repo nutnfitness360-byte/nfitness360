@@ -42,6 +42,8 @@ const SECTIONS = [
 
 const TIEMPOS = ["Desayuno", "Colación", "Comida", "Colación", "Cena"];
 
+const OBJETIVOS = ["Aumento de masa muscular", "Baja de grasa", "Recomposición corporal", "Salud", "Rendimiento deportivo", "Otro"];
+
 
 function baseSeed() {
   return {
@@ -376,9 +378,30 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
                 onChange={(e) => setField("datos", "ocupacion", e.target.value)} />
             </Field>
             <Field label="Objetivo" full>
-              <textarea style={styles.textarea} rows={2} value={data.datos.objetivo}
-                placeholder="Objetivo de la paciente con el plan…"
-                onChange={(e) => setField("datos", "objetivo", e.target.value)} />
+              <select style={styles.input}
+                value={OBJETIVOS.includes(data.datos.objetivoTipo) ? data.datos.objetivoTipo : (OBJETIVOS.slice(0, -1).includes(data.datos.objetivo) ? data.datos.objetivo : (data.datos.objetivo ? "Otro" : ""))}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setData((d) => ({
+                    ...d,
+                    datos: {
+                      ...d.datos,
+                      objetivoTipo: v,
+                      objetivo: v === "Otro"
+                        ? (OBJETIVOS.slice(0, -1).includes(d.datos.objetivo) ? "" : d.datos.objetivo)
+                        : v,
+                    },
+                  }));
+                }}>
+                <option value="">Selecciona un objetivo…</option>
+                {OBJETIVOS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+              {(data.datos.objetivoTipo === "Otro" ||
+                (!data.datos.objetivoTipo && data.datos.objetivo && !OBJETIVOS.slice(0, -1).includes(data.datos.objetivo))) && (
+                <input style={{ ...styles.input, marginTop: 8 }} value={data.datos.objetivo}
+                  placeholder="Especifica el objetivo de la consulta"
+                  onChange={(e) => setField("datos", "objetivo", e.target.value)} />
+              )}
             </Field>
           </Grid>
           <p style={styles.note}>
