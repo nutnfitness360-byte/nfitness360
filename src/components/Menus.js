@@ -138,7 +138,8 @@ export default function Menus({ patient, onBack }) {
       await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos } });
       setStatus('guardado');
       const html = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos });
-      const filename = 'Reporte_' + String(patient.nombre || 'paciente').replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
+      const fechaTxt = new Date().toLocaleDateString('es-MX').replace(/\//g, '-');
+      const filename = 'Plan nutricional ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt + '.pdf';
       setRep('Subiendo a Drive…');
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -146,7 +147,7 @@ export default function Menus({ patient, onBack }) {
       });
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (data.ok && data.link) {
-        const nuevo = { nombre: 'Reporte ' + new Date().toLocaleDateString('es-MX'), fecha: new Date().toISOString().slice(0, 10), link: data.link };
+        const nuevo = { nombre: 'Plan nutricional ' + new Date().toLocaleDateString('es-MX'), fecha: new Date().toISOString().slice(0, 10), link: data.link };
         await updateDoc(doc(db, 'pacientes', patient.id), { planes: [...(patient.planes || []), nuevo] });
         setRep('Reporte subido a Drive y registrado en Planes ✓');
       } else { setRep('Error: ' + (data.error || 'no se recibió enlace.')); }
