@@ -3,6 +3,7 @@ import { db } from '../firebase/config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import Plan from './Plan';
 import Menus from './Menus';
+import HistoriaClinica from './HistoriaClinica';
 import InBodyModal from './InBodyModal';
 
 /* ===== utilidades ===== */
@@ -45,7 +46,6 @@ export default function Pacientes() {
   const [selId, setSelId] = useState(null);
   const [sub, setSub] = useState('dash');
   const [nuevo, setNuevo] = useState(false);
-  const [form, setForm] = useState({ nombre: '', edad: '', sexo: 'Femenino', estatura: '', objetivo: '', contacto: '', correo: '' });
   const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' });
   const [plan, setPlan] = useState({ nombre: '', fecha: hoyISO(), link: '' });
   const [openMed, setOpenMed] = useState(false);
@@ -68,19 +68,28 @@ export default function Pacientes() {
     return 'NF-' + String(mx + 1).padStart(4, '0');
   };
 
-  const crearPaciente = async () => {
-    if (!form.nombre.trim()) { setErr('Escribe el nombre del paciente.'); return; }
-    try {
-      await addDoc(collection(db, 'pacientes'), {
-        codigo: nextCodigo(),
-        nombre: form.nombre.trim(),
-        edad: form.edad, sexo: form.sexo, estatura: form.estatura,
-        objetivo: form.objetivo, contacto: form.contacto, correo: form.correo.trim().toLowerCase(),
-        inicio: hoyISO(), mediciones: [], planes: [], creado: Date.now(),
-      });
-      setForm({ nombre: '', edad: '', sexo: 'Femenino', estatura: '', objetivo: '', contacto: '', correo: '' });
-      setNuevo(false); setErr('');
-    } catch (e) { setErr('No se pudo crear: ' + e.message); }
+  const derivar = (h) => {
+    const d = (h && h.datos) || {};
+    return {
+      nombre: (d.nombre || '').trim(), edad: d.edad || '', sexo: d.sexo || 'Femenino',
+      estatura: d.talla || '', objetivo: d.objetivo || '', correo: (d.correo || '').trim().toLowerCase(),
+    };
+  };
+
+  const guardarHistoriaNueva = async (h) => {
+    const der = derivar(h);
+    if (!der.nombre) { setErr('Escribe el nombre en "Datos generales".'); throw new Error('sin nombre'); }
+    const ref = await addDoc(collection(db, 'pacientes'), {
+      codigo: (h.datos && h.datos.pacienteNo) || nextCodigo(), ...der, contacto: '',
+      historia: h, inicio: hoyISO(), mediciones: [], planes: [], creado: Date.now(),
+    });
+    setNuevo(false); setErr(''); setSelId(ref.id); setSub('dash');
+  };
+
+  const guardarHistoriaExistente = async (h) => {
+    const der = derivar(h);
+    await updateDoc(doc(db, 'pacientes', sel.id), { ...der, historia: h });
+    setErr('');
   };
 
   const addMedicion = async () => {
@@ -121,6 +130,15 @@ export default function Pacientes() {
   };
 
   const S = styles;
+
+  /* ----- VISTA: historia clínica (alta de paciente nuevo) ----- */
+  if (nuevo) {
+    return <HistoriaClinica codigo={nextCodigo()} onSave={guardarHistoriaNueva} onBack={() => { setNuevo(false); setErr(''); }} />;
+  }
+  /* ----- VISTA: historia clínica de un paciente existente ----- */
+  if (sel && sub === 'historia') {
+    return <HistoriaClinica initial={sel.historia} codigo={sel.codigo} onSave={guardarHistoriaExistente} onBack={() => setSub('dash')} />;
+  }
 
   /* ----- VISTA: dashboard de un paciente ----- */
   if (sel) {
@@ -164,6 +182,17 @@ export default function Pacientes() {
         </div>
 
         <CorreoVinculo patient={sel} key={'cv-' + sel.id} />
+
+        <div className="card">
+          <div style={S.titleRow}>
+            <div className="card-title" style={{ margin: 0 }}>Historial clínico</div>
+            <button style={S.smallBtn} onClick={() => setSub('historia')}>Ver / editar</button>
+          </div>
+          <div style={S.note}>Datos generales, bioquímica, suplementación, síntomas, antecedentes, historia dietética y ejercicio.</div>
+          {sel.historia
+            ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Historia clínica registrada.</div>
+            : <div className="empty-state">Aún no hay historia clínica.</div>}
+        </div>
 
         <div className="card">
           <div style={S.titleRow}>
@@ -259,29 +288,9 @@ export default function Pacientes() {
     <div>
       <div style={S.titleRow}>
         <div className="card-title" style={{ margin: 0, fontSize: 16 }}>Pacientes</div>
-        <button style={S.smallBtn} onClick={() => setNuevo(v => !v)}>{nuevo ? 'Cancelar' : '+ Nuevo paciente'}</button>
+        <button style={S.smallBtn} onClick={() => { setNuevo(true); setErr(''); }}>+ Nuevo paciente</button>
       </div>
       {err && <div style={S.err}>{err}</div>}
-
-      {nuevo && (
-        <div className="card">
-          <div className="card-title">Nuevo paciente</div>
-          <div style={S.formGrid}>
-            <Field l="Nombre"><input style={S.inp} value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} /></Field>
-            <Field l="Edad"><input style={S.inp} inputMode="numeric" value={form.edad} onChange={e => setForm({ ...form, edad: e.target.value })} /></Field>
-            <Field l="Sexo">
-              <select style={S.inp} value={form.sexo} onChange={e => setForm({ ...form, sexo: e.target.value })}>
-                <option>Femenino</option><option>Masculino</option>
-              </select>
-            </Field>
-            <Field l="Estatura (cm)"><input style={S.inp} inputMode="numeric" value={form.estatura} onChange={e => setForm({ ...form, estatura: e.target.value })} /></Field>
-            <Field l="Objetivo"><input style={S.inp} value={form.objetivo} onChange={e => setForm({ ...form, objetivo: e.target.value })} placeholder="Aumento de músculo" /></Field>
-            <Field l="Contacto"><input style={S.inp} value={form.contacto} onChange={e => setForm({ ...form, contacto: e.target.value })} placeholder="teléfono" /></Field>
-            <Field l="Correo (cuenta del paciente)"><input style={S.inp} value={form.correo} onChange={e => setForm({ ...form, correo: e.target.value })} placeholder="correo con el que inicia sesión" /></Field>
-          </div>
-          <button style={{ ...S.saveBtn, marginTop: 12 }} onClick={crearPaciente}>Guardar paciente</button>
-        </div>
-      )}
 
       <div className="card">
         <div className="card-title">Mis pacientes ({pacientes.length})</div>
