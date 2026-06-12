@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import Plan from './Plan';
+import PlanNutricional from './PlanNutricional';
 
 /* ===== utilidades ===== */
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -40,6 +42,7 @@ function Linea({ data, field, color, unit }) {
 export default function Pacientes() {
   const [pacientes, setPacientes] = useState([]);
   const [selId, setSelId] = useState(null);
+  const [sub, setSub] = useState('dash');
   const [nuevo, setNuevo] = useState(false);
   const [form, setForm] = useState({ nombre: '', edad: '', sexo: 'Femenino', estatura: '', objetivo: '', contacto: '' });
   const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' });
@@ -106,6 +109,10 @@ export default function Pacientes() {
   /* ----- VISTA: dashboard de un paciente ----- */
   if (sel) {
     const m = last(sel.mediciones);
+    if (sub === 'plan') {
+      const pdata = { peso: m ? m.peso : '', talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: m ? m.grasa : '' };
+      return <Plan patient={sel} pdata={pdata} onBack={() => setSub('dash')} />;
+    }
     return (
       <div>
         <button style={S.back} onClick={() => { setSelId(null); setErr(''); }}>← Pacientes</button>
@@ -154,6 +161,19 @@ export default function Pacientes() {
             <ChartCard title="% de grasa" unit="%" valor={m ? m.grasa : null}><Linea data={sel.mediciones} field="grasa" color="var(--stone)" unit="" /></ChartCard>
             <ChartCard title="Masa muscular" unit=" kg" valor={m ? m.musculo : null}><Linea data={sel.mediciones} field="musculo" color="var(--sage)" unit="" /></ChartCard>
           </div>
+        </div>
+
+        <PlanNutricional patient={sel} />
+
+        <div className="card">
+          <div style={S.titleRow}>
+            <div className="card-title" style={{ margin: 0 }}>Plan nutricional</div>
+            <button style={S.smallBtn} onClick={() => setSub('plan')}>Abrir cálculo</button>
+          </div>
+          <div style={S.note}>Calcula los equivalentes (SMAE) y los macros del plan a partir de los datos del paciente.</div>
+          {sel.plan && sel.plan.totales
+            ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Plan guardado: <b>{sel.plan.totales.kcal} kcal</b> · {fmtFecha(sel.plan.fecha)}</div>
+            : <div className="empty-state">Aún no hay cálculo de plan.</div>}
         </div>
 
         <div className="card">
@@ -226,7 +246,7 @@ export default function Pacientes() {
           : pacientes.map(p => {
             const m = last(p.mediciones);
             return (
-              <div className="pac-item" key={p.id} onClick={() => setSelId(p.id)}>
+              <div className="pac-item" key={p.id} onClick={() => { setSelId(p.id); setSub('dash'); }}>
                 <div className="pac-avatar">{initials(p.nombre)}</div>
                 <div style={{ flex: 1 }}>
                   <div className="pac-nombre">{p.nombre}</div>
