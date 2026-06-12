@@ -40,6 +40,18 @@ const isFin = (v) => typeof v === 'number' && isFinite(v);
 const r0 = (n) => Math.round(n);
 const r1 = (n) => Math.round(n * 10) / 10;
 
+/* Plantilla base: % de la energía total que aporta cada grupo (índice de GRUPOS).
+   Editable después en vivo. Suma = 100%. */
+const PLANTILLA_PCT = { 0: 28, 2: 10, 3: 5, 4: 12, 5: 20, 9: 10, 13: 12, 15: 3 };
+function plantillaEq(energia) {
+  const e = num(energia);
+  return GRUPOS.map((g, i) => {
+    const pct = PLANTILLA_PCT[i];
+    if (!pct || !e || !g[1]) return 0;
+    return Math.round((pct / 100 * e) / g[1]);
+  });
+}
+
 const FACTORES = [
   ['1.2', 'Sedentario'],
   ['1.375', 'Actividad ligera'],
@@ -77,9 +89,21 @@ export default function Plan({ patient, pdata, onBack }) {
   const sugerido = isFin(mifflin) ? mifflin * factor : NaN;
 
   useEffect(() => {
+    const e0 = num(meta.energia) || (isFin(sugerido) ? r0(sugerido) : 0);
     if (!num(meta.energia) && isFin(sugerido)) setMeta(m => ({ ...m, energia: r0(sugerido) }));
+    // Plan nuevo (sin equivalentes guardados): aplicar la plantilla base.
+    const teniaEq = Array.isArray(saved.eq) && saved.eq.some(v => num(v) > 0);
+    const eqVacios = eq.every(v => num(v) === 0);
+    if (!teniaEq && eqVacios && e0) setEq(plantillaEq(e0).map(String));
     // eslint-disable-next-line
   }, []);
+
+  const aplicarPlantilla = () => {
+    const e = num(meta.energia) || (isFin(sugerido) ? r0(sugerido) : 0);
+    if (!e) { setStatus('error'); return; }
+    setEq(plantillaEq(e).map(String));
+    setStatus('nuevo');
+  };
 
   const energia = num(meta.energia);
   const pP = num(meta.pP), pL = num(meta.pL), pC = num(meta.pC);
@@ -184,7 +208,7 @@ export default function Plan({ patient, pdata, onBack }) {
         </Section>
 
         {/* SECCIÓN C */}
-        <Section n="C" title="Tabla de equivalentes" hint="Edita el número de equivalentes por grupo; el recálculo es en vivo.">
+        <Section n="C" title="Tabla de equivalentes" hint="Plantilla base aplicada; edita el # Eq de cada grupo (recálculo en vivo)." action={<button style={styles.templateBtn} className="nf-tpl" onClick={aplicarPlantilla}>Aplicar plantilla base</button>}>
           <div style={styles.tableScroll}>
             <table style={styles.table}>
               <thead>
@@ -272,12 +296,13 @@ export default function Plan({ patient, pdata, onBack }) {
 }
 
 /* ===================== subcomponentes ===================== */
-function Section({ n, title, hint, children }) {
+function Section({ n, title, hint, action, children }) {
   return (
     <section style={styles.card}>
       <div style={styles.cardHead}>
         <span style={styles.cardNum}>{n}</span>
-        <div><h2 style={styles.h2}>{title}</h2>{hint && <p style={styles.hint}>{hint}</p>}</div>
+        <div style={{ flex: 1 }}><h2 style={styles.h2}>{title}</h2>{hint && <p style={styles.hint}>{hint}</p>}</div>
+        {action}
       </div>
       {children}
     </section>
@@ -396,10 +421,12 @@ const styles = {
   actions: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '4px 2px 8px' },
   footerInfo: { fontSize: 12.5, color: T.inkSoft },
   primaryBtn: { background: T.amber, color: '#211C17', border: 'none', padding: '12px 24px', borderRadius: 11, fontSize: 14.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
+  templateBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono, alignSelf: 'flex-start' },
 };
 
 const css = `
 .nf-primary:hover { background: #C0986F; }
+.nf-tpl:hover { background: ${T.mint}; }
 input:focus, select:focus { outline: none; border-color: ${T.amber} !important; box-shadow: 0 0 0 3px rgba(205,167,136,0.30); }
 input::placeholder { color: #B7AC9F; }
 .nf-pulse { animation: nfpulse 1s ease-in-out infinite; }
