@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import Plan from './Plan';
-import PlanNutricional from './PlanNutricional';
 
 /* ===== utilidades ===== */
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -162,8 +161,6 @@ export default function Pacientes() {
             <ChartCard title="Masa muscular" unit=" kg" valor={m ? m.musculo : null}><Linea data={sel.mediciones} field="musculo" color="var(--sage)" unit="" /></ChartCard>
           </div>
         </div>
-
-        <PlanNutricional patient={sel} />
 
         <div className="card">
           <div style={S.titleRow}>
