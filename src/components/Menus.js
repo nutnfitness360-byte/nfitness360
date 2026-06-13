@@ -247,6 +247,7 @@ export default function Menus({ patient, onBack }) {
           {rep || (status === 'guardado' && 'Menús guardados.') || (status === 'guardando' && 'Guardando…') || (status === 'error' && 'No se pudo guardar.') || (status === 'nuevo' && 'Cambios sin guardar.')}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
+          <button style={S.volverBtn} onClick={onBack}>← Atrás</button>
           <button style={S.reportBtn} className="nf-tpl2" onClick={generarReporte}>Generar reporte PDF</button>
           <button style={S.primaryBtn} className="nf-primary" onClick={guardar}>Guardar menús</button>
         </div>
@@ -294,6 +295,7 @@ const styles = {
   footerInfo: { fontSize: 12.5, color: T.inkSoft },
   primaryBtn: { background: T.amber, color: '#211C17', border: 'none', padding: '12px 24px', borderRadius: 11, fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: mono },
   reportBtn: { background: T.pine, color: '#fff', border: 'none', padding: '12px 20px', borderRadius: 11, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: mono },
+  volverBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.pine}`, padding: '12px 18px', borderRadius: 11, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: mono },
   empty: { background: T.mint, border: `1px solid ${T.line}`, borderRadius: 12, padding: '18px', fontSize: 13.5, color: T.ink, lineHeight: 1.6 },
 };
 
