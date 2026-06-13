@@ -288,7 +288,10 @@ export default function Plan({ patient, pdata, onBack }) {
             {status === 'error' && (sumaPct !== 100 ? 'Los macros deben sumar 100%.' : 'No se pudo guardar.')}
             {status === 'nuevo' && 'Cambios sin guardar.'}
           </div>
-          <button style={styles.primaryBtn} className="nf-primary" onClick={guardar}>Guardar plan</button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button style={styles.volverBtn} onClick={onBack}>← Atrás</button>
+            <button style={styles.primaryBtn} className="nf-primary" onClick={guardar}>Guardar plan</button>
+          </div>
         </div>
       </main>
     </div>
@@ -421,6 +424,7 @@ const styles = {
   actions: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '4px 2px 8px' },
   footerInfo: { fontSize: 12.5, color: T.inkSoft },
   primaryBtn: { background: T.amber, color: '#211C17', border: 'none', padding: '12px 24px', borderRadius: 11, fontSize: 14.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
+  volverBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.pine}`, padding: '12px 20px', borderRadius: 11, fontSize: 14.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
   templateBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono, alignSelf: 'flex-start' },
 };
 
