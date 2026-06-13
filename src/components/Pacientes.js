@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import Plan from './Plan';
@@ -64,6 +64,30 @@ export default function Pacientes() {
 
   const sel = pacientes.find(p => p.id === selId);
 
+  /* ----- Navegación con historial del navegador (botón Atrás / mouse / gesto) ----- */
+  const navRef = useRef({});
+  navRef.current = { nuevo, selId, sub };
+
+  // Empuja una entrada al historial al entrar a una vista más profunda
+  const pushNav = () => { try { window.history.pushState({ nf: true }, ''); } catch (e) {} };
+  // "Atrás": deja que el navegador haga el popstate (sincroniza mouse/gesto/botón)
+  const volver = () => { try { window.history.back(); } catch (e) {} };
+
+  useEffect(() => {
+    const onPop = () => {
+      const s = navRef.current;
+      if (s.nuevo) { setNuevo(false); }
+      else if (s.selId && s.sub && s.sub !== 'dash') { setSub('dash'); }
+      else if (s.selId) { setSelId(null); }
+      setMenuId(null); setErr('');
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const irNuevo = () => { setErr(''); pushNav(); setNuevo(true); };
+  const irSub = (s) => { pushNav(); setSub(s); };
+
   const nextCodigo = () => {
     let mx = 0;
     pacientes.forEach(p => { const m = /NF-(\d+)/.exec(p.codigo || ''); if (m) mx = Math.max(mx, +m[1]); });
@@ -94,7 +118,7 @@ export default function Pacientes() {
     setErr('');
   };
 
-  const abrir = (id) => { setSelId(id); setSub('dash'); setInbody(null); setMenuId(null); };
+  const abrir = (id) => { pushNav(); setSelId(id); setSub('dash'); setInbody(null); setMenuId(null); };
 
   const eliminar = async (p) => {
     setMenuId(null);
@@ -145,18 +169,18 @@ export default function Pacientes() {
     }
     setInbody({ peso: data.peso, grasa: data.grasa, mme: data.mme, tmb: data.tmb, fecha: data.fecha });
     setInbodyOpen(false);
-    setSub('plan');
+    irSub('plan');
   };
 
   const S = styles;
 
   /* ----- VISTA: historia clínica (alta de paciente nuevo) ----- */
   if (nuevo) {
-    return <HistoriaClinica codigo={nextCodigo()} onSave={guardarHistoriaNueva} onBack={() => { setNuevo(false); setErr(''); }} />;
+    return <HistoriaClinica codigo={nextCodigo()} onSave={guardarHistoriaNueva} onBack={volver} />;
   }
   /* ----- VISTA: historia clínica de un paciente existente ----- */
   if (sel && sub === 'historia') {
-    return <HistoriaClinica initial={sel.historia} codigo={sel.codigo} onSave={guardarHistoriaExistente} onBack={() => setSub('dash')} />;
+    return <HistoriaClinica initial={sel.historia} codigo={sel.codigo} onSave={guardarHistoriaExistente} onBack={volver} />;
   }
 
   /* ----- VISTA: dashboard de un paciente ----- */
@@ -166,14 +190,14 @@ export default function Pacientes() {
       const pdata = inbody
         ? { peso: inbody.peso || (m ? m.peso : ''), talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: inbody.grasa || (m ? m.grasa : ''), tmb: inbody.tmb || '' }
         : { peso: m ? m.peso : '', talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: m ? m.grasa : '', tmb: (m && m.tmb) || '' };
-      return <Plan patient={sel} pdata={pdata} onBack={() => setSub('dash')} />;
+      return <Plan patient={sel} pdata={pdata} onBack={volver} />;
     }
     if (sub === 'menus') {
-      return <Menus patient={sel} onBack={() => setSub('dash')} />;
+      return <Menus patient={sel} onBack={volver} />;
     }
     return (
       <div>
-        <button style={S.back} onClick={() => { setSelId(null); setErr(''); }}>← Pacientes</button>
+        <button style={S.back} onClick={volver}>← Pacientes</button>
         {err && <div style={S.err}>{err}</div>}
 
         <div className="card">
@@ -205,7 +229,7 @@ export default function Pacientes() {
         <div className="card">
           <div style={S.titleRow}>
             <div className="card-title" style={{ margin: 0 }}>Historial clínico</div>
-            <button style={S.smallBtn} onClick={() => setSub('historia')}>Ver / editar</button>
+            <button style={S.smallBtn} onClick={() => irSub('historia')}>Ver / editar</button>
           </div>
           <div style={S.note}>Datos generales, bioquímica, suplementación, síntomas, antecedentes, historia dietética y ejercicio.</div>
           {sel.historia
@@ -248,7 +272,7 @@ export default function Pacientes() {
         <div className="card">
           <div style={S.titleRow}>
             <div className="card-title" style={{ margin: 0 }}>Menús por tiempo de comida</div>
-            <button style={S.smallBtn} onClick={() => setSub('menus')}>Abrir menús</button>
+            <button style={S.smallBtn} onClick={() => irSub('menus')}>Abrir menús</button>
           </div>
           <div style={S.note}>Reparte los equivalentes del plan en los tiempos de comida y arma las opciones de menú.</div>
           {!(sel.plan && sel.plan.eq)
@@ -294,7 +318,7 @@ export default function Pacientes() {
           <InBodyModal
             patient={sel}
             onClose={() => setInbodyOpen(false)}
-            onDesdeCero={() => { setInbody(null); setInbodyOpen(false); setSub('plan'); }}
+            onDesdeCero={() => { setInbody(null); setInbodyOpen(false); irSub('plan'); }}
             onInBody={onInBody}
           />
         )}
@@ -310,7 +334,7 @@ export default function Pacientes() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <input style={S.search} value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar paciente…" />
-          <button style={S.smallBtn} onClick={() => { setNuevo(true); setErr(''); }}>+ Nuevo paciente</button>
+          <button style={S.smallBtn} onClick={irNuevo}>+ Nuevo paciente</button>
         </div>
       </div>
       {err && <div style={S.err}>{err}</div>}
