@@ -830,6 +830,9 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           )}
         </div>
         <div style={styles.footerBtns}>
+          <button style={styles.secondaryBtn} onClick={onBack} className="nf-secondary">
+            ← Atrás
+          </button>
           <button style={styles.secondaryBtn} onClick={generarPDF} className="nf-secondary">
             Generar PDF
           </button>
