@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import Plan from './Plan';
 import Menus from './Menus';
 import HistoriaClinica from './HistoriaClinica';
@@ -46,6 +46,8 @@ export default function Pacientes() {
   const [selId, setSelId] = useState(null);
   const [sub, setSub] = useState('dash');
   const [nuevo, setNuevo] = useState(false);
+  const [busca, setBusca] = useState('');
+  const [menuId, setMenuId] = useState(null);
   const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' });
   const [plan, setPlan] = useState({ nombre: '', fecha: hoyISO(), link: '' });
   const [openMed, setOpenMed] = useState(false);
@@ -90,6 +92,23 @@ export default function Pacientes() {
     const der = derivar(h);
     await updateDoc(doc(db, 'pacientes', sel.id), { ...der, historia: h });
     setErr('');
+  };
+
+  const abrir = (id) => { setSelId(id); setSub('dash'); setInbody(null); setMenuId(null); };
+
+  const eliminar = async (p) => {
+    setMenuId(null);
+    const ok = window.confirm(
+      '¿Eliminar a ' + (p.nombre || 'este paciente') + '?\n\n' +
+      'Se borrará su expediente, mediciones, planes e historia clínica de forma permanente. ' +
+      'Los archivos que ya estén en Google Drive NO se eliminan.'
+    );
+    if (!ok) return;
+    try {
+      await deleteDoc(doc(db, 'pacientes', p.id));
+      if (selId === p.id) { setSelId(null); setSub('dash'); }
+      setErr('');
+    } catch (e) { setErr('No se pudo eliminar: ' + e.message); }
   };
 
   const addMedicion = async () => {
@@ -288,28 +307,56 @@ export default function Pacientes() {
     <div>
       <div style={S.titleRow}>
         <div className="card-title" style={{ margin: 0, fontSize: 16 }}>Pacientes</div>
-        <button style={S.smallBtn} onClick={() => { setNuevo(true); setErr(''); }}>+ Nuevo paciente</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <input style={S.search} value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar paciente…" />
+          <button style={S.smallBtn} onClick={() => { setNuevo(true); setErr(''); }}>+ Nuevo paciente</button>
+        </div>
       </div>
       {err && <div style={S.err}>{err}</div>}
 
       <div className="card">
-        <div className="card-title">Mis pacientes ({pacientes.length})</div>
-        {pacientes.length === 0
-          ? <div className="empty-state">No hay pacientes registrados aún. Usa “+ Nuevo paciente”.</div>
-          : pacientes.map(p => {
-            const m = last(p.mediciones);
-            return (
-              <div className="pac-item" key={p.id} onClick={() => { setSelId(p.id); setSub('dash'); setInbody(null); }}>
-                <div className="pac-avatar">{initials(p.nombre)}</div>
-                <div style={{ flex: 1 }}>
-                  <div className="pac-nombre">{p.nombre}</div>
-                  <div className="pac-detalle">{p.codigo} · {p.objetivo || 'sin objetivo'}</div>
-                </div>
-                <div className="pac-citas">{m ? m.peso + ' kg' : '—'}</div>
-              </div>
-            );
-          })
-        }
+        {(() => {
+          const q = busca.trim().toLowerCase();
+          const filtrados = q
+            ? pacientes.filter(p => (p.nombre || '').toLowerCase().includes(q) || (p.codigo || '').toLowerCase().includes(q))
+            : pacientes;
+          return (
+            <>
+              <div className="card-title">Mis pacientes ({filtrados.length})</div>
+              {pacientes.length === 0
+                ? <div className="empty-state">No hay pacientes registrados aún. Usa “+ Nuevo paciente”.</div>
+                : filtrados.length === 0
+                  ? <div className="empty-state">No se encontraron pacientes con “{busca}”.</div>
+                  : filtrados.map(p => {
+                    const m = last(p.mediciones);
+                    return (
+                      <div className="pac-item" key={p.id} style={{ position: 'relative' }}
+                        onClick={() => abrir(p.id)}>
+                        <div className="pac-avatar">{initials(p.nombre)}</div>
+                        <div style={{ flex: 1 }}>
+                          <div className="pac-nombre">{p.nombre}</div>
+                          <div className="pac-detalle">{p.codigo} · {p.objetivo || 'sin objetivo'}</div>
+                        </div>
+                        <div className="pac-citas">{m ? m.peso + ' kg' : '—'}</div>
+                        <button style={S.kebab} title="Opciones rápidas"
+                          onClick={(e) => { e.stopPropagation(); setMenuId(menuId === p.id ? null : p.id); }}>⋮</button>
+                        {menuId === p.id && (
+                          <>
+                            <div style={S.menuOverlay} onClick={(e) => { e.stopPropagation(); setMenuId(null); }} />
+                            <div style={S.menu} onClick={(e) => e.stopPropagation()}>
+                              <button style={S.menuItem} onClick={() => abrir(p.id)}>Ver paciente</button>
+                              <button style={{ ...S.menuItem, color: '#B0593F' }} onClick={() => eliminar(p)}>Eliminar</button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })
+              }
+            </>
+          );
+        })()}
       </div>
     </div>
   );
@@ -377,6 +424,11 @@ const styles = {
   inp: { border: '0.5px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', width: '100%' },
   saveBtn: { background: 'var(--gold)', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
   smallBtn: { background: '#fff', color: 'var(--dark)', border: '0.5px solid var(--border)', padding: '7px 13px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
+  search: { flex: '1 1 160px', minWidth: 150, maxWidth: 260, background: '#fff', color: 'var(--dark)', border: '0.5px solid var(--border)', padding: '7px 12px', borderRadius: 8, fontSize: 13, fontFamily: 'var(--font)', boxSizing: 'border-box' },
+  kebab: { flexShrink: 0, width: 34, height: 34, marginLeft: 8, borderRadius: '50%', border: '0.5px solid var(--border)', background: '#fff', color: 'var(--stone)', fontSize: 18, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+  menuOverlay: { position: 'fixed', inset: 0, zIndex: 25, background: 'transparent' },
+  menu: { position: 'absolute', top: 46, right: 10, zIndex: 30, background: '#fff', border: '0.5px solid var(--border)', borderRadius: 10, boxShadow: '0 10px 30px rgba(33,28,23,0.18)', padding: 5, minWidth: 150 },
+  menuItem: { display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: '9px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600, color: 'var(--dark)', cursor: 'pointer', fontFamily: 'var(--font)' },
   note: { fontSize: 11.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 },
   planRow: { display: 'flex', alignItems: 'center', gap: 12, border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 8 },
   planIcon: { width: 36, height: 36, borderRadius: 8, background: 'var(--dark)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 },
