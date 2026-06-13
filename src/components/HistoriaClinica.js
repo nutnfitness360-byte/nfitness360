@@ -214,6 +214,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
   const [active, setActive] = useState("datos");
   const [status, setStatus] = useState("guardado");
   const [anaStatus, setAnaStatus] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const sectionRefs = useRef({});
   const analisisInput = useRef(null);
 
@@ -287,10 +288,31 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
     } catch (e) { setAnaStatus('No se pudo subir: ' + e.message); }
   };
 
-  const guardar = () => {
+  const guardar = () => { setConfirmOpen(true); };
+
+  const guardarYGenerar = async () => {
+    setConfirmOpen(false);
     if (typeof onSave !== "function") return;
     setStatus("guardando");
-    Promise.resolve(onSave(data)).then(() => setStatus("guardado")).catch(() => setStatus("error"));
+    try {
+      let dataFinal = data;
+      const nombre = (data.datos.nombre || "").trim();
+      const url = process.env.REACT_APP_APPSCRIPT_URL;
+      if (nombre && url) {
+        try {
+          const html = buildPrintHTML(data);
+          const filename = "Historial clínico " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
+          const res = await fetch(url, {
+            method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "saveHistorial", patient: nombre, filename, html }), redirect: "follow",
+          });
+          let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false }; }
+          if (d.ok && d.link) dataFinal = { ...data, historialDrive: { link: d.link, fecha: new Date().toLocaleDateString("es-MX") } };
+        } catch (e) { /* si falla el PDF, igual guardamos la historia */ }
+      }
+      await Promise.resolve(onSave(dataFinal));
+      setStatus("guardado");
+    } catch (e) { setStatus("error"); }
   };
 
   const generarPDF = () => {
@@ -734,6 +756,18 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           </button>
         </div>
       </footer>
+
+      {confirmOpen && (
+        <div style={styles.modalOverlay} onClick={() => setConfirmOpen(false)}>
+          <div style={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalText}>¿Deseas continuar? No se podrán hacer cambios futuros.</div>
+            <div style={styles.modalBtns}>
+              <button style={styles.modalNo} onClick={() => setConfirmOpen(false)}>No</button>
+              <button style={styles.modalSi} onClick={guardarYGenerar}>Sí</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -848,6 +882,12 @@ const styles = {
   footerBtns: { display: "flex", alignItems: "center", gap: 10 },
   secondaryBtn: { background: "#fff", color: T.pine, border: `1px solid ${T.pine}`, padding: "11px 18px", borderRadius: 11, fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" },
   primaryBtn: { background: T.amber, color: "#211C17", border: "none", padding: "11px 20px", borderRadius: 11, fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" },
+  modalOverlay: { position: "fixed", inset: 0, background: "rgba(33,28,23,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 },
+  modalBox: { background: "#fff", borderRadius: 16, padding: "26px 24px", maxWidth: 380, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", textAlign: "center" },
+  modalText: { fontSize: 15.5, fontWeight: 600, color: T.ink, lineHeight: 1.5, marginBottom: 22 },
+  modalBtns: { display: "flex", gap: 12, justifyContent: "center" },
+  modalNo: { flex: 1, background: "#fff", color: T.ink, border: `1px solid ${T.line}`, padding: "11px 0", borderRadius: 10, fontSize: 14.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  modalSi: { flex: 1, background: T.amber, color: "#211C17", border: "none", padding: "11px 0", borderRadius: 10, fontSize: 14.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" },
 };
 
 const css = `
