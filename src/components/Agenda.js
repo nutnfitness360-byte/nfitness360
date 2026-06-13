@@ -119,12 +119,19 @@ export default function Agenda({ isNutri }) {
 
   const guardar = async () => {
     if (isNutri && !mPaciente.trim()) { alert('Selecciona el paciente.'); return; }
+    if (isNutri && !mPacienteEmail) {
+      alert('Elige un paciente de la lista (debe tener correo registrado). Si es nuevo, primero debe crear su cuenta / darse de alta.');
+      return;
+    }
     if (!servSel) { alert('Selecciona el tipo de consulta.'); return; }
     if (bloqueado(selDate)) { alert('Ese día no hay atención. Elige otro día.'); return; }
     if (!mHora) { alert('Selecciona un horario.'); return; }
     const objetivoFinal = mObjetivo === 'Otro' ? (mObjetivoOtro.trim() || 'Otro') : mObjetivo;
+    const correo = (isNutri ? mPacienteEmail : user.email || '').toLowerCase();
+    const pacienteNombre = isNutri ? mPaciente.trim() : (user.displayName || user.email.split('@')[0]);
     setSaving(true);
     try {
+      // 1) Guardar la cita en la base de datos (rápido y prioritario).
       await addDoc(collection(db, 'citas'), {
         fecha: selDate,
         hora: mHora,
@@ -136,10 +143,32 @@ export default function Agenda({ isNutri }) {
         motivo: servSel.nombre, // compatibilidad con vistas previas
         notas: mNotas,
         estado: 'confirmada',
-        pacienteEmail: isNutri ? (mPacienteEmail || '').toLowerCase() : user.email,
-        pacienteNombre: isNutri ? mPaciente.trim() : (user.displayName || user.email.split('@')[0]),
+        pacienteEmail: correo,
+        pacienteNombre: pacienteNombre,
         creadoEn: Timestamp.now(),
       });
+      // 2) Crear el evento en Google Calendar + enviar el correo (vía Apps Script).
+      //    Es secundario: si fallara, la cita ya quedó agendada.
+      const url = process.env.REACT_APP_APPSCRIPT_URL;
+      if (url && correo) {
+        try {
+          await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'crearCita',
+              paciente: pacienteNombre,
+              correo: correo,
+              fecha: selDate,
+              hora: mHora,
+              dur: servSel.dur,
+              tipoNombre: servSel.nombre,
+              online: servSel.online,
+              objetivo: objetivoFinal,
+              notas: mNotas,
+            }), redirect: 'follow',
+          });
+        } catch (e) { /* el evento/correo es secundario; la cita ya quedó guardada */ }
+      }
       cerrarModal();
     } catch (e) { alert('Error: ' + e.message); }
     setSaving(false);
@@ -280,7 +309,7 @@ export default function Agenda({ isNutri }) {
 
             <div className="btn-row">
               <button className="btn-cancel" onClick={cerrarModal}>Cancelar</button>
-              <button className="btn-save" onClick={guardar} disabled={saving || !servSel || !mHora || (isNutri && !mPaciente.trim())}>
+              <button className="btn-save" onClick={guardar} disabled={saving || !servSel || !mHora || (isNutri && !mPacienteEmail)}>
                 {saving ? 'Guardando...' : (isNutri ? 'Guardar cita' : 'Confirmar cita')}
               </button>
             </div>
