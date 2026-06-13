@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, query, where, onSnapshot, addDoc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, Timestamp, orderBy } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -87,9 +87,9 @@ export default function Agenda({ isNutri }) {
   const [showSug, setShowSug] = useState(false);
 
   useEffect(() => {
-    const q = isNutri
-      ? query(collection(db, 'citas'), orderBy('fecha', 'asc'))
-      : query(collection(db, 'citas'), where('pacienteEmail', '==', user.email));
+    // Se cargan TODAS las citas para calcular la disponibilidad real (slots ocupados).
+    // Los datos de otros pacientes nunca se muestran: la lista del día filtra por dueño.
+    const q = query(collection(db, 'citas'), orderBy('fecha', 'asc'));
     return onSnapshot(q, snap => setCitas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [isNutri, user]);
 
@@ -99,11 +99,16 @@ export default function Agenda({ isNutri }) {
     return onSnapshot(qp, snap => setPacientesList(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
   }, [isNutri]);
 
-  const citasDia = citas.filter(c => c.fecha === selDate).sort((a,b) => a.hora.localeCompare(b.hora));
-  const citaDates = new Set(citas.map(c => c.fecha));
+  const emailUser = (user.email || '').toLowerCase();
+  const esPropia = (c) => isNutri || (c.pacienteEmail || '').toLowerCase() === emailUser;
+  // Para los SLOTS se consideran TODAS las citas del día (disponibilidad real)
+  const citasDelDia = citas.filter(c => c.fecha === selDate);
+  // Para MOSTRAR (lista del día y puntos del calendario) solo las propias del paciente
+  const citasDia = citasDelDia.filter(esPropia).slice().sort((a,b) => a.hora.localeCompare(b.hora));
+  const citaDates = new Set(citas.filter(esPropia).map(c => c.fecha));
 
   const servSel = SERVICIOS.find(s => s.id === mTipo) || null;
-  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, citasDia);
+  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, citasDelDia);
 
   const abrirModal = () => {
     setMPaciente(''); setMPacienteEmail(''); setMTipo(null);
@@ -130,7 +135,7 @@ export default function Agenda({ isNutri }) {
         objetivo: objetivoFinal,
         motivo: servSel.nombre, // compatibilidad con vistas previas
         notas: mNotas,
-        estado: isNutri ? 'confirmada' : 'pendiente',
+        estado: 'confirmada',
         pacienteEmail: isNutri ? (mPacienteEmail || '').toLowerCase() : user.email,
         pacienteNombre: isNutri ? mPaciente.trim() : (user.displayName || user.email.split('@')[0]),
         creadoEn: Timestamp.now(),
