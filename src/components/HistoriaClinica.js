@@ -215,6 +215,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
   const [status, setStatus] = useState("guardado");
   const [anaStatus, setAnaStatus] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pdfStatus, setPdfStatus] = useState("");
   const sectionRefs = useRef({});
   const analisisInput = useRef(null);
 
@@ -317,18 +318,23 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
     }
   };
 
-  const generarPDF = () => {
-    const html = buildPrintHTML(data);
-    const f = document.createElement("iframe");
-    Object.assign(f.style, { position: "fixed", right: "0", bottom: "0", width: "0", height: "0", border: "0" });
-    document.body.appendChild(f);
-    const doc = f.contentWindow.document;
-    doc.open(); doc.write(html); doc.close();
-    const fire = () => {
-      try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) {}
-      setTimeout(() => { try { document.body.removeChild(f); } catch (e) {} }, 1500);
-    };
-    setTimeout(fire, 500);
+  const generarPDF = async () => {
+    const nombre = (data.datos.nombre || "").trim();
+    if (!nombre) { setPdfStatus("Escribe el nombre del paciente (apartado 1) antes de generar el PDF."); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setPdfStatus("Falta configurar REACT_APP_APPSCRIPT_URL en Vercel."); return; }
+    setPdfStatus("Generando PDF y guardando en Drive…");
+    try {
+      const html = buildPrintHTML(data);
+      const filename = "Historial clínico " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
+      const res = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "saveHistorial", patient: nombre, filename, html }), redirect: "follow",
+      });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false }; }
+      if (d.ok && d.link) setPdfStatus("PDF guardado en Drive ✓");
+      else setPdfStatus("Error: " + (d.error || "no se pudo generar el PDF."));
+    } catch (e) { setPdfStatus("No se pudo generar: " + e.message); }
   };
 
   const scrollTo = (id) => {
@@ -743,11 +749,15 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
       {/* ---------- PIE ---------- */}
       <footer style={styles.footer}>
         <div style={styles.footerInfo}>
-          {status === "guardado" && "Historia guardada automáticamente."}
-          {status === "guardando" && "Guardando cambios…"}
-          {status === "error" && "No se pudo guardar. Revisa la conexión."}
-          {status === "listo" && "Listo para el cálculo del plan."}
-          {status === "cargando" && "Cargando…"}
+          {pdfStatus ? pdfStatus : (
+            <>
+              {status === "guardado" && "Historia guardada."}
+              {status === "guardando" && "Guardando cambios…"}
+              {status === "error" && "No se pudo guardar. Revisa la conexión."}
+              {status === "listo" && "Listo."}
+              {status === "cargando" && "Cargando…"}
+            </>
+          )}
         </div>
         <div style={styles.footerBtns}>
           <button style={styles.secondaryBtn} onClick={generarPDF} className="nf-secondary">
