@@ -4,8 +4,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import Topbar from '../components/Topbar';
 import PerfilPaciente from '../components/PerfilPaciente';
-
-const CALENDLY_URL = 'https://calendly.com/nutnfitness360';
+import Agenda from '../components/Agenda';
 
 export default function PacienteDashboard() {
   const { user } = useAuth();
@@ -26,31 +25,6 @@ export default function PacienteDashboard() {
       snap => setExpediente(snap.docs.length ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null),
       () => setExpediente(null));
   }, [user]);
-
-  useEffect(() => {
-    const link = document.createElement('link');
-    link.href = 'https://assets.calendly.com/assets/external/widget.css';
-    link.rel = 'stylesheet';
-    document.head.appendChild(link);
-    const script = document.createElement('script');
-    script.src = 'https://assets.calendly.com/assets/external/widget.js';
-    script.async = true;
-    document.body.appendChild(script);
-    return () => {
-      try { document.head.removeChild(link); document.body.removeChild(script); } catch (e) {}
-    };
-  }, []);
-
-  const abrirCalendly = () => {
-    if (window.Calendly) {
-      window.Calendly.initPopupWidget({
-        url: CALENDLY_URL,
-        prefill: { name: user.displayName || '', email: user.email || '' }
-      });
-    } else {
-      window.open(CALENDLY_URL, '_blank');
-    }
-  };
 
   const hoyKey = new Date().toISOString().slice(0, 10);
   const proxima = citas.find(c => c.fecha >= hoyKey && c.estado !== 'cancelada');
@@ -108,7 +82,7 @@ export default function PacienteDashboard() {
                 <div className="empty-state">No tienes citas proximas</div>
               )}
             </div>
-            <button className="btn-primary" onClick={abrirCalendly}>
+            <button className="btn-primary" onClick={() => setTab('agendar')}>
               + Agendar nueva cita
             </button>
             {citas.length > 0 && (
@@ -130,18 +104,7 @@ export default function PacienteDashboard() {
         )}
 
         {tab === 'agendar' && (
-          <div className="card">
-            <div className="card-title">Agendar cita</div>
-            <div style={{ fontSize: '13px', color: 'var(--stone)', marginBottom: '1.5rem', lineHeight: '1.5' }}>
-              Selecciona el dia y horario de tu preferencia. Recibiras un correo de confirmacion automaticamente.
-            </div>
-            <button className="btn-primary" onClick={abrirCalendly}>
-              Ver disponibilidad y agendar
-            </button>
-            <div style={{ marginTop: '1rem', fontSize: '11px', color: 'var(--stone)', textAlign: 'center' }}>
-              Los correos de confirmacion se envian automaticamente
-            </div>
-          </div>
+          <Agenda isNutri={false} />
         )}
 
         {tab === 'planes' && (
