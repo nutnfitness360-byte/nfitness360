@@ -294,25 +294,27 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
     setConfirmOpen(false);
     if (typeof onSave !== "function") return;
     setStatus("guardando");
+    // 1) Guardar la historia PRIMERO (rápido). Nunca depende del PDF.
     try {
-      let dataFinal = data;
-      const nombre = (data.datos.nombre || "").trim();
-      const url = process.env.REACT_APP_APPSCRIPT_URL;
-      if (nombre && url) {
-        try {
-          const html = buildPrintHTML(data);
-          const filename = "Historial clínico " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
-          const res = await fetch(url, {
-            method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ action: "saveHistorial", patient: nombre, filename, html }), redirect: "follow",
-          });
-          let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false }; }
-          if (d.ok && d.link) dataFinal = { ...data, historialDrive: { link: d.link, fecha: new Date().toLocaleDateString("es-MX") } };
-        } catch (e) { /* si falla el PDF, igual guardamos la historia */ }
-      }
-      await Promise.resolve(onSave(dataFinal));
+      await Promise.resolve(onSave(data));
       setStatus("guardado");
-    } catch (e) { setStatus("error"); }
+    } catch (e) {
+      setStatus("error");
+      return;
+    }
+    // 2) Generar y subir el PDF del historial a Drive (mejor esfuerzo, en segundo plano).
+    const nombre = (data.datos.nombre || "").trim();
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (nombre && url) {
+      try {
+        const html = buildPrintHTML(data);
+        const filename = "Historial clínico " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
+        await fetch(url, {
+          method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "saveHistorial", patient: nombre, filename, html }), redirect: "follow",
+        });
+      } catch (e) { /* el PDF es secundario; la historia ya quedó guardada */ }
+    }
   };
 
   const generarPDF = () => {
