@@ -197,7 +197,7 @@ export default function Pacientes() {
     }
     return (
       <div>
-        <button style={S.back} onClick={volver}>← Pacientes</button>
+        <button style={S.back} onClick={volver}>← Atrás</button>
         {err && <div style={S.err}>{err}</div>}
 
         <div className="card">
@@ -429,7 +429,7 @@ function ChartCard({ title, unit, valor, children }) {
 }
 
 const styles = {
-  back: { background: 'transparent', border: 'none', color: 'var(--stone)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 12 },
+  back: { background: '#fff', border: '0.5px solid var(--border)', color: 'var(--dark)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 14px', borderRadius: 8, marginBottom: 14 },
   err: { background: '#fef0f0', color: '#c0392b', fontSize: 12.5, padding: '10px 12px', borderRadius: 10, marginBottom: 12 },
   headRow: { display: 'flex', alignItems: 'center', gap: 12 },
   titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
