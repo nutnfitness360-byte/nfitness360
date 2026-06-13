@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, query, onSnapshot, addDoc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -101,14 +101,15 @@ export default function Agenda({ isNutri }) {
 
   const emailUser = (user.email || '').toLowerCase();
   const esPropia = (c) => isNutri || (c.pacienteEmail || '').toLowerCase() === emailUser;
-  // Para los SLOTS se consideran TODAS las citas del día (disponibilidad real)
   const citasDelDia = citas.filter(c => c.fecha === selDate);
+  // Para los SLOTS solo cuentan las citas NO canceladas (la cancelada libera el horario)
+  const ocupadasDia = citasDelDia.filter(c => c.estado !== 'cancelada');
   // Para MOSTRAR (lista del día y puntos del calendario) solo las propias del paciente
   const citasDia = citasDelDia.filter(esPropia).slice().sort((a,b) => a.hora.localeCompare(b.hora));
-  const citaDates = new Set(citas.filter(esPropia).map(c => c.fecha));
+  const citaDates = new Set(citas.filter(c => c.estado !== 'cancelada').filter(esPropia).map(c => c.fecha));
 
   const servSel = SERVICIOS.find(s => s.id === mTipo) || null;
-  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, citasDelDia);
+  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, ocupadasDia);
 
   const abrirModal = () => {
     setMPaciente(''); setMPacienteEmail(''); setMTipo(null);
@@ -132,7 +133,7 @@ export default function Agenda({ isNutri }) {
     setSaving(true);
     try {
       // 1) Guardar la cita en la base de datos (rápido y prioritario).
-      await addDoc(collection(db, 'citas'), {
+      const ref = await addDoc(collection(db, 'citas'), {
         fecha: selDate,
         hora: mHora,
         tipo: servSel.id,
@@ -148,11 +149,11 @@ export default function Agenda({ isNutri }) {
         creadoEn: Timestamp.now(),
       });
       // 2) Crear el evento en Google Calendar + enviar el correo (vía Apps Script).
-      //    Es secundario: si fallara, la cita ya quedó agendada.
+      //    Guardamos el eventId devuelto para poder cancelar (borrar) el evento luego.
       const url = process.env.REACT_APP_APPSCRIPT_URL;
       if (url && correo) {
         try {
-          await fetch(url, {
+          const res = await fetch(url, {
             method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
               action: 'crearCita',
@@ -167,11 +168,44 @@ export default function Agenda({ isNutri }) {
               notas: mNotas,
             }), redirect: 'follow',
           });
+          let d; try { d = JSON.parse(await res.text()); } catch (_) { d = null; }
+          if (d && d.eventId) { try { await updateDoc(doc(db, 'citas', ref.id), { eventId: d.eventId }); } catch (e) {} }
         } catch (e) { /* el evento/correo es secundario; la cita ya quedó guardada */ }
       }
       cerrarModal();
     } catch (e) { alert('Error: ' + e.message); }
     setSaving(false);
+  };
+
+  const cancelar = async (c) => {
+    if (c.estado === 'cancelada') return;
+    const ok = window.confirm(
+      '¿Cancelar esta cita?\n\n' + (c.pacienteNombre || '') + ' · ' + c.fecha + ' ' + c.hora + '\n' +
+      'Se libera el horario, se elimina el evento del calendario y se envía el correo de cancelación.'
+    );
+    if (!ok) return;
+    try {
+      await updateDoc(doc(db, 'citas', c.id), { estado: 'cancelada' });
+      const url = process.env.REACT_APP_APPSCRIPT_URL;
+      if (url) {
+        try {
+          await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'cancelarCita',
+              eventId: c.eventId || '',
+              correo: (c.pacienteEmail || '').toLowerCase(),
+              paciente: c.pacienteNombre || '',
+              fecha: c.fecha,
+              hora: c.hora,
+              tipoNombre: c.tipoNombre || c.motivo || '',
+              online: !!c.online,
+              canceladoPor: isNutri ? 'nutriologa' : 'paciente',
+            }), redirect: 'follow',
+          });
+        } catch (e) { /* el correo/borrado de evento es secundario; ya quedó cancelada */ }
+      }
+    } catch (e) { alert('No se pudo cancelar: ' + e.message); }
   };
 
   const renderCal = () => {
@@ -223,6 +257,12 @@ export default function Agenda({ isNutri }) {
                   <div className="cita-motivo">{(c.tipoNombre || c.motivo)}{c.objetivo ? ' · ' + c.objetivo : ''}</div>
                 </div>
                 <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>
+                {c.estado !== 'cancelada' && (
+                  <button onClick={() => cancelar(c)} title="Cancelar cita"
+                    style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid #B0593F', borderRadius: 8, fontSize: 11, fontWeight: 600, color: '#B0593F', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', flexShrink: 0 }}>
+                    Cancelar
+                  </button>
+                )}
               </div>
             ))
         }
