@@ -5,86 +5,138 @@ import { useAuth } from '../context/AuthContext';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DIAS = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
-const HORARIOS = ['08:00','09:00','10:00','11:00','12:00','13:00','15:00','16:00','17:00','18:00','19:00','20:00'];
-const MOTIVOS = ['Primera vez','Seguimiento','Deportiva primera vez','Seguimiento deportiva','Online primera vez','Online seguimiento'];
+
+// Tipos de consulta (definen la duración de la cita)
+const SERVICIOS = [
+  { id: 'primera',       nombre: 'Primera vez',           dur: 60, online: false },
+  { id: 'seguimiento',   nombre: 'Seguimiento',           dur: 30, online: false },
+  { id: 'deportivo',     nombre: 'Deportivo',             dur: 60, online: false },
+  { id: 'seg_deportivo', nombre: 'Seguimiento deportivo', dur: 30, online: false },
+  { id: 'online',        nombre: 'Online',                dur: 40, online: true  },
+  { id: 'online_dep',    nombre: 'Deportivo online',      dur: 40, online: true  },
+];
+const DUR_POR_ID = Object.fromEntries(SERVICIOS.map(s => [s.id, s.dur]));
+
+// Objetivo (independiente del tipo de consulta)
+const OBJETIVOS = ['Aumento de masa muscular','Baja de grasa','Recomposición corporal','Salud','Rendimiento deportivo','Otro'];
+
+// ---- Disponibilidad ----
+// Bloqueados: domingo (0), martes (2) y jueves (4)
+const DOW_BLOQ = new Set([0, 2, 4]);
+const APERTURA = 9 * 60;                 // 09:00
+const ultimoInicio = (dow) => (dow === 6 ? 13 * 60 : 18 * 60); // Sábado 13:00, L/X/V 18:00
 
 function toKey(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function dowDe(key) { const [y,m,d] = key.split('-'); return new Date(+y,+m-1,+d).getDay(); }
+function bloqueado(key) { return DOW_BLOQ.has(dowDe(key)); }
 function fmtDate(key) {
   const [y,m,d] = key.split('-');
   return new Date(+y,+m-1,+d).toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'}).replace(/^\w/,c=>c.toUpperCase());
+}
+function toMin(h) { const [H,M] = h.split(':').map(Number); return H*60+M; }
+function fromMin(m) { return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function proxDisponible(date) {
+  const d = new Date(date);
+  for (let i = 0; i < 14; i++) { if (!DOW_BLOQ.has(d.getDay())) return d; d.setDate(d.getDate()+1); }
+  return date;
+}
+// Duración (min) de una cita existente (compatibilidad con citas viejas que solo tienen 'motivo')
+function durDeCita(c) {
+  if (c.dur) return c.dur;
+  if (c.tipo && DUR_POR_ID[c.tipo]) return DUR_POR_ID[c.tipo];
+  const legacy = { 'Primera vez':60,'Seguimiento':30,'Deportiva primera vez':60,'Seguimiento deportiva':30,'Online primera vez':40,'Online seguimiento':40 };
+  return legacy[c.motivo] || 60;
+}
+
+// Genera los horarios candidatos del día: rejilla base de 30 min + puntos de
+// continuación (cada 10 min) tras cada cita existente. Marca cuáles caben para
+// la duración elegida (sin traslaparse con citas existentes).
+function generarSlots(dateKey, durMin, citasDelDia) {
+  const dow = dowDe(dateKey);
+  if (DOW_BLOQ.has(dow)) return [];
+  const fin = ultimoInicio(dow);
+  const ocup = citasDelDia.map(c => { const s = toMin(c.hora); return { s, e: s + durDeCita(c) }; });
+  const set = new Set();
+  for (let t = APERTURA; t <= fin; t += 30) set.add(t);            // rejilla base 30 min
+  ocup.forEach(o => { let c = o.e; while (c % 30 !== 0 && c <= fin) { set.add(c); c += 10; } }); // continuación 10 min
+  const cand = [...set].filter(t => t >= APERTURA && t <= fin).sort((a,b)=>a-b);
+  const choca = (s, d) => ocup.some(o => s < o.e && o.s < s + d);
+  return cand.map(t => ({ hora: fromMin(t), disponible: durMin ? !choca(t, durMin) : false }));
 }
 
 export default function Agenda({ isNutri }) {
   const { user } = useAuth();
   const hoy = new Date();
   const [view, setView] = useState({ y: hoy.getFullYear(), m: hoy.getMonth() });
-  const [selDate, setSelDate] = useState(toKey(hoy));
+  const [selDate, setSelDate] = useState(toKey(proxDisponible(hoy)));
   const [citas, setCitas] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [selHora, setSelHora] = useState(null);
-  const [selMotivo, setSelMotivo] = useState(null);
-  const [notas, setNotas] = useState('');
   const [saving, setSaving] = useState(false);
-  const [nPaciente, setNPaciente] = useState('');
-  const [nFecha, setNFecha] = useState(toKey(hoy));
-  const [nHora, setNHora] = useState('09:00');
-  const [nMotivo, setNMotivo] = useState(MOTIVOS[0]);
-  const [nNotas, setNNotas] = useState('');
+
+  // Campos del modal (unificados para nutrióloga y paciente)
+  const [mPaciente, setMPaciente] = useState('');
+  const [mPacienteEmail, setMPacienteEmail] = useState('');
+  const [mTipo, setMTipo] = useState(null);
+  const [mObjetivo, setMObjetivo] = useState(OBJETIVOS[0]);
+  const [mObjetivoOtro, setMObjetivoOtro] = useState('');
+  const [mHora, setMHora] = useState(null);
+  const [mNotas, setMNotas] = useState('');
+
+  // Autocompletado de pacientes (solo nutrióloga)
+  const [pacientesList, setPacientesList] = useState([]);
+  const [showSug, setShowSug] = useState(false);
 
   useEffect(() => {
     const q = isNutri
       ? query(collection(db, 'citas'), orderBy('fecha', 'asc'))
       : query(collection(db, 'citas'), where('pacienteEmail', '==', user.email));
-    const unsub = onSnapshot(q, snap => {
-      setCitas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    return unsub;
+    return onSnapshot(q, snap => setCitas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [isNutri, user]);
 
+  useEffect(() => {
+    if (!isNutri) return undefined;
+    const qp = query(collection(db, 'pacientes'), orderBy('codigo', 'asc'));
+    return onSnapshot(qp, snap => setPacientesList(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+  }, [isNutri]);
+
   const citasDia = citas.filter(c => c.fecha === selDate).sort((a,b) => a.hora.localeCompare(b.hora));
-  const horasOcupadas = new Set(citas.filter(c => c.fecha === selDate).map(c => c.hora));
   const citaDates = new Set(citas.map(c => c.fecha));
 
-  const confirmarCita = async () => {
-    if (!selHora || !selMotivo) { alert('Selecciona hora y motivo'); return; }
+  const servSel = SERVICIOS.find(s => s.id === mTipo) || null;
+  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, citasDia);
+
+  const abrirModal = () => {
+    setMPaciente(''); setMPacienteEmail(''); setMTipo(null);
+    setMObjetivo(OBJETIVOS[0]); setMObjetivoOtro(''); setMHora(null); setMNotas('');
+    setShowSug(false); setShowModal(true);
+  };
+  const cerrarModal = () => setShowModal(false);
+
+  const guardar = async () => {
+    if (isNutri && !mPaciente.trim()) { alert('Selecciona el paciente.'); return; }
+    if (!servSel) { alert('Selecciona el tipo de consulta.'); return; }
+    if (bloqueado(selDate)) { alert('Ese día no hay atención. Elige otro día.'); return; }
+    if (!mHora) { alert('Selecciona un horario.'); return; }
+    const objetivoFinal = mObjetivo === 'Otro' ? (mObjetivoOtro.trim() || 'Otro') : mObjetivo;
     setSaving(true);
     try {
       await addDoc(collection(db, 'citas'), {
         fecha: selDate,
-        hora: selHora,
-        motivo: selMotivo,
-        notas: notas,
-        estado: 'pendiente',
-        pacienteEmail: user.email,
-        pacienteNombre: user.displayName || user.email.split('@')[0],
-        creadoEn: Timestamp.now()
+        hora: mHora,
+        tipo: servSel.id,
+        tipoNombre: servSel.nombre,
+        dur: servSel.dur,
+        online: servSel.online,
+        objetivo: objetivoFinal,
+        motivo: servSel.nombre, // compatibilidad con vistas previas
+        notas: mNotas,
+        estado: isNutri ? 'confirmada' : 'pendiente',
+        pacienteEmail: isNutri ? (mPacienteEmail || '').toLowerCase() : user.email,
+        pacienteNombre: isNutri ? mPaciente.trim() : (user.displayName || user.email.split('@')[0]),
+        creadoEn: Timestamp.now(),
       });
-      setShowModal(false);
-      setSelHora(null);
-      setSelMotivo(null);
-      setNotas('');
-    } catch(e) { alert('Error: ' + e.message); }
-    setSaving(false);
-  };
-
-  const crearCitaNutri = async () => {
-    if (!nPaciente || !nFecha || !nHora) { alert('Completa todos los campos'); return; }
-    setSaving(true);
-    try {
-      await addDoc(collection(db, 'citas'), {
-        fecha: nFecha,
-        hora: nHora,
-        motivo: nMotivo,
-        notas: nNotas,
-        estado: 'confirmada',
-        pacienteEmail: '',
-        pacienteNombre: nPaciente,
-        creadoEn: Timestamp.now()
-      });
-      setShowModal(false);
-      setNPaciente('');
-      setNNotas('');
-    } catch(e) { alert('Error: ' + e.message); }
+      cerrarModal();
+    } catch (e) { alert('Error: ' + e.message); }
     setSaving(false);
   };
 
@@ -96,12 +148,14 @@ export default function Agenda({ isNutri }) {
     for (let d=1; d<=days; d++) {
       const key = view.y+'-'+String(view.m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
       const dow = new Date(view.y, view.m, d).getDay();
+      const bloq = DOW_BLOQ.has(dow);
       let cls = 'cal-day';
-      if (dow === 0) cls += ' sunday';
+      if (bloq) cls += ' sunday';                       // reutiliza el estilo "deshabilitado"
       if (key === toKey(hoy)) cls += ' today';
       if (key === selDate) cls += ' selected';
       if (citaDates.has(key)) cls += ' has-cita';
-      cells.push(<div key={key} className={cls} onClick={() => dow !== 0 && setSelDate(key)}>{d}</div>);
+      cells.push(<div key={key} className={cls} title={bloq ? 'No disponible' : ''}
+        onClick={() => { if (!bloq) setSelDate(key); }}>{d}</div>);
     }
     return cells;
   };
@@ -118,75 +172,113 @@ export default function Agenda({ isNutri }) {
           {DIAS.map(d => <div key={d} className="cal-lbl">{d}</div>)}
           {renderCal()}
         </div>
+        <div style={{ fontSize: 10, color: 'var(--stone)', marginBottom: 12 }}>
+          Martes, jueves y domingo no disponibles.
+        </div>
+
         <div className="section-label">{fmtDate(selDate)}</div>
-        {citasDia.length === 0
-          ? <div className="empty-state">Sin citas este dia</div>
-          : citasDia.map(c => (
-            <div className="cita-item" key={c.id}>
-              <div className="cita-hora">{c.hora}</div>
-              <div style={{flex:1}}>
-                <div className="cita-nombre">{c.pacienteNombre}</div>
-                <div className="cita-motivo">{c.motivo}</div>
+        {bloqueado(selDate)
+          ? <div className="empty-state">Día no disponible para citas.</div>
+          : citasDia.length === 0
+            ? <div className="empty-state">Sin citas este día</div>
+            : citasDia.map(c => (
+              <div className="cita-item" key={c.id}>
+                <div className="cita-hora">{c.hora}</div>
+                <div style={{flex:1}}>
+                  <div className="cita-nombre">{c.pacienteNombre}</div>
+                  <div className="cita-motivo">{(c.tipoNombre || c.motivo)}{c.objetivo ? ' · ' + c.objetivo : ''}</div>
+                </div>
+                <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>
               </div>
-              <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>
-            </div>
-          ))
+            ))
         }
-        <button className="btn-primary" onClick={() => setShowModal(true)}>
+        <button className="btn-primary" onClick={abrirModal} disabled={bloqueado(selDate)}>
           + {isNutri ? 'Nueva cita' : 'Agendar cita'}
         </button>
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && cerrarModal()}>
           <div className="modal">
             <div className="modal-title">{isNutri ? 'Nueva cita' : 'Agendar cita'}</div>
 
-            {isNutri ? (
-              <>
-                <div className="fg"><label>Paciente</label><input value={nPaciente} onChange={e=>setNPaciente(e.target.value)} placeholder="Nombre del paciente" /></div>
-                <div className="f2">
-                  <div className="fg"><label>Fecha</label><input type="date" value={nFecha} onChange={e=>setNFecha(e.target.value)} /></div>
-                  <div className="fg"><label>Hora</label><input type="time" value={nHora} onChange={e=>setNHora(e.target.value)} /></div>
-                </div>
-                <div className="fg"><label>Motivo</label>
-                  <select value={nMotivo} onChange={e=>setNMotivo(e.target.value)}>
-                    {MOTIVOS.map(m => <option key={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div className="fg"><label>Notas</label><textarea value={nNotas} onChange={e=>setNNotas(e.target.value)} placeholder="Observaciones..." /></div>
-                <div className="btn-row">
-                  <button className="btn-cancel" onClick={() => setShowModal(false)}>Cancelar</button>
-                  <button className="btn-save" onClick={crearCitaNutri} disabled={saving}>{saving ? 'Guardando...' : 'Guardar cita'}</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="section-label">Horarios disponibles — {fmtDate(selDate)}</div>
-                <div className="horario-grid">
-                  {HORARIOS.map(h => (
-                    <button key={h}
-                      className={`horario-slot${horasOcupadas.has(h)?' ocupado':selHora===h?' selected':''}`}
-                      onClick={() => { if(!horasOcupadas.has(h)) setSelHora(h); }}>{h}</button>
-                  ))}
-                </div>
-                <div className="section-label">Motivo de consulta</div>
-                <div className="motivos-grid">
-                  {MOTIVOS.map(m => (
-                    <button key={m}
-                      className={`motivo-btn${selMotivo===m?' selected':''}`}
-                      onClick={() => setSelMotivo(m)}>{m}</button>
-                  ))}
-                </div>
-                <div className="fg"><label>Notas (opcional)</label><textarea value={notas} onChange={e=>setNotas(e.target.value)} placeholder="Cuentanos tu objetivo..." /></div>
-                <div className="btn-row">
-                  <button className="btn-cancel" onClick={() => setShowModal(false)}>Cancelar</button>
-                  <button className="btn-save" onClick={confirmarCita} disabled={saving || !selHora || !selMotivo}>
-                    {saving ? 'Guardando...' : 'Confirmar cita'}
-                  </button>
-                </div>
-              </>
+            {isNutri && (
+              <div className="fg" style={{ position: 'relative' }}>
+                <label>Paciente</label>
+                <input value={mPaciente} autoComplete="off"
+                  onChange={e => { setMPaciente(e.target.value); setMPacienteEmail(''); setShowSug(true); }}
+                  onFocus={() => setShowSug(true)}
+                  onBlur={() => setTimeout(() => setShowSug(false), 150)}
+                  placeholder="Escribe el nombre del paciente…" />
+                {showSug && mPaciente.trim() && (() => {
+                  const qq = mPaciente.trim().toLowerCase();
+                  const matches = pacientesList.filter(p => (p.nombre || '').toLowerCase().includes(qq)).slice(0, 6);
+                  if (matches.length === 0) return null;
+                  return (
+                    <div style={{ position:'absolute', left:0, right:0, top:'100%', zIndex:50, background:'#fff', border:'1px solid var(--border)', borderRadius:10, marginTop:4, boxShadow:'0 10px 30px rgba(33,28,23,0.15)', maxHeight:190, overflowY:'auto' }}>
+                      {matches.map(p => (
+                        <button key={p.id} type="button"
+                          onMouseDown={(e) => { e.preventDefault(); setMPaciente(p.nombre); setMPacienteEmail((p.correo || '').toLowerCase()); setShowSug(false); }}
+                          style={{ display:'block', width:'100%', textAlign:'left', background:'transparent', border:'none', padding:'9px 12px', fontSize:13, cursor:'pointer', color:'var(--dark)', fontFamily:'Montserrat, sans-serif' }}>
+                          {p.nombre} <span style={{ color:'var(--stone)', fontSize:11 }}>· {p.codigo}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
             )}
+
+            <div className="section-label">Tipo de consulta</div>
+            <div className="motivos-grid">
+              {SERVICIOS.map(s => (
+                <button key={s.id}
+                  className={`motivo-btn${mTipo === s.id ? ' selected' : ''}`}
+                  onClick={() => { setMTipo(s.id); setMHora(null); }}>
+                  {s.nombre}<br/><span style={{ fontSize:9, opacity:.8 }}>{s.dur} min{s.online ? ' · online' : ''}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="fg"><label>Objetivo</label>
+              <select value={mObjetivo} onChange={e=>setMObjetivo(e.target.value)}>
+                {OBJETIVOS.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+            {mObjetivo === 'Otro' && (
+              <div className="fg"><label>Especifica el objetivo</label>
+                <input value={mObjetivoOtro} onChange={e=>setMObjetivoOtro(e.target.value)} placeholder="Describe el objetivo" />
+              </div>
+            )}
+
+            <div className="section-label">Horarios disponibles — {fmtDate(selDate)}</div>
+            {!servSel
+              ? <div className="empty-state">Selecciona el tipo de consulta para ver los horarios.</div>
+              : slots.length === 0
+                ? <div className="empty-state">No hay horarios para este día.</div>
+                : slots.every(s => !s.disponible)
+                  ? <div className="empty-state">Sin horarios disponibles (día lleno).</div>
+                  : (
+                    <div className="horario-grid">
+                      {slots.map(s => (
+                        <button key={s.hora}
+                          className={`horario-slot${!s.disponible ? ' ocupado' : mHora === s.hora ? ' selected' : ''}`}
+                          onClick={() => { if (s.disponible) setMHora(s.hora); }}>{s.hora}</button>
+                      ))}
+                    </div>
+                  )
+            }
+
+            <div className="fg"><label>Notas (opcional)</label>
+              <textarea value={mNotas} onChange={e=>setMNotas(e.target.value)} placeholder={isNutri ? 'Observaciones…' : 'Cuéntanos tu objetivo…'} />
+            </div>
+
+            <div className="btn-row">
+              <button className="btn-cancel" onClick={cerrarModal}>Cancelar</button>
+              <button className="btn-save" onClick={guardar} disabled={saving || !servSel || !mHora || (isNutri && !mPaciente.trim())}>
+                {saving ? 'Guardando...' : (isNutri ? 'Guardar cita' : 'Confirmar cita')}
+              </button>
+            </div>
           </div>
         </div>
       )}
