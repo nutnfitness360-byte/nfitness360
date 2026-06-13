@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import Topbar from '../components/Topbar';
 import PerfilPaciente from '../components/PerfilPaciente';
@@ -29,6 +29,37 @@ export default function PacienteDashboard() {
   const hoyKey = new Date().toISOString().slice(0, 10);
   const proxima = citas.find(c => c.fecha >= hoyKey && c.estado !== 'cancelada');
   const nombre = user?.displayName?.split(' ')[0] || 'bienvenida';
+
+  const cancelarCita = async (c) => {
+    if (c.estado === 'cancelada') return;
+    const ok = window.confirm(
+      '¿Cancelar tu cita del ' + c.fecha + ' a las ' + c.hora + '?\n' +
+      'Recuerda las políticas de cancelación. Si necesitas reagendar, podrás hacerlo desde la app.'
+    );
+    if (!ok) return;
+    try {
+      await updateDoc(doc(db, 'citas', c.id), { estado: 'cancelada' });
+      const url = process.env.REACT_APP_APPSCRIPT_URL;
+      if (url) {
+        try {
+          await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'cancelarCita',
+              eventId: c.eventId || '',
+              correo: (c.pacienteEmail || user.email || '').toLowerCase(),
+              paciente: c.pacienteNombre || nombre,
+              fecha: c.fecha,
+              hora: c.hora,
+              tipoNombre: c.tipoNombre || c.motivo || '',
+              online: !!c.online,
+              canceladoPor: 'paciente',
+            }), redirect: 'follow',
+          });
+        } catch (e) { /* secundario: ya quedó cancelada */ }
+      }
+    } catch (e) { alert('No se pudo cancelar: ' + e.message); }
+  };
 
   const fmtFecha = (key) => {
     if (!key) return '';
@@ -76,6 +107,12 @@ export default function PacienteDashboard() {
                       <div className="cita-motivo">{fmtFecha(proxima.fecha)}</div>
                     </div>
                     <span className={`badge b-${proxima.estado === 'confirmada' ? 'confirm' : proxima.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{proxima.estado}</span>
+                    {proxima.estado !== 'cancelada' && (
+                      <button onClick={() => cancelarCita(proxima)} title="Cancelar cita"
+                        style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid #B0593F', borderRadius: 8, fontSize: 11, fontWeight: 600, color: '#B0593F', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                        Cancelar
+                      </button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -96,6 +133,12 @@ export default function PacienteDashboard() {
                       <div className="cita-motivo">{fmtFecha(c.fecha)}</div>
                     </div>
                     <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>
+                    {c.estado !== 'cancelada' && c.fecha >= hoyKey && (
+                      <button onClick={() => cancelarCita(c)} title="Cancelar cita"
+                        style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid #B0593F', borderRadius: 8, fontSize: 11, fontWeight: 600, color: '#B0593F', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                        Cancelar
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
