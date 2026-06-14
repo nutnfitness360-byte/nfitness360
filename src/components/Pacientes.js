@@ -205,7 +205,7 @@ export default function Pacientes() {
           const url = process.env.REACT_APP_APPSCRIPT_URL;
           if (url) await fetch(url, {
             method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'saveInBody', patient: sel.nombre, filename: 'InBody_' + (sel.codigo || '') + '_' + nm.fecha + '.pdf', pdfBase64: b64 }),
+            body: JSON.stringify({ action: 'saveInBody', patient: sel.nombre, correo: (sel.correo || ''), filename: 'InBody_' + (sel.codigo || '') + '_' + nm.fecha + '.pdf', pdfBase64: b64 }),
             redirect: 'follow',
           });
         } catch (e) { /* el respaldo en Drive es secundario; la medición ya quedó guardada */ }
