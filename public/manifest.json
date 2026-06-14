@@ -3,9 +3,12 @@
   "name": "Nfitness 360® — Nutrición y bienestar",
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#1a1612",
+  "theme_color": "#211C17",
   "background_color": "#EEE4DA",
   "icons": [
-    { "src": "favicon.ico", "sizes": "64x64 32x32 24x24 16x16", "type": "image/x-icon" }
+    { "src": "favicon.ico", "sizes": "64x64 48x48 32x32 16x16", "type": "image/x-icon" },
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
   ]
 }
