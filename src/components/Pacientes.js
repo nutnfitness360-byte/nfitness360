@@ -10,6 +10,7 @@ import InBodyModal from './InBodyModal';
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const MESES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const fmtMes = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} ${MESES[d.getMonth()]}`; };
+const fmtSello = (ts) => { const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
 const fmtFecha = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} de ${MESES_L[d.getMonth()]} de ${d.getFullYear()}`; };
 const initials = (n) => n ? n.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase() : 'NU';
 const last = (a) => (a && a.length ? a[a.length - 1] : null);
@@ -54,6 +55,7 @@ export default function Pacientes() {
   const [openPlan, setOpenPlan] = useState(false);
   const [inbodyOpen, setInbodyOpen] = useState(false);
   const [inbody, setInbody] = useState(null);
+  const [recoTexto, setRecoTexto] = useState('');
   const [err, setErr] = useState('');
 
   useEffect(() => {
@@ -159,6 +161,22 @@ export default function Pacientes() {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { planes: arr }); } catch (e) { setErr(e.message); }
   };
 
+  const addReco = async () => {
+    const t = recoTexto.trim();
+    if (!t) { setErr('Escribe la recomendación.'); return; }
+    const arr = [...(sel.recomendaciones || []), { texto: t, fecha: Date.now() }];
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr });
+      setRecoTexto(''); setErr('');
+    } catch (e) { setErr('No se pudo guardar la recomendación: ' + e.message); }
+  };
+
+  const removeReco = async (i) => {
+    if (!window.confirm('¿Eliminar esta recomendación?')) return;
+    const arr = (sel.recomendaciones || []).filter((_, k) => k !== i);
+    try { await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr }); } catch (e) { setErr(e.message); }
+  };
+
   const onInBody = async (data) => {
     const peso = parseFloat(data.peso);
     if (isFinite(peso)) {
@@ -210,6 +228,12 @@ export default function Pacientes() {
           </div>
         </div>
 
+        <div style={S.metricGrid}>
+          <div style={S.metric}><div style={S.metricLbl}>Peso actual</div><div style={S.metricVal}>{m ? m.peso : '—'}<span style={S.metricUnit}> kg</span></div></div>
+          <div style={S.metric}><div style={S.metricLbl}>% de grasa</div><div style={S.metricVal}>{m ? m.grasa : '—'}<span style={S.metricUnit}> %</span></div></div>
+          <div style={S.metric}><div style={S.metricLbl}>Masa muscular</div><div style={S.metricVal}>{m ? m.musculo : '—'}<span style={S.metricUnit}> kg</span></div></div>
+        </div>
+
         <div className="card">
           <div className="card-title">Información general</div>
           <div style={S.infoGrid}>
@@ -218,9 +242,7 @@ export default function Pacientes() {
             <Info l="Estatura" v={sel.estatura ? sel.estatura + ' cm' : '—'} />
             <Info l="Inicio" v={sel.inicio ? fmtFecha(sel.inicio) : '—'} />
             <Info l="Contacto" v={sel.contacto || '—'} />
-            <Info l="Peso actual" v={m ? m.peso + ' kg' : '—'} />
-            <Info l="% grasa" v={m ? m.grasa + '%' : '—'} />
-            <Info l="Masa muscular" v={m ? m.musculo + ' kg' : '—'} />
+            <Info l="Objetivo" v={sel.objetivo || '—'} />
           </div>
         </div>
 
@@ -256,6 +278,27 @@ export default function Pacientes() {
             <ChartCard title="% de grasa" unit="%" valor={m ? m.grasa : null}><Linea data={sel.mediciones} field="grasa" color="var(--stone)" unit="" /></ChartCard>
             <ChartCard title="Masa muscular" unit=" kg" valor={m ? m.musculo : null}><Linea data={sel.mediciones} field="musculo" color="var(--sage)" unit="" /></ChartCard>
           </div>
+        </div>
+
+        <div className="card">
+          <div className="card-title">Recomendaciones</div>
+          <div style={S.note}>Notas de bitácora para el paciente. Se guardan con la fecha y hora en que las publicas, y el paciente las verá en su sección "Recomendaciones".</div>
+          <div style={{ marginBottom: 12 }}>
+            <textarea style={S.recoArea} rows={3} value={recoTexto} onChange={e => setRecoTexto(e.target.value)}
+              placeholder="Escribe una recomendación para el paciente…" />
+            <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addReco}>+ Agregar recomendación</button>
+          </div>
+          {(!sel.recomendaciones || sel.recomendaciones.length === 0)
+            ? <div className="empty-state">Aún no hay recomendaciones.</div>
+            : [...sel.recomendaciones].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+              <div key={idx} style={S.recoItem}>
+                <div style={{ flex: 1 }}>
+                  <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
+                  <div style={S.recoText}>{r.texto}</div>
+                </div>
+                <button style={S.rm} onClick={() => removeReco(idx)} title="Eliminar">×</button>
+              </div>
+            ))}
         </div>
 
         <div className="card">
@@ -437,7 +480,16 @@ const styles = {
   infoCell: { background: 'var(--cream)', borderRadius: 10, padding: '9px 11px' },
   infoLbl: { fontSize: 9.5, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: 3 },
   infoVal: { fontSize: 13, color: 'var(--dark)', fontWeight: 600 },
-  chartGrid: { display: 'grid', gridTemplateColumns: '1fr', gap: 12 },
+  chartGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
+  metricGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 12 },
+  metric: { background: '#fff', border: '0.5px solid var(--border)', borderRadius: 14, padding: '14px 16px' },
+  metricLbl: { fontSize: 11, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 },
+  metricVal: { fontSize: 26, fontWeight: 800, color: 'var(--dark)', marginTop: 4, lineHeight: 1.1 },
+  metricUnit: { fontSize: 12, fontWeight: 600, color: 'var(--stone)' },
+  recoArea: { width: '100%', border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', resize: 'vertical', boxSizing: 'border-box' },
+  recoItem: { display: 'flex', alignItems: 'flex-start', gap: 10, border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, background: 'var(--cream)' },
+  recoDate: { fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 },
+  recoText: { fontSize: 13, color: 'var(--dark)', lineHeight: 1.5, whiteSpace: 'pre-wrap' },
   chartCard: { border: '0.5px solid var(--border)', borderRadius: 12, padding: '10px 12px', background: '#fff' },
   chartTop: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 },
   field: { display: 'flex', flexDirection: 'column', gap: 5 },
