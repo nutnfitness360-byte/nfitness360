@@ -21,7 +21,7 @@ function Linea({ data, field, color, unit }) {
   const Y = (v) => h - pad - ((v - min) / span) * (h - 2 * pad);
   const pts = valid.map((d, i) => `${X(i)},${Y(d[field])}`).join(' ');
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto', display: 'block', fontFamily: 'Montserrat, sans-serif' }}>
       <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="var(--border)" strokeWidth="1" />
       {valid.length > 1 && <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />}
       {valid.map((d, i) => <circle key={i} cx={X(i)} cy={Y(d[field])} r="3.5" fill={color} />)}
@@ -188,6 +188,11 @@ export default function PacienteDashboard() {
                 <div style={D.tileTitle}>Grasa visceral</div>
                 <div style={D.tileValue}>{ultMed && typeof ultMed.visceral === 'number' ? ultMed.visceral : '—'}</div>
                 <Linea data={medics} field="visceral" color="#36302B" unit="" />
+              </div>
+              <div style={D.tile}>
+                <div style={D.tileTitle}>Agua corporal total</div>
+                <div style={D.tileValue}>{ultMed && typeof ultMed.agua === 'number' ? ultMed.agua : '—'}<span style={D.tileUnit}> L</span></div>
+                <Linea data={medics} field="agua" color="#5B7C99" unit="" />
               </div>
             </div>
 
