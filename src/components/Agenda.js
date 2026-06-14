@@ -64,7 +64,7 @@ function generarSlots(dateKey, durMin, citasDelDia) {
   return cand.map(t => ({ hora: fromMin(t), disponible: durMin ? !choca(t, durMin) : false }));
 }
 
-export default function Agenda({ isNutri }) {
+export default function Agenda({ isNutri, reagendarDe = null, onReagendado }) {
   const { user } = useAuth();
   const hoy = new Date();
   const [view, setView] = useState({ y: hoy.getFullYear(), m: hoy.getMonth() });
@@ -172,9 +172,37 @@ export default function Agenda({ isNutri }) {
           if (d && d.eventId) { try { await updateDoc(doc(db, 'citas', ref.id), { eventId: d.eventId }); } catch (e) {} }
         } catch (e) { /* el evento/correo es secundario; la cita ya quedó guardada */ }
       }
+      // Si venimos de "Reagendar": cancelar la cita anterior ahora que la nueva ya quedó.
+      if (reagendarDe && reagendarDe.id) {
+        try { await cancelarEnServidor(reagendarDe, 'paciente'); } catch (e) { /* la nueva ya quedó; el aviso de cancelación es secundario */ }
+      }
       cerrarModal();
+      if (reagendarDe && onReagendado) onReagendado();
     } catch (e) { alert('Error: ' + e.message); }
     setSaving(false);
+  };
+
+  const cancelarEnServidor = async (c, quien) => {
+    await updateDoc(doc(db, 'citas', c.id), { estado: 'cancelada' });
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (url) {
+      try {
+        await fetch(url, {
+          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'cancelarCita',
+            eventId: c.eventId || '',
+            correo: (c.pacienteEmail || '').toLowerCase(),
+            paciente: c.pacienteNombre || '',
+            fecha: c.fecha,
+            hora: c.hora,
+            tipoNombre: c.tipoNombre || c.motivo || '',
+            online: !!c.online,
+            canceladoPor: quien,
+          }), redirect: 'follow',
+        });
+      } catch (e) { /* el correo/borrado de evento es secundario; ya quedó cancelada */ }
+    }
   };
 
   const cancelar = async (c) => {
@@ -185,26 +213,7 @@ export default function Agenda({ isNutri }) {
     );
     if (!ok) return;
     try {
-      await updateDoc(doc(db, 'citas', c.id), { estado: 'cancelada' });
-      const url = process.env.REACT_APP_APPSCRIPT_URL;
-      if (url) {
-        try {
-          await fetch(url, {
-            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-              action: 'cancelarCita',
-              eventId: c.eventId || '',
-              correo: (c.pacienteEmail || '').toLowerCase(),
-              paciente: c.pacienteNombre || '',
-              fecha: c.fecha,
-              hora: c.hora,
-              tipoNombre: c.tipoNombre || c.motivo || '',
-              online: !!c.online,
-              canceladoPor: isNutri ? 'nutriologa' : 'paciente',
-            }), redirect: 'follow',
-          });
-        } catch (e) { /* el correo/borrado de evento es secundario; ya quedó cancelada */ }
-      }
+      await cancelarEnServidor(c, isNutri ? 'nutriologa' : 'paciente');
     } catch (e) { alert('No se pudo cancelar: ' + e.message); }
   };
 
@@ -230,6 +239,11 @@ export default function Agenda({ isNutri }) {
 
   return (
     <div>
+      {reagendarDe && (
+        <div style={{ background: '#fff', border: '1px solid var(--gold)', borderRadius: 12, padding: '12px 14px', marginBottom: 14, fontSize: 12.5, color: 'var(--dark)', lineHeight: 1.5 }}>
+          <b>Reagendando tu cita</b> del {reagendarDe.fecha} a las {reagendarDe.hora}. Elige un nuevo día y horario; al confirmar, tu cita anterior se cancelará automáticamente.
+        </div>
+      )}
       <div className="card">
         <div className="cal-nav">
           <button onClick={() => setView(v => { let m=v.m-1,y=v.y; if(m<0){m=11;y--;} return {y,m}; })}>&#x2039;</button>
