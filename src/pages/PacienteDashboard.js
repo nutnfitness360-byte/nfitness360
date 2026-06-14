@@ -56,6 +56,8 @@ export default function PacienteDashboard() {
   const [tab, setTab] = useState('inicio');
   const [citas, setCitas] = useState([]);
   const [expediente, setExpediente] = useState(null);
+  const [modalCita, setModalCita] = useState(null);
+  const [reagendando, setReagendando] = useState(null);
 
   useEffect(() => {
     const q = query(collection(db, 'citas'), where('pacienteEmail', '==', user.email));
@@ -75,13 +77,9 @@ export default function PacienteDashboard() {
   const proxima = citas.find(c => c.fecha >= hoyKey && c.estado !== 'cancelada');
   const nombre = user?.displayName?.split(' ')[0] || 'bienvenida';
 
-  const cancelarCita = async (c) => {
-    if (c.estado === 'cancelada') return;
-    const ok = window.confirm(
-      '¿Cancelar tu cita del ' + c.fecha + ' a las ' + c.hora + '?\n' +
-      'Recuerda las políticas de cancelación. Si necesitas reagendar, podrás hacerlo desde la app.'
-    );
-    if (!ok) return;
+  // Cancelación en servidor (sin confirm; la confirmación es la ventanilla).
+  const ejecutarCancelacion = async (c) => {
+    if (!c || c.estado === 'cancelada') return;
     try {
       await updateDoc(doc(db, 'citas', c.id), { estado: 'cancelada' });
       const url = process.env.REACT_APP_APPSCRIPT_URL;
@@ -105,6 +103,18 @@ export default function PacienteDashboard() {
       }
     } catch (e) { alert('No se pudo cancelar: ' + e.message); }
   };
+
+  // ¿Faltan 24 h o más para la cita? (define si puede reagendar)
+  const horasFaltantes = (c) => {
+    if (!c) return 0;
+    const dt = new Date(c.fecha + 'T' + (c.hora || '00:00') + ':00');
+    return (dt.getTime() - Date.now()) / 3600000;
+  };
+  const puedeReagendar = (c) => horasFaltantes(c) >= 24;
+
+  // Botones de la ventanilla
+  const confirmarCancelar = async () => { const c = modalCita; setModalCita(null); await ejecutarCancelacion(c); };
+  const iniciarReagendar = () => { const c = modalCita; setModalCita(null); setReagendando(c); setTab('agendar'); };
 
   const fmtFecha = (key) => {
     if (!key) return '';
@@ -169,7 +179,7 @@ export default function PacienteDashboard() {
                   </div>
                   <span className={`badge b-${proxima.estado === 'confirmada' ? 'confirm' : proxima.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{proxima.estado}</span>
                   {proxima.estado !== 'cancelada' && (
-                    <button onClick={() => cancelarCita(proxima)} title="Cancelar cita"
+                    <button onClick={() => setModalCita(proxima)} title="Cancelar o reagendar"
                       style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid #B0593F', borderRadius: 8, fontSize: 11, fontWeight: 600, color: '#B0593F', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
                       Cancelar
                     </button>
@@ -236,7 +246,7 @@ export default function PacienteDashboard() {
         )}
 
         {tab === 'agendar' && (
-          <Agenda isNutri={false} />
+          <Agenda isNutri={false} reagendarDe={reagendando} onReagendado={() => { setReagendando(null); setTab('inicio'); }} />
         )}
 
         {tab === 'planes' && (
@@ -306,6 +316,38 @@ export default function PacienteDashboard() {
           </div>
         )}
       </div>
+
+      {modalCita && (
+        <div onClick={() => setModalCita(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(26,22,18,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 360, padding: '22px 20px', fontFamily: 'var(--font)' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)', marginBottom: 6 }}>¿Cancelar o reagendar tu cita?</div>
+            <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5, marginBottom: 16 }}>
+              {fmtFecha(modalCita.fecha)} a las {modalCita.hora}.
+            </div>
+
+            {!puedeReagendar(modalCita) && (
+              <div style={{ background: '#fbeae6', color: '#B0593F', fontSize: 11.5, padding: '9px 11px', borderRadius: 8, marginBottom: 14, lineHeight: 1.45 }}>
+                Ya no es posible reagendar: falta menos de 24 h para tu cita. Según las políticas, una cancelación a destiempo o inasistencia se penaliza con el importe total de la consulta.
+              </div>
+            )}
+
+            <button onClick={iniciarReagendar} disabled={!puedeReagendar(modalCita)}
+              style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: puedeReagendar(modalCita) ? 'pointer' : 'not-allowed', border: 'none', background: puedeReagendar(modalCita) ? 'var(--gold)' : 'var(--border)', color: puedeReagendar(modalCita) ? '#fff' : 'var(--stone)' }}>
+              Reagendar
+            </button>
+            <button onClick={confirmarCancelar}
+              style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: 'transparent', border: '1px solid #B0593F', color: '#B0593F' }}>
+              Cancelar cita
+            </button>
+            <button onClick={() => setModalCita(null)}
+              style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 10, fontSize: 12.5, fontFamily: 'var(--font)', cursor: 'pointer', background: 'transparent', border: 'none', color: 'var(--stone)' }}>
+              Volver
+            </button>
+          </div>
+        </div>
+      )}
 
       {navEl}
     </div>
