@@ -56,6 +56,7 @@ export default function Pacientes() {
   const [inbodyOpen, setInbodyOpen] = useState(false);
   const [inbody, setInbody] = useState(null);
   const [recoTexto, setRecoTexto] = useState('');
+  const [panel, setPanel] = useState(null);
   const [err, setErr] = useState('');
 
   useEffect(() => {
@@ -215,7 +216,6 @@ export default function Pacientes() {
     }
     return (
       <div>
-        <button style={S.back} onClick={volver}>← Atrás</button>
         {err && <div style={S.err}>{err}</div>}
 
         <div className="card">
@@ -250,17 +250,6 @@ export default function Pacientes() {
 
         <div className="card">
           <div style={S.titleRow}>
-            <div className="card-title" style={{ margin: 0 }}>Historial clínico</div>
-            <button style={S.smallBtn} onClick={() => irSub('historia')}>Ver / editar</button>
-          </div>
-          <div style={S.note}>Datos generales, bioquímica, suplementación, síntomas, antecedentes, historia dietética y ejercicio.</div>
-          {sel.historia
-            ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Historia clínica registrada.</div>
-            : <div className="empty-state">Aún no hay historia clínica.</div>}
-        </div>
-
-        <div className="card">
-          <div style={S.titleRow}>
             <div className="card-title" style={{ margin: 0 }}>Seguimiento</div>
             <button style={S.smallBtn} onClick={() => setOpenMed(v => !v)}>{openMed ? 'Cancelar' : '+ Medición'}</button>
           </div>
@@ -280,82 +269,137 @@ export default function Pacientes() {
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-title">Recomendaciones</div>
-          <div style={S.note}>Notas de bitácora para el paciente. Se guardan con la fecha y hora en que las publicas, y el paciente las verá en su sección "Recomendaciones".</div>
-          <div style={{ marginBottom: 12 }}>
-            <textarea style={S.recoArea} rows={3} value={recoTexto} onChange={e => setRecoTexto(e.target.value)}
-              placeholder="Escribe una recomendación para el paciente…" />
-            <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addReco}>+ Agregar recomendación</button>
-          </div>
-          {(!sel.recomendaciones || sel.recomendaciones.length === 0)
-            ? <div className="empty-state">Aún no hay recomendaciones.</div>
-            : [...sel.recomendaciones].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
-              <div key={idx} style={S.recoItem}>
-                <div style={{ flex: 1 }}>
-                  <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
-                  <div style={S.recoText}>{r.texto}</div>
+        <div style={S.panelGrid}>
+          {/* Historial clínico */}
+          <div className="card" style={panel === 'historia' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'historia' ? null : 'historia')}>
+              <span style={S.panelTitle}>Historial clínico</span>
+              <span style={panel === 'historia' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'historia' && (
+              <div style={S.panelBody}>
+                <div style={S.titleRow}>
+                  <div style={S.note}>Datos generales, bioquímica, suplementación, síntomas, antecedentes, historia dietética y ejercicio.</div>
+                  <button style={S.smallBtn} onClick={() => irSub('historia')}>Ver / editar</button>
                 </div>
-                <button style={S.rm} onClick={() => removeReco(idx)} title="Eliminar">×</button>
+                {sel.historia
+                  ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Historia clínica registrada.</div>
+                  : <div className="empty-state">Aún no hay historia clínica.</div>}
               </div>
-            ))}
-        </div>
-
-        <div className="card">
-          <div style={S.titleRow}>
-            <div className="card-title" style={{ margin: 0 }}>Plan nutricional</div>
-            <button style={S.smallBtn} onClick={() => setInbodyOpen(true)}>Abrir cálculo</button>
+            )}
           </div>
-          <div style={S.note}>Calcula los equivalentes (SMAE) y los macros del plan a partir de los datos del paciente.</div>
-          {sel.plan && sel.plan.totales
-            ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Plan guardado: <b>{sel.plan.totales.kcal} kcal</b> · {fmtFecha(sel.plan.fecha)}</div>
-            : <div className="empty-state">Aún no hay cálculo de plan.</div>}
-        </div>
 
-        <div className="card">
-          <div style={S.titleRow}>
-            <div className="card-title" style={{ margin: 0 }}>Menús por tiempo de comida</div>
-            <button style={S.smallBtn} onClick={() => irSub('menus')}>Abrir menús</button>
-          </div>
-          <div style={S.note}>Reparte los equivalentes del plan en los tiempos de comida y arma las opciones de menú.</div>
-          {!(sel.plan && sel.plan.eq)
-            ? <div className="empty-state">Primero calcula y guarda el plan.</div>
-            : (sel.plan.menus && sel.plan.menus.tiempos
-              ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>{sel.plan.menus.tiempos.length} tiempos de comida configurados.</div>
-              : <div className="empty-state">Aún no hay menús generados.</div>)}
-        </div>
-
-        <div className="card">
-          <div style={S.titleRow}>
-            <div className="card-title" style={{ margin: 0 }}>Planes</div>
-            <button style={S.smallBtn} onClick={() => setOpenPlan(v => !v)}>{openPlan ? 'Cancelar' : '+ Plan'}</button>
-          </div>
-          <div style={S.note}>El reporte (PDF) se guarda en Google Drive y aquí se registra su enlace.</div>
-          {openPlan && (
-            <div style={S.formRow}>
-              <Field l="Nombre del plan"><input style={S.inp} value={plan.nombre} onChange={e => setPlan({ ...plan, nombre: e.target.value })} placeholder="Plan · 2200 kcal" /></Field>
-              <Field l="Fecha"><input type="date" style={S.inp} value={plan.fecha} onChange={e => setPlan({ ...plan, fecha: e.target.value })} /></Field>
-              <Field l="Enlace de Drive"><input style={S.inp} value={plan.link} onChange={e => setPlan({ ...plan, link: e.target.value })} placeholder="https://drive.google.com/…" /></Field>
-              <button style={S.saveBtn} onClick={addPlan}>Guardar</button>
-            </div>
-          )}
-          {(!sel.planes || sel.planes.length === 0)
-            ? <div className="empty-state">Aún no hay planes para este paciente.</div>
-            : sel.planes.map((pl, i) => (
-              <div key={i} style={S.planRow}>
-                <div style={S.planIcon}>PDF</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{pl.nombre}</div>
-                  <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{pl.fecha ? fmtFecha(pl.fecha) : ''}</div>
+          {/* Recomendaciones */}
+          <div className="card" style={panel === 'reco' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'reco' ? null : 'reco')}>
+              <span style={S.panelTitle}>Recomendaciones</span>
+              <span style={panel === 'reco' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'reco' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Notas de bitácora para el paciente. Se guardan con la fecha y hora en que las publicas, y el paciente las verá en su sección "Recomendaciones".</div>
+                <div style={{ marginBottom: 12 }}>
+                  <textarea style={S.recoArea} rows={3} value={recoTexto} onChange={e => setRecoTexto(e.target.value)}
+                    placeholder="Escribe una recomendación para el paciente…" />
+                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addReco}>+ Agregar recomendación</button>
                 </div>
-                {pl.link
-                  ? <a href={pl.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>
-                  : <span style={{ fontSize: 11, color: 'var(--stone)', fontStyle: 'italic' }}>Sin enlace</span>}
-                <button style={S.rm} onClick={() => removePlan(i)} title="Quitar">×</button>
+                {(!sel.recomendaciones || sel.recomendaciones.length === 0)
+                  ? <div className="empty-state">Aún no hay recomendaciones.</div>
+                  : [...sel.recomendaciones].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                    <div key={idx} style={S.recoItem}>
+                      <div style={{ flex: 1 }}>
+                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
+                        <div style={S.recoText}>{r.texto}</div>
+                      </div>
+                      <button style={S.rm} onClick={() => removeReco(idx)} title="Eliminar">×</button>
+                    </div>
+                  ))}
               </div>
-            ))
-          }
+            )}
+          </div>
+
+          {/* Plan nutricional */}
+          <div className="card" style={panel === 'plan' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'plan' ? null : 'plan')}>
+              <span style={S.panelTitle}>Plan nutricional</span>
+              <span style={panel === 'plan' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'plan' && (
+              <div style={S.panelBody}>
+                <div style={S.titleRow}>
+                  <div style={S.note}>Calcula los equivalentes (SMAE) y los macros del plan a partir de los datos del paciente.</div>
+                  <button style={S.smallBtn} onClick={() => setInbodyOpen(true)}>Abrir cálculo</button>
+                </div>
+                {sel.plan && sel.plan.totales
+                  ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Plan guardado: <b>{sel.plan.totales.kcal} kcal</b> · {fmtFecha(sel.plan.fecha)}</div>
+                  : <div className="empty-state">Aún no hay cálculo de plan.</div>}
+              </div>
+            )}
+          </div>
+
+          {/* Menús */}
+          <div className="card" style={panel === 'menus' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'menus' ? null : 'menus')}>
+              <span style={S.panelTitle}>Menús por tiempo de comida</span>
+              <span style={panel === 'menus' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'menus' && (
+              <div style={S.panelBody}>
+                <div style={S.titleRow}>
+                  <div style={S.note}>Reparte los equivalentes del plan en los tiempos de comida y arma las opciones de menú.</div>
+                  <button style={S.smallBtn} onClick={() => irSub('menus')}>Abrir menús</button>
+                </div>
+                {!(sel.plan && sel.plan.eq)
+                  ? <div className="empty-state">Primero calcula y guarda el plan.</div>
+                  : (sel.plan.menus && sel.plan.menus.tiempos
+                    ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>{sel.plan.menus.tiempos.length} tiempos de comida configurados.</div>
+                    : <div className="empty-state">Aún no hay menús generados.</div>)}
+              </div>
+            )}
+          </div>
+
+          {/* Planes */}
+          <div className="card" style={panel === 'planes' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'planes' ? null : 'planes')}>
+              <span style={S.panelTitle}>Planes</span>
+              <span style={panel === 'planes' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'planes' && (
+              <div style={S.panelBody}>
+                <div style={S.titleRow}>
+                  <div style={S.note}>El reporte (PDF) se guarda en Google Drive y aquí se registra su enlace.</div>
+                  <button style={S.smallBtn} onClick={() => setOpenPlan(v => !v)}>{openPlan ? 'Cancelar' : '+ Plan'}</button>
+                </div>
+                {openPlan && (
+                  <div style={S.formRow}>
+                    <Field l="Nombre del plan"><input style={S.inp} value={plan.nombre} onChange={e => setPlan({ ...plan, nombre: e.target.value })} placeholder="Plan · 2200 kcal" /></Field>
+                    <Field l="Fecha"><input type="date" style={S.inp} value={plan.fecha} onChange={e => setPlan({ ...plan, fecha: e.target.value })} /></Field>
+                    <Field l="Enlace de Drive"><input style={S.inp} value={plan.link} onChange={e => setPlan({ ...plan, link: e.target.value })} placeholder="https://drive.google.com/…" /></Field>
+                    <button style={S.saveBtn} onClick={addPlan}>Guardar</button>
+                  </div>
+                )}
+                {(!sel.planes || sel.planes.length === 0)
+                  ? <div className="empty-state">Aún no hay planes para este paciente.</div>
+                  : sel.planes.map((pl, i) => (
+                    <div key={i} style={S.planRow}>
+                      <div style={S.planIcon}>PDF</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{pl.nombre}</div>
+                        <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{pl.fecha ? fmtFecha(pl.fecha) : ''}</div>
+                      </div>
+                      {pl.link
+                        ? <a href={pl.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>
+                        : <span style={{ fontSize: 11, color: 'var(--stone)', fontStyle: 'italic' }}>Sin enlace</span>}
+                      <button style={S.rm} onClick={() => removePlan(i)} title="Quitar">×</button>
+                    </div>
+                  ))
+                }
+              </div>
+            )}
+          </div>
         </div>
+
+        <button style={{ ...S.back, marginTop: 16, marginBottom: 0 }} onClick={volver}>← Atrás</button>
 
         {inbodyOpen && (
           <InBodyModal
@@ -490,6 +534,14 @@ const styles = {
   recoItem: { display: 'flex', alignItems: 'flex-start', gap: 10, border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, background: 'var(--cream)' },
   recoDate: { fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 },
   recoText: { fontSize: 13, color: 'var(--dark)', lineHeight: 1.5, whiteSpace: 'pre-wrap' },
+  panelGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, alignItems: 'start' },
+  panel: { padding: 0, overflow: 'hidden' },
+  panelOpen: { padding: 0, overflow: 'hidden', gridColumn: '1 / -1' },
+  panelHead: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', padding: '16px 16px', textAlign: 'left' },
+  panelTitle: { fontSize: 14, fontWeight: 700, color: 'var(--dark)', lineHeight: 1.3 },
+  chev: { color: 'var(--stone)', fontSize: 16, transition: 'transform .15s', flexShrink: 0 },
+  chevOpen: { color: 'var(--gold)', fontSize: 16, transform: 'rotate(180deg)', flexShrink: 0 },
+  panelBody: { padding: '0 16px 16px' },
   chartCard: { border: '0.5px solid var(--border)', borderRadius: 12, padding: '10px 12px', background: '#fff' },
   chartTop: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 },
   field: { display: 'flex', flexDirection: 'column', gap: 5 },
