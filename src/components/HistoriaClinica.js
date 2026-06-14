@@ -347,7 +347,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
       const filename = /\.pdf$/i.test(file.name || '') ? file.name : ((file.name || 'analisis') + '.pdf');
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'saveAnalisis', patient: nombre, filename, pdfBase64: b64 }), redirect: 'follow',
+        body: JSON.stringify({ action: 'saveAnalisis', patient: nombre, correo: (data.datos.correo || ''), filename, pdfBase64: b64 }), redirect: 'follow',
       });
       let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (d.ok && d.link) {
@@ -381,7 +381,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
         const filename = "Historial clínico " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
         await fetch(url, {
           method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "saveHistorial", patient: nombre, filename, pdfBase64 }), redirect: "follow",
+          body: JSON.stringify({ action: "saveHistorial", patient: nombre, correo: (data.datos.correo || ""), filename, pdfBase64 }), redirect: "follow",
         });
       } catch (e) { /* el PDF es secundario; la historia ya quedó guardada */ }
     }
@@ -399,7 +399,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
       const filename = "Historial clínico " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
       const res = await fetch(url, {
         method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "saveHistorial", patient: nombre, filename, pdfBase64 }), redirect: "follow",
+        body: JSON.stringify({ action: "saveHistorial", patient: nombre, correo: (data.datos.correo || ""), filename, pdfBase64 }), redirect: "follow",
       });
       let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false }; }
       if (d.ok && d.link) setPdfStatus("PDF guardado en Drive ✓");
