@@ -29,7 +29,7 @@ function Linea({ data, field, color, unit }) {
   const Y = (v) => h - pad - ((v - min) / span) * (h - 2 * pad);
   const pts = valid.map((d, i) => `${X(i)},${Y(d[field])}`).join(' ');
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto', display: 'block', fontFamily: 'Montserrat, sans-serif' }}>
       <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="var(--border)" strokeWidth="1" />
       {valid.length > 1 && <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />}
       {valid.map((d, i) => <circle key={i} cx={X(i)} cy={Y(d[field])} r="3.5" fill={color} />)}
@@ -58,7 +58,7 @@ export default function Pacientes() {
   const [inbody, setInbody] = useState(null);
   const [recoTexto, setRecoTexto] = useState('');
   const [panel, setPanel] = useState(null);
-  const [ib, setIb] = useState({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '' });
+  const [ib, setIb] = useState({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '', agua: '' });
   const [ibFile, setIbFile] = useState(null);
   const [ibBusy, setIbBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -193,6 +193,7 @@ export default function Pacientes() {
       musculo: parseFloat(ib.mme) || 0,
       grasaKg: parseFloat(ib.grasaKg) || 0,
       visceral: parseFloat(ib.visceral) || 0,
+      agua: parseFloat(ib.agua) || 0,
     };
     const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
     try {
@@ -209,7 +210,7 @@ export default function Pacientes() {
           });
         } catch (e) { /* el respaldo en Drive es secundario; la medición ya quedó guardada */ }
       }
-      setIb({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '' });
+      setIb({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '', agua: '' });
       setIbFile(null); setErr('');
     } catch (e) { setErr('No se pudo guardar el InBody: ' + e.message); }
     setIbBusy(false);
@@ -305,6 +306,7 @@ export default function Pacientes() {
             <ChartCard title="Masa muscular" unit=" kg" valor={m ? m.musculo : null}><Linea data={sel.mediciones} field="musculo" color="var(--sage)" unit="" /></ChartCard>
             <ChartCard title="Masa grasa" unit=" kg" valor={m ? m.grasaKg : null}><Linea data={sel.mediciones} field="grasaKg" color="#B0593F" unit="" /></ChartCard>
             <ChartCard title="Grasa visceral" unit="" valor={m ? m.visceral : null}><Linea data={sel.mediciones} field="visceral" color="#36302B" unit="" /></ChartCard>
+            <ChartCard title="Agua corporal total" unit=" L" valor={m ? m.agua : null}><Linea data={sel.mediciones} field="agua" color="#5B7C99" unit="" /></ChartCard>
           </div>
         </div>
 
@@ -348,6 +350,7 @@ export default function Pacientes() {
                   <Field l="Masa muscular (kg)"><input style={S.inp} inputMode="decimal" value={ib.mme} onChange={e => setIb({ ...ib, mme: e.target.value })} placeholder="34.5" /></Field>
                   <Field l="Masa grasa corporal (kg)"><input style={S.inp} inputMode="decimal" value={ib.grasaKg} onChange={e => setIb({ ...ib, grasaKg: e.target.value })} placeholder="13.4" /></Field>
                   <Field l="Grasa visceral (nivel)"><input style={S.inp} inputMode="decimal" value={ib.visceral} onChange={e => setIb({ ...ib, visceral: e.target.value })} placeholder="7" /></Field>
+                  <Field l="Agua corporal total (L)"><input style={S.inp} inputMode="decimal" value={ib.agua} onChange={e => setIb({ ...ib, agua: e.target.value })} placeholder="38.5" /></Field>
                 </div>
                 <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={guardarInBody} disabled={ibBusy}>{ibBusy ? 'Guardando…' : 'Guardar InBody'}</button>
               </div>
