@@ -11,6 +11,7 @@ const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov'
 const MESES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const fmtMes = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} ${MESES[d.getMonth()]}`; };
 const fmtSello = (ts) => { const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+const fileToBase64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
 const fmtFecha = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} de ${MESES_L[d.getMonth()]} de ${d.getFullYear()}`; };
 const initials = (n) => n ? n.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase() : 'NU';
 const last = (a) => (a && a.length ? a[a.length - 1] : null);
@@ -57,6 +58,9 @@ export default function Pacientes() {
   const [inbody, setInbody] = useState(null);
   const [recoTexto, setRecoTexto] = useState('');
   const [panel, setPanel] = useState(null);
+  const [ib, setIb] = useState({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '' });
+  const [ibFile, setIbFile] = useState(null);
+  const [ibBusy, setIbBusy] = useState(false);
   const [err, setErr] = useState('');
 
   useEffect(() => {
@@ -178,6 +182,39 @@ export default function Pacientes() {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr }); } catch (e) { setErr(e.message); }
   };
 
+  const guardarInBody = async () => {
+    const peso = parseFloat(ib.peso);
+    if (!isFinite(peso)) { setErr('El peso es necesario para registrar el InBody.'); return; }
+    setIbBusy(true);
+    const nm = {
+      fecha: ib.fecha || hoyISO(),
+      peso,
+      grasa: parseFloat(ib.grasa) || 0,
+      musculo: parseFloat(ib.mme) || 0,
+      grasaKg: parseFloat(ib.grasaKg) || 0,
+      visceral: parseFloat(ib.visceral) || 0,
+    };
+    const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), { mediciones: arr });
+      // Respaldo del PDF en Drive (carpeta "InBody" del paciente). Es secundario.
+      if (ibFile) {
+        try {
+          const b64 = await fileToBase64(ibFile);
+          const url = process.env.REACT_APP_APPSCRIPT_URL;
+          if (url) await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'saveInBody', patient: sel.nombre, filename: 'InBody_' + (sel.codigo || '') + '_' + nm.fecha + '.pdf', pdfBase64: b64 }),
+            redirect: 'follow',
+          });
+        } catch (e) { /* el respaldo en Drive es secundario; la medición ya quedó guardada */ }
+      }
+      setIb({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '' });
+      setIbFile(null); setErr('');
+    } catch (e) { setErr('No se pudo guardar el InBody: ' + e.message); }
+    setIbBusy(false);
+  };
+
   const onInBody = async (data) => {
     const peso = parseFloat(data.peso);
     if (isFinite(peso)) {
@@ -266,6 +303,8 @@ export default function Pacientes() {
             <ChartCard title="Peso" unit=" kg" valor={m ? m.peso : null}><Linea data={sel.mediciones} field="peso" color="var(--gold)" unit="" /></ChartCard>
             <ChartCard title="% de grasa" unit="%" valor={m ? m.grasa : null}><Linea data={sel.mediciones} field="grasa" color="var(--stone)" unit="" /></ChartCard>
             <ChartCard title="Masa muscular" unit=" kg" valor={m ? m.musculo : null}><Linea data={sel.mediciones} field="musculo" color="var(--sage)" unit="" /></ChartCard>
+            <ChartCard title="Masa grasa" unit=" kg" valor={m ? m.grasaKg : null}><Linea data={sel.mediciones} field="grasaKg" color="#B0593F" unit="" /></ChartCard>
+            <ChartCard title="Grasa visceral" unit="" valor={m ? m.visceral : null}><Linea data={sel.mediciones} field="visceral" color="#36302B" unit="" /></ChartCard>
           </div>
         </div>
 
@@ -285,6 +324,32 @@ export default function Pacientes() {
                 {sel.historia
                   ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Historia clínica registrada.</div>
                   : <div className="empty-state">Aún no hay historia clínica.</div>}
+              </div>
+            )}
+          </div>
+
+          {/* InBody */}
+          <div className="card" style={panel === 'inbody' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'inbody' ? null : 'inbody')}>
+              <span style={S.panelTitle}>InBody</span>
+              <span style={panel === 'inbody' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'inbody' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Sube el PDF del InBody (se respalda en Drive) y captura los valores del estudio. Estos datos alimentan las gráficas de seguimiento.</div>
+                <label style={S.upload}>
+                  <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => setIbFile(e.target.files && e.target.files[0])} />
+                  {ibFile ? ('PDF seleccionado: ' + ibFile.name) : 'Seleccionar PDF del InBody'}
+                </label>
+                <div style={S.formRow}>
+                  <Field l="Fecha del test"><input type="date" style={S.inp} value={ib.fecha} onChange={e => setIb({ ...ib, fecha: e.target.value })} /></Field>
+                  <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={ib.peso} onChange={e => setIb({ ...ib, peso: e.target.value })} placeholder="74.0" /></Field>
+                  <Field l="% de grasa"><input style={S.inp} inputMode="decimal" value={ib.grasa} onChange={e => setIb({ ...ib, grasa: e.target.value })} placeholder="18.2" /></Field>
+                  <Field l="Masa muscular (kg)"><input style={S.inp} inputMode="decimal" value={ib.mme} onChange={e => setIb({ ...ib, mme: e.target.value })} placeholder="34.5" /></Field>
+                  <Field l="Masa grasa corporal (kg)"><input style={S.inp} inputMode="decimal" value={ib.grasaKg} onChange={e => setIb({ ...ib, grasaKg: e.target.value })} placeholder="13.4" /></Field>
+                  <Field l="Grasa visceral (nivel)"><input style={S.inp} inputMode="decimal" value={ib.visceral} onChange={e => setIb({ ...ib, visceral: e.target.value })} placeholder="7" /></Field>
+                </div>
+                <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={guardarInBody} disabled={ibBusy}>{ibBusy ? 'Guardando…' : 'Guardar InBody'}</button>
               </div>
             )}
           </div>
@@ -542,6 +607,7 @@ const styles = {
   chev: { color: 'var(--stone)', fontSize: 16, transition: 'transform .15s', flexShrink: 0 },
   chevOpen: { color: 'var(--gold)', fontSize: 16, transform: 'rotate(180deg)', flexShrink: 0 },
   panelBody: { padding: '0 16px 16px' },
+  upload: { display: 'block', textAlign: 'center', background: 'var(--cream)', border: '1px dashed var(--gold)', borderRadius: 10, padding: '14px', fontSize: 13, fontWeight: 600, color: 'var(--dark)', cursor: 'pointer', marginBottom: 12 },
   chartCard: { border: '0.5px solid var(--border)', borderRadius: 12, padding: '10px 12px', background: '#fff' },
   chartTop: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 },
   field: { display: 'flex', flexDirection: 'column', gap: 5 },
