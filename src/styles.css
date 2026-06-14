@@ -33,12 +33,49 @@ body {
 }
 
 @media (min-width: 768px) {
+  .app {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "nav topbar" "nav content";
+    min-height: 100vh;
+  }
+  .topbar { grid-area: topbar; }
   .content {
-    max-width: 960px;
+    grid-area: content;
+    max-width: 1200px;
     margin: 0 auto;
     width: 100%;
     padding: 2rem 2.5rem !important;
   }
+  .bottomnav {
+    grid-area: nav;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 4px;
+    padding: 1.5rem 0.75rem;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    bottom: auto;
+  }
+  .bottomnav .nav-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    width: 100%;
+    padding: 0.7rem 0.85rem;
+  }
+  .bottomnav .nav-item span {
+    font-size: 13px;
+    text-transform: none;
+    letter-spacing: 0.2px;
+  }
+  .bottomnav .nav-item.active {
+    background: rgba(205,167,136,0.16);
+  }
+  .nav-spacer { flex: 1 1 auto; }
   .stats {
     grid-template-columns: repeat(4, minmax(0,1fr)) !important;
   }
@@ -48,6 +85,10 @@ body {
   .horario-grid {
     grid-template-columns: repeat(4, minmax(0,1fr)) !important;
   }
+}
+
+@media (max-width: 767px) {
+  .nav-spacer { display: none; }
 }
 
 /* Topbar */
