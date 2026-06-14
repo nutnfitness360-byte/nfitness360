@@ -179,6 +179,16 @@ export default function PacienteDashboard() {
                 <div style={D.tileValue}>{ultMed && typeof ultMed.musculo === 'number' ? ultMed.musculo : '—'}<span style={D.tileUnit}> kg</span></div>
                 <Linea data={medics} field="musculo" color="var(--sage)" unit="" />
               </div>
+              <div style={D.tile}>
+                <div style={D.tileTitle}>Masa grasa</div>
+                <div style={D.tileValue}>{ultMed && typeof ultMed.grasaKg === 'number' ? ultMed.grasaKg : '—'}<span style={D.tileUnit}> kg</span></div>
+                <Linea data={medics} field="grasaKg" color="#B0593F" unit="" />
+              </div>
+              <div style={D.tile}>
+                <div style={D.tileTitle}>Grasa visceral</div>
+                <div style={D.tileValue}>{ultMed && typeof ultMed.visceral === 'number' ? ultMed.visceral : '—'}</div>
+                <Linea data={medics} field="visceral" color="#36302B" unit="" />
+              </div>
             </div>
 
             <h2 style={D.section}>Accesos rápidos</h2>
