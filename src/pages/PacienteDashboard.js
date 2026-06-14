@@ -9,6 +9,7 @@ import Agenda from '../components/Agenda';
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
 const MESES_MINI = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const fmtMesP = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} ${MESES_MINI[d.getMonth()]}`; };
+const fmtSello = (ts) => { const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
 function Linea({ data, field, color, unit }) {
   const valid = (data || []).filter(d => typeof d[field] === 'number' && !isNaN(d[field]));
   if (valid.length === 0) return <div style={{ fontSize: 12, color: 'var(--stone)', padding: '20px 0', textAlign: 'center' }}>Sin mediciones aún</div>;
@@ -256,10 +257,19 @@ export default function PacienteDashboard() {
               ← Atrás
             </button>
             <div className="card-title">Recomendaciones</div>
-            <div className="empty-state">
-              <div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>💡</div>
-              Próximamente tu nutrióloga publicará aquí recomendaciones personalizadas para tu proceso.
-            </div>
+            {(!expediente || !Array.isArray(expediente.recomendaciones) || expediente.recomendaciones.length === 0) ? (
+              <div className="empty-state">
+                <div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>💡</div>
+                Aún no tienes recomendaciones. Tu nutrióloga las publicará aquí cuando las tenga listas.
+              </div>
+            ) : (
+              [...expediente.recomendaciones].reverse().map((r, i) => (
+                <div key={i} style={{ border: '0.5px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 10, background: 'var(--cream)' }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 5 }}>{fmtSello(r.fecha)}</div>
+                  <div style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{r.texto}</div>
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>
