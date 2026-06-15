@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth, googleProvider, db } from '../firebase/config';
 import {
   signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  fetchSignInMethodsForEmail, updateProfile, signOut,
+  updateProfile, signOut,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -20,15 +20,20 @@ async function esNutriAutorizada(email) {
 const MSG = {
   'auth/invalid-email': 'El correo no es válido.',
   'auth/wrong-password': 'La contraseña no es correcta.',
-  'auth/invalid-credential': 'Correo o contraseña incorrectos.',
   'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
   'auth/popup-closed-by-user': 'Se cerró la ventana de Google.',
   'auth/operation-not-allowed': 'El acceso con correo no está habilitado. Avisa al administrador.',
+  'auth/too-many-requests': 'Demasiados intentos. Espera un momento e inténtalo de nuevo.',
 };
 const traducir = (code) => MSG[code] || ('Ocurrió un error (' + code + ').');
 
+// Códigos que pueden significar "la cuenta no existe" (Firebase a veces los
+// enmascara como credencial inválida cuando la protección anti-enumeración
+// está activada).
+const POSIBLE_SIN_CUENTA = ['auth/user-not-found', 'auth/invalid-credential', 'auth/invalid-login-credentials'];
+
 export default function LoginPage() {
-  const [vista, setVista] = useState('inicio');   // inicio | acceso | email | password | crear | denegado
+  const [vista, setVista] = useState('inicio');     // inicio | acceso | email | crear | denegado
   const [puerta, setPuerta] = useState('paciente'); // nutri | paciente
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -36,11 +41,12 @@ export default function LoginPage() {
   const [nombre, setNombre] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [ofrecerCrear, setOfrecerCrear] = useState(false);
 
   const esNutriPuerta = puerta === 'nutri';
   const tituloPuerta = esNutriPuerta ? 'Panel de nutrición' : 'Portal del paciente';
 
-  const abrir = (p) => { setPuerta(p); setError(''); setEmail(''); setPass(''); setPass2(''); setNombre(''); setVista('acceso'); };
+  const abrir = (p) => { setPuerta(p); setError(''); setEmail(''); setPass(''); setPass2(''); setNombre(''); setOfrecerCrear(false); setVista('acceso'); };
   const volverInicio = () => { setError(''); setVista('inicio'); };
 
   // ---- Google ----
@@ -60,45 +66,35 @@ export default function LoginPage() {
     setLoading(false);
   };
 
-  // ---- Continuar con correo: detecta si es primera vez ----
-  const continuarCorreo = async () => {
+  // ---- Entrar con correo + contraseña ----
+  const entrarConCorreo = async () => {
     const e = email.trim().toLowerCase();
     if (!e || e.indexOf('@') < 0) { setError('Escribe un correo válido.'); return; }
-    setLoading(true); setError('');
-    try {
-      if (esNutriPuerta && !(await esNutriAutorizada(e))) {
-        setLoading(false); setVista('denegado'); return;
-      }
-      const metodos = await fetchSignInMethodsForEmail(auth, e);
-      if (metodos.includes('password')) {
-        setVista('password');
-      } else if (metodos.length > 0 && metodos.includes('google.com')) {
-        setError('Este correo ya usa acceso con Google. Usa el botón "Continuar con Google".');
-      } else {
-        setVista('crear'); // sin métodos conocidos → primera vez (con respaldo abajo)
-      }
-    } catch (err) {
-      setError(traducir(err.code));
-    }
-    setLoading(false);
-  };
-
-  // ---- Iniciar sesión con contraseña existente ----
-  const entrarPassword = async () => {
     if (!pass) { setError('Escribe tu contraseña.'); return; }
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setOfrecerCrear(false);
     try {
-      const cred = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), pass);
+      if (esNutriPuerta && !(await esNutriAutorizada(e))) { setLoading(false); setVista('denegado'); return; }
+      const cred = await signInWithEmailAndPassword(auth, e, pass);
       if (esNutriPuerta && !(await esNutriAutorizada(cred.user.email))) {
         await signOut(auth); setVista('denegado');
       }
-    } catch (e) {
-      setError(traducir(e.code));
+      // éxito → AuthContext entra al panel
+    } catch (err) {
+      if (err.code === 'auth/wrong-password') {
+        setError('La contraseña no es correcta.');
+      } else if (POSIBLE_SIN_CUENTA.includes(err.code)) {
+        setError('No pudimos iniciar sesión. Si ya tienes cuenta, revisa tu contraseña; si es tu primera vez, crea tu cuenta.');
+        setOfrecerCrear(true);
+      } else {
+        setError(traducir(err.code));
+      }
     }
     setLoading(false);
   };
 
-  // ---- Crear contraseña (primera vez) ----
+  // ---- Crear cuenta (solo si el correo es nuevo) ----
+  const irACrear = () => { setError(''); setOfrecerCrear(false); setPass2(''); setNombre(''); setVista('crear'); };
+
   const crearCuenta = async () => {
     const e = email.trim().toLowerCase();
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
@@ -111,9 +107,8 @@ export default function LoginPage() {
       // AuthContext entra al panel que corresponda.
     } catch (err) {
       if (err.code === 'auth/email-already-in-use') {
-        // Ya existía: lo mandamos a iniciar sesión con su contraseña.
         setError('Ya tienes una cuenta con este correo. Escribe tu contraseña para entrar.');
-        setVista('password');
+        setVista('email'); setOfrecerCrear(false);
       } else {
         setError(traducir(err.code));
       }
@@ -129,7 +124,6 @@ export default function LoginPage() {
     hola: { fontSize: 14, color: 'var(--cream)', marginBottom: 22, opacity: 0.85 },
     cards: { display: 'flex', gap: 12 },
     card: { flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid #4A423B', borderRadius: 14, padding: '22px 12px', cursor: 'pointer', color: '#fff' },
-    cardIcon: { fontSize: 26, color: 'var(--gold)' },
     cardTitle: { fontSize: 13.5, fontWeight: 700, marginTop: 10 },
     cardDesc: { fontSize: 10.5, color: '#B7ABA2', marginTop: 4, lineHeight: 1.4 },
     panel: { background: '#fff', borderRadius: 16, padding: '22px 20px', textAlign: 'left' },
@@ -139,6 +133,7 @@ export default function LoginPage() {
     btnGoogle: { background: '#fff', border: '1px solid var(--border)', color: 'var(--dark)', marginBottom: 9 },
     btnDark: { background: 'var(--dark)', color: '#fff' },
     btnGhost: { background: 'transparent', border: '1px solid var(--border)', color: 'var(--stone)' },
+    btnGold: { background: 'var(--gold)', color: '#fff', marginTop: 8 },
     lbl: { fontSize: 10, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', margin: '0 0 4px', display: 'block' },
     inp: { width: '100%', boxSizing: 'border-box', border: '0.5px solid var(--border)', borderRadius: 9, padding: 10, fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', marginBottom: 12 },
     err: { background: '#fbeae6', color: '#B0593F', fontSize: 11.5, padding: '9px 11px', borderRadius: 8, marginBottom: 12, lineHeight: 1.4 },
@@ -170,18 +165,25 @@ export default function LoginPage() {
     );
   }
 
-  // ===================== VENTANILLA (acceso / email / password / crear / denegado) =====================
+  // ===================== VENTANILLA =====================
+  const backHandler = () => {
+    setError(''); setOfrecerCrear(false);
+    if (vista === 'acceso') volverInicio();
+    else if (vista === 'crear') setVista('email');
+    else setVista('acceso');
+  };
+
   return (
     <div style={S.wrap}>
       <div style={{ ...S.box, maxWidth: 340 }}>
         <div style={S.panel}>
-          <button style={S.back} onClick={vista === 'acceso' ? volverInicio : () => { setError(''); setVista('acceso'); }}>← Atrás</button>
+          <button style={S.back} onClick={backHandler}>← Atrás</button>
 
           {vista === 'denegado' ? (
             <>
               <div style={S.h3}>Acceso no autorizado</div>
               <div style={S.err}>Este correo no está autorizado para el panel de nutrición.</div>
-              <p style={S.p}>Si crees que es un error, contacta al administrador para que te dé de alta. Si eres paciente, regresa y entra por "Paciente".</p>
+              <p style={S.p}>Si crees que es un error, contacta al administrador. Si eres paciente, regresa y entra por "Paciente".</p>
               <button style={{ ...S.btn, ...S.btnGhost }} onClick={volverInicio}>Volver al inicio</button>
             </>
           ) : (
@@ -204,38 +206,35 @@ export default function LoginPage() {
 
               {vista === 'email' && (
                 <>
-                  <p style={S.p}>Escribe tu correo para continuar.</p>
+                  <p style={S.p}>Ingresa tu correo y contraseña.</p>
                   {error && <div style={S.err}>{error}</div>}
                   <label style={S.lbl}>Correo electrónico</label>
-                  <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="correo@ejemplo.com" />
-                  <button style={{ ...S.btn, ...S.btnDark }} onClick={continuarCorreo} disabled={loading}>
-                    {loading ? 'Verificando…' : 'Continuar'}
-                  </button>
-                </>
-              )}
-
-              {vista === 'password' && (
-                <>
-                  <p style={S.p}>Ingresa tu contraseña para <b>{email.trim().toLowerCase()}</b>.</p>
-                  {error && <div style={S.err}>{error}</div>}
+                  <input style={S.inp} type="email" value={email} onChange={e => { setEmail(e.target.value); setOfrecerCrear(false); }} placeholder="correo@ejemplo.com" />
                   <label style={S.lbl}>Contraseña</label>
-                  <input style={S.inp} type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••" />
-                  <button style={{ ...S.btn, ...S.btnDark }} onClick={entrarPassword} disabled={loading}>
+                  <input style={S.inp} type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••"
+                    onKeyDown={e => { if (e.key === 'Enter') entrarConCorreo(); }} />
+                  <button style={{ ...S.btn, ...S.btnDark }} onClick={entrarConCorreo} disabled={loading}>
                     {loading ? 'Entrando…' : 'Entrar'}
                   </button>
+                  {ofrecerCrear && (
+                    <button style={{ ...S.btn, ...S.btnGold }} onClick={irACrear} disabled={loading}>
+                      Crear cuenta con este correo
+                    </button>
+                  )}
                 </>
               )}
 
               {vista === 'crear' && (
                 <>
-                  <p style={S.p}>Primera vez con <b>{email.trim().toLowerCase()}</b>. Crea tu contraseña.</p>
+                  <p style={S.p}>Crea tu cuenta para <b>{email.trim().toLowerCase()}</b>.</p>
                   {error && <div style={S.err}>{error}</div>}
                   <label style={S.lbl}>Tu nombre</label>
                   <input style={S.inp} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre y apellido" />
-                  <label style={S.lbl}>Crear contraseña</label>
+                  <label style={S.lbl}>Contraseña</label>
                   <input style={S.inp} type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Mínimo 6 caracteres" />
                   <label style={S.lbl}>Confirmar contraseña</label>
-                  <input style={S.inp} type="password" value={pass2} onChange={e => setPass2(e.target.value)} placeholder="Repite la contraseña" />
+                  <input style={S.inp} type="password" value={pass2} onChange={e => setPass2(e.target.value)} placeholder="Repite la contraseña"
+                    onKeyDown={e => { if (e.key === 'Enter') crearCuenta(); }} />
                   <button style={{ ...S.btn, ...S.btnDark }} onClick={crearCuenta} disabled={loading}>
                     {loading ? 'Creando…' : 'Crear y entrar'}
                   </button>
