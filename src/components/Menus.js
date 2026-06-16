@@ -160,33 +160,38 @@ export default function Menus({ patient, onBack }) {
   };
 
   const guardar = async () => {
-    setStatus('guardando');
-    try { await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos } }); setStatus('guardado'); }
-    catch (e) { setStatus('error'); }
-  };
-
-  const generarReporte = async () => {
-    const url = process.env.REACT_APP_APPSCRIPT_URL;
-    if (!url) { setRep('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
-    setRep('Guardando menús y generando reporte…');
+    setStatus('guardando'); setRep('Guardando menús…');
+    // 1) Guardar SIEMPRE los menús primero (un fallo del PDF no debe hacer perder el trabajo).
     try {
       await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos } });
-      setStatus('guardado');
+    } catch (e) {
+      setStatus('error'); setRep('No se pudieron guardar los menús: ' + e.message); return;
+    }
+    setStatus('guardado');
+    // 2) Generar el PDF, subirlo a Drive y registrarlo en "Planes".
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setRep('Menús guardados ✓ (no se generó PDF: falta REACT_APP_APPSCRIPT_URL).'); return; }
+    try {
+      setRep('Generando y subiendo el PDF a Drive…');
       const html = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos });
       const fechaTxt = new Date().toLocaleDateString('es-MX').replace(/\//g, '-');
-      const filename = 'Plan nutricional ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt + '.pdf';
-      setRep('Subiendo a Drive…');
+      const baseNombre = 'Plan nutricional ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt;
+      const filename = baseNombre + '.pdf';
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'savePlan', patient: patient.nombre, correo: (patient.correo || ''), filename, html }), redirect: 'follow',
       });
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (data.ok && data.link) {
-        const nuevo = { nombre: 'Plan nutricional ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt, fecha: new Date().toISOString().slice(0, 10), link: data.link };
+        const nuevo = { nombre: baseNombre, fecha: new Date().toISOString().slice(0, 10), link: data.link };
         await updateDoc(doc(db, 'pacientes', patient.id), { planes: [...(patient.planes || []), nuevo] });
-        setRep('Reporte subido a Drive y registrado en Planes ✓');
-      } else { setRep('Error: ' + (data.error || 'no se recibió enlace.')); }
-    } catch (e) { setRep('No se pudo generar/subir: ' + e.message); }
+        setRep('Menús guardados y reporte subido a Drive (registrado en Planes) ✓');
+      } else {
+        setRep('Menús guardados ✓, pero el PDF no se pudo subir: ' + (data.error || 'no se recibió enlace.'));
+      }
+    } catch (e) {
+      setRep('Menús guardados ✓, pero falló el PDF: ' + e.message);
+    }
   };
 
   // balance: suma por grupo de todos los tiempos vs total del plan
@@ -283,8 +288,7 @@ export default function Menus({ patient, onBack }) {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button style={S.volverBtn} onClick={onBack}>← Atrás</button>
-          <button style={S.reportBtn} className="nf-tpl2" onClick={generarReporte}>Generar reporte PDF</button>
-          <button style={S.primaryBtn} className="nf-primary" onClick={guardar}>Guardar menús</button>
+          <button style={S.primaryBtn} className="nf-primary" onClick={guardar} disabled={status === 'guardando'}>{status === 'guardando' ? 'Guardando…' : 'Guardar menús'}</button>
         </div>
       </div>
     </div>
@@ -301,7 +305,7 @@ const styles = {
   balOk: { background: '#E9F1ED', color: '#3E6B5B' }, balBad: { background: '#F7EAE5', color: T.danger },
   toolbar: { display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 },
   toolBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, padding: '9px 15px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: mono },
-  iaBtn: { borderColor: T.line, color: T.inkSoft, cursor: 'not-allowed', background: '#FBF8F4' },
+  iaBtn: { borderColor: T.amber, color: '#211C17', cursor: 'pointer', background: T.amber },
   iaNote: { fontSize: 12, color: T.inkSoft, background: T.mint, borderRadius: 9, padding: '9px 12px', marginBottom: 16, lineHeight: 1.5 },
   card: { background: T.surface, border: `1px solid ${T.line}`, borderRadius: 14, padding: '16px 18px', marginBottom: 14 },
   mealHead: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 },
