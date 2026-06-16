@@ -171,8 +171,9 @@ export default function PacienteDashboard() {
       <div className="content">
         {tab === 'inicio' && (
           <>
+            <h1 style={{ fontSize: 30, fontWeight: 800, color: 'var(--dark)', margin: '4px 4px 16px', fontFamily: 'var(--font)', letterSpacing: 0.2 }}>¡Hola, {nombre}!</h1>
             <div className="card">
-              <div className="card-title">¡Hola, {nombre}!</div>
+              <div className="card-title">Próximas citas</div>
               {proxima ? (
                 <div className="cita-item" style={{ paddingTop: 0 }}>
                   <div className="cita-hora">{proxima.hora}</div>
@@ -237,7 +238,7 @@ export default function PacienteDashboard() {
               <button style={D.access} onClick={() => setTab('planes')}>
                 {IconPlan}
                 <span style={D.accessLabel}>Mis archivos</span>
-                <span style={D.accessSub}>Consulta tu plan nutricional</span>
+                <span style={D.accessSub}>Consulta tus archivos relevantes</span>
               </button>
               <button style={D.access} onClick={() => setTab('recomendaciones')}>
                 {IconRecom}
