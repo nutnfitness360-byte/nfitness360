@@ -109,13 +109,6 @@ export default function Plan({ patient, pdata, onBack }) {
     // eslint-disable-next-line
   }, [meta.energia]);
 
-  const aplicarPlantilla = () => {
-    const e = num(meta.energia) || (isFin(sugerido) ? r0(sugerido) : 0);
-    if (!e) { setStatus('error'); return; }
-    setEq(plantillaEq(e).map(String));
-    setStatus('nuevo');
-  };
-
   const energia = num(meta.energia);
   const pP = num(meta.pP), pL = num(meta.pL), pC = num(meta.pC);
   const sumaPct = pP + pL + pC;
@@ -219,7 +212,7 @@ export default function Plan({ patient, pdata, onBack }) {
         </Section>
 
         {/* SECCIÓN C */}
-        <Section n="C" title="Tabla de equivalentes" hint="Se recalcula automáticamente al cambiar la energía meta (B). También puedes editar el # Eq de cada grupo (recálculo en vivo)." action={<button style={styles.templateBtn} className="nf-tpl" onClick={aplicarPlantilla}>Aplicar plantilla base</button>}>
+        <Section n="C" title="Tabla de equivalentes" hint="Se calcula automáticamente a partir de la energía meta (B). Puedes ajustar el # Eq de cada grupo; el recálculo es en vivo.">
           <div style={styles.tableScroll}>
             <table style={styles.table}>
               <thead>
