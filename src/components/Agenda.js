@@ -64,7 +64,7 @@ function generarSlots(dateKey, durMin, citasDelDia) {
   return cand.map(t => ({ hora: fromMin(t), disponible: durMin ? !choca(t, durMin) : false }));
 }
 
-export default function Agenda({ isNutri, reagendarDe = null, onReagendado }) {
+export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSolicitarCancelar }) {
   const { user } = useAuth();
   const hoy = new Date();
   const [view, setView] = useState({ y: hoy.getFullYear(), m: hoy.getMonth() });
@@ -272,7 +272,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado }) {
                 </div>
                 <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>
                 {c.estado !== 'cancelada' && (
-                  <button onClick={() => cancelar(c)} title="Cancelar cita"
+                  <button onClick={() => (!isNutri && onSolicitarCancelar) ? onSolicitarCancelar(c) : cancelar(c)} title="Cancelar cita"
                     style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid #B0593F', borderRadius: 8, fontSize: 11, fontWeight: 600, color: '#B0593F', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', flexShrink: 0 }}>
                     Cancelar
                   </button>
