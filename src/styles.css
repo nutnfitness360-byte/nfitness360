@@ -37,7 +37,7 @@ body {
     display: grid;
     grid-template-columns: 220px 1fr;
     grid-template-rows: auto 1fr;
-    grid-template-areas: "nav topbar" "nav content";
+    grid-template-areas: "topbar topbar" "nav content";
     min-height: 100vh;
   }
   .topbar { grid-area: topbar; }
@@ -55,9 +55,10 @@ body {
     align-items: stretch;
     gap: 4px;
     padding: 1.5rem 0.75rem;
-    height: 100vh;
+    align-self: stretch;
+    min-height: calc(100vh - 120px);
     position: sticky;
-    top: 0;
+    top: 120px;
     bottom: auto;
   }
   .bottomnav .nav-item {
