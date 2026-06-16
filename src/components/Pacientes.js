@@ -57,6 +57,7 @@ export default function Pacientes() {
   const [inbodyOpen, setInbodyOpen] = useState(false);
   const [inbody, setInbody] = useState(null);
   const [recoTexto, setRecoTexto] = useState('');
+  const [bitacoraTexto, setBitacoraTexto] = useState('');
   const [panel, setPanel] = useState(null);
   const [ib, setIb] = useState({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '', agua: '' });
   const [ibFile, setIbFile] = useState(null);
@@ -197,6 +198,22 @@ export default function Pacientes() {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr }); } catch (e) { setErr(e.message); }
   };
 
+  const addBitacora = async () => {
+    const t = bitacoraTexto.trim();
+    if (!t) { setErr('Escribe la nota de la consulta.'); return; }
+    const arr = [...(sel.bitacora || []), { texto: t, fecha: Date.now() }];
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), { bitacora: arr });
+      setBitacoraTexto(''); setErr('');
+    } catch (e) { setErr('No se pudo guardar la nota: ' + e.message); }
+  };
+
+  const removeBitacora = async (i) => {
+    if (!window.confirm('¿Eliminar esta nota de la bitácora?')) return;
+    const arr = (sel.bitacora || []).filter((_, k) => k !== i);
+    try { await updateDoc(doc(db, 'pacientes', sel.id), { bitacora: arr }); } catch (e) { setErr(e.message); }
+  };
+
   const guardarInBody = async () => {
     const peso = parseFloat(ib.peso);
     if (!isFinite(peso)) { setErr('El peso es necesario para registrar el InBody.'); return; }
@@ -326,6 +343,35 @@ export default function Pacientes() {
         </div>
 
         <div style={S.panelGrid}>
+          {/* Seguimientos (notas internas de consulta, no visibles para el paciente) */}
+          <div className="card" style={panel === 'bitacora' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'bitacora' ? null : 'bitacora')}>
+              <span style={S.panelTitle}>Seguimientos</span>
+              <span style={panel === 'bitacora' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'bitacora' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Notas de seguimiento de la consulta (texto libre). <b>El paciente no las ve.</b></div>
+                <div style={{ marginBottom: 12 }}>
+                  <textarea style={S.recoArea} rows={3} value={bitacoraTexto} onChange={e => setBitacoraTexto(e.target.value)}
+                    placeholder="Anota lo que comente el paciente, observaciones, acuerdos…" />
+                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addBitacora}>+ Agregar nota</button>
+                </div>
+                {(!sel.bitacora || sel.bitacora.length === 0)
+                  ? <div className="empty-state">Aún no hay notas de consulta.</div>
+                  : [...sel.bitacora].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                    <div key={idx} style={S.recoItem}>
+                      <div style={{ flex: 1 }}>
+                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
+                        <div style={S.recoText}>{r.texto}</div>
+                      </div>
+                      <button style={S.rm} onClick={() => removeBitacora(idx)} title="Eliminar">×</button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
           {/* Historial clínico */}
           <div className="card" style={panel === 'historia' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'historia' ? null : 'historia')}>
