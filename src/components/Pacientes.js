@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, query, orderBy } from 'firebase/firestore';
 import Plan from './Plan';
 import Menus from './Menus';
 import HistoriaClinica from './HistoriaClinica';
@@ -109,6 +109,19 @@ export default function Pacientes() {
     };
   };
 
+  // Opción C: copia el sexo (y nombre) al registro de suscriptor, si hay correo vinculado.
+  const mirrorSuscriptor = async (correo, sexo, nombre) => {
+    const c = (correo || '').trim().toLowerCase();
+    if (!c || c.indexOf('@') < 0) return;
+    try {
+      await setDoc(doc(db, 'suscriptores', c), {
+        correo: c,
+        ...(sexo ? { sexo } : {}),
+        ...(nombre ? { nombre } : {}),
+      }, { merge: true });
+    } catch (e) { /* secundario */ }
+  };
+
   const guardarHistoriaNueva = async (h) => {
     const der = derivar(h);
     if (!der.nombre) { setErr('Escribe el nombre en "Datos generales".'); throw new Error('sin nombre'); }
@@ -116,12 +129,14 @@ export default function Pacientes() {
       codigo: (h.datos && h.datos.pacienteNo) || nextCodigo(), ...der, contacto: '',
       historia: h, inicio: hoyISO(), mediciones: [], planes: [], creado: Date.now(),
     });
+    mirrorSuscriptor(der.correo, der.sexo, der.nombre);
     setNuevo(false); setErr(''); setSelId(ref.id); setSub('dash');
   };
 
   const guardarHistoriaExistente = async (h) => {
     const der = derivar(h);
     await updateDoc(doc(db, 'pacientes', sel.id), { ...der, historia: h });
+    mirrorSuscriptor(der.correo, der.sexo, der.nombre);
     setErr('');
   };
 
@@ -551,7 +566,14 @@ function CorreoVinculo({ patient }) {
   const [st, setSt] = useState('');
   const save = async () => {
     setSt('Guardando…');
-    try { await updateDoc(doc(db, 'pacientes', patient.id), { correo: v.trim().toLowerCase() }); setSt('Vínculo guardado ✓'); }
+    const correo = v.trim().toLowerCase();
+    try {
+      await updateDoc(doc(db, 'pacientes', patient.id), { correo });
+      if (correo && correo.indexOf('@') >= 0) {
+        try { await setDoc(doc(db, 'suscriptores', correo), { correo, sexo: patient.sexo || '', nombre: patient.nombre || '' }, { merge: true }); } catch (e) {}
+      }
+      setSt('Vínculo guardado ✓');
+    }
     catch (e) { setSt('Error: ' + e.message); }
   };
   return (
