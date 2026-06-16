@@ -35,9 +35,9 @@ body {
 @media (min-width: 768px) {
   .app {
     display: grid;
-    grid-template-columns: 220px 1fr;
-    grid-template-rows: auto 1fr;
-    grid-template-areas: "nav topbar" "nav content";
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas: "topbar" "nav" "content";
     min-height: 100vh;
   }
   .topbar { grid-area: topbar; }
@@ -50,22 +50,21 @@ body {
   }
   .bottomnav {
     grid-area: nav;
-    flex-direction: column;
+    flex-direction: row;
     justify-content: flex-start;
-    align-items: stretch;
-    gap: 4px;
-    padding: 1.5rem 0.75rem;
-    height: 100vh;
-    position: sticky;
-    top: 0;
+    align-items: center;
+    gap: 6px;
+    padding: 0.45rem 1.5rem;
+    position: static;
     bottom: auto;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
   }
   .bottomnav .nav-item {
     flex-direction: row;
     justify-content: flex-start;
-    gap: 12px;
-    width: 100%;
-    padding: 0.7rem 0.85rem;
+    gap: 9px;
+    width: auto;
+    padding: 0.6rem 0.95rem;
   }
   .bottomnav .nav-item span {
     font-size: 13px;
