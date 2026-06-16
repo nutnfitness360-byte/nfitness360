@@ -101,6 +101,7 @@ export default function Menus({ patient, onBack }) {
   });
   const [status, setStatus] = useState(plan.menus ? 'guardado' : 'nuevo');
   const [rep, setRep] = useState('');
+  const [iaBusy, setIaBusy] = useState(false);
 
   const touch = () => setStatus('nuevo');
   const setT = (idx, patch) => { setTiempos(ts => ts.map((t, i) => i === idx ? { ...t, ...patch } : t)); touch(); };
@@ -122,7 +123,41 @@ export default function Menus({ patient, onBack }) {
     catch (_) { setStatus('error'); }
   };
 
-  const generarIA = () => { /* CAPA 2: aquí se conecta Sonnet 4.6 para rellenar opciones. */ };
+  const generarIA = async () => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setRep('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    if (!planEq) return;
+    setIaBusy(true); setRep('Generando menús con IA… (puede tardar unos segundos)');
+    try {
+      const payloadTiempos = tiempos.map(t => {
+        const en = t.eq.reduce((a, _, g) => ({
+          kcal: a.kcal + num(t.eq[g]) * GRUPOS[g][1], prot: a.prot + num(t.eq[g]) * GRUPOS[g][2],
+          lip: a.lip + num(t.eq[g]) * GRUPOS[g][3], hc: a.hc + num(t.eq[g]) * GRUPOS[g][4],
+        }), { kcal: 0, prot: 0, lip: 0, hc: 0 });
+        const equivalentes = t.eq.map((n, g) => ({ grupo: GRUPOS[g][0], n: r0(num(n)) })).filter(x => x.n > 0);
+        return { nombre: t.nombre, hora: t.hora, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) } };
+      });
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'generarMenusIA', objetivo: patient.objetivo || '', totales: plan.totales || {}, tiempos: payloadTiempos, nOpciones: 3 }),
+        redirect: 'follow',
+      });
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      if (!data.ok || !Array.isArray(data.tiempos)) throw new Error(data.error || 'No se recibieron menús.');
+      setTiempos(ts => ts.map((t, i) => {
+        const r = data.tiempos[i];
+        if (!r || !Array.isArray(r.opciones)) return t;
+        const ops = r.opciones.slice(0, 3).map(o => ({ nombre: (o && o.nombre) || '', prep: (o && o.prep) || '' }));
+        while (ops.length < 3) ops.push(nuevaOpcion());
+        return { ...t, opciones: ops };
+      }));
+      setStatus('nuevo');
+      setRep('Menús generados por IA. Revísalos y edítalos antes de guardar.');
+    } catch (e) {
+      setRep('No se pudo generar con IA: ' + e.message);
+    }
+    setIaBusy(false);
+  };
 
   const guardar = async () => {
     setStatus('guardando');
@@ -186,9 +221,9 @@ export default function Menus({ patient, onBack }) {
 
       <div style={S.toolbar}>
         <button style={S.toolBtn} onClick={redistribuir}>Redistribuir equivalentes</button>
-        <button style={{ ...S.toolBtn, ...S.iaBtn }} onClick={generarIA} disabled title="Disponible al conectar la IA (Capa 2)">Generar menús con IA ✦</button>
+        <button style={{ ...S.toolBtn, ...S.iaBtn }} onClick={generarIA} disabled={iaBusy}>{iaBusy ? 'Generando…' : 'Generar menús con IA ✦'}</button>
       </div>
-      <div style={S.iaNote}>La generación automática de los platillos con IA se activa al conectar la API (Sonnet 4.6). Por ahora puedes escribir las opciones a mano; el reparto de equivalentes ya es automático.</div>
+      <div style={S.iaNote}>La IA propone los platillos ciñéndose a los equivalentes y macros de cada tiempo. <b>Revisa y edita</b> las opciones antes de guardar; la IA solo sugiere.</div>
 
       {tiempos.map((t, idx) => {
         const en = t.eq.reduce((a, _, g) => ({
