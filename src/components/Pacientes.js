@@ -710,7 +710,7 @@ function ChartCard({ title, unit, valor, children }) {
     <div style={styles.chartCard}>
       <div style={styles.chartTop}>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dark)' }}>{title}</span>
-        <span style={{ fontFamily: 'var(--font-display), serif', fontSize: 22, color: 'var(--dark)' }}>{valor != null ? valor : '—'}<span style={{ fontSize: 11, color: 'var(--stone)' }}>{unit}</span></span>
+        <span style={{ fontFamily: 'var(--font)', fontWeight: 800, fontSize: 22, color: 'var(--dark)' }}>{valor != null ? valor : '—'}<span style={{ fontSize: 11, fontWeight: 600, color: 'var(--stone)' }}>{unit}</span></span>
       </div>
       {children}
     </div>
