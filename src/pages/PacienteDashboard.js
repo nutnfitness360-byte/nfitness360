@@ -293,6 +293,28 @@ export default function PacienteDashboard() {
           </div>
         )}
 
+        {tab === 'planes' && expediente && (
+          <div className="card">
+            <div className="card-title">Reportes ISAK</div>
+            {(!Array.isArray(expediente.isak) || expediente.isak.length === 0) ? (
+              <div className="empty-state">Aún no tienes reportes ISAK.</div>
+            ) : (
+              [...expediente.isak].reverse().map((r, i) => (
+                <div className="cita-item" key={i}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--dark)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>PDF</div>
+                  <div style={{ flex: 1, marginLeft: '12px' }}>
+                    <div className="cita-nombre">{r.nombre || 'Reporte ISAK'}</div>
+                    <div className="cita-motivo">{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+                  </div>
+                  {r.link
+                    ? <a href={r.link} target="_blank" rel="noreferrer" style={{ background: 'var(--gold)', color: '#fff', textDecoration: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap' }}>Abrir</a>
+                    : <span style={{ fontSize: '11px', color: 'var(--stone)' }}>Sin archivo</span>}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         {tab === 'recomendaciones' && (
           <div className="card">
             <button onClick={() => setTab('inicio')}
