@@ -58,6 +58,7 @@ export default function Pacientes() {
   const [inbody, setInbody] = useState(null);
   const [recoTexto, setRecoTexto] = useState('');
   const [bitacoraTexto, setBitacoraTexto] = useState('');
+  const [isakTexto, setIsakTexto] = useState('');
   const [panel, setPanel] = useState(null);
   const [ib, setIb] = useState({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '', agua: '' });
   const [ibFile, setIbFile] = useState(null);
@@ -214,6 +215,22 @@ export default function Pacientes() {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { bitacora: arr }); } catch (e) { setErr(e.message); }
   };
 
+  const addIsak = async () => {
+    const t = isakTexto.trim();
+    if (!t) { setErr('Escribe la nota.'); return; }
+    const arr = [...(sel.isak || []), { texto: t, fecha: Date.now() }];
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), { isak: arr });
+      setIsakTexto(''); setErr('');
+    } catch (e) { setErr('No se pudo guardar la nota: ' + e.message); }
+  };
+
+  const removeIsak = async (i) => {
+    if (!window.confirm('¿Eliminar esta nota?')) return;
+    const arr = (sel.isak || []).filter((_, k) => k !== i);
+    try { await updateDoc(doc(db, 'pacientes', sel.id), { isak: arr }); } catch (e) { setErr(e.message); }
+  };
+
   const guardarInBody = async () => {
     const peso = parseFloat(ib.peso);
     if (!isFinite(peso)) { setErr('El peso es necesario para registrar el InBody.'); return; }
@@ -366,6 +383,35 @@ export default function Pacientes() {
                         <div style={S.recoText}>{r.texto}</div>
                       </div>
                       <button style={S.rm} onClick={() => removeBitacora(idx)} title="Eliminar">×</button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          {/* Isak (notas internas, no visibles para el paciente) */}
+          <div className="card" style={panel === 'isak' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'isak' ? null : 'isak')}>
+              <span style={S.panelTitle}>Isak</span>
+              <span style={panel === 'isak' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'isak' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Notas de texto libre. <b>El paciente no las ve.</b></div>
+                <div style={{ marginBottom: 12 }}>
+                  <textarea style={S.recoArea} rows={3} value={isakTexto} onChange={e => setIsakTexto(e.target.value)}
+                    placeholder="Escribe una nota…" />
+                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addIsak}>+ Agregar nota</button>
+                </div>
+                {(!sel.isak || sel.isak.length === 0)
+                  ? <div className="empty-state">Aún no hay notas.</div>
+                  : [...sel.isak].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                    <div key={idx} style={S.recoItem}>
+                      <div style={{ flex: 1 }}>
+                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
+                        <div style={S.recoText}>{r.texto}</div>
+                      </div>
+                      <button style={S.rm} onClick={() => removeIsak(idx)} title="Eliminar">×</button>
                     </div>
                   ))}
               </div>
