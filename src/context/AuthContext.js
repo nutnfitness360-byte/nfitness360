@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase/config';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -23,6 +23,35 @@ async function resolverRol(u) {
   return 'paciente';
 }
 
+// Registra o actualiza al suscriptor cada vez que inicia sesión.
+// Guarda: correo, nombre, método de acceso, primer registro y último acceso.
+// El campo "sexo" lo completa después la nutrióloga desde el expediente.
+async function registrarSuscriptor(u) {
+  const email = (u.email || '').toLowerCase();
+  if (!email) return;
+  const metodo = (u.providerData && u.providerData[0] && u.providerData[0].providerId) === 'google.com' ? 'Google' : 'Correo';
+  const ref = doc(db, 'suscriptores', email);
+  try {
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await setDoc(ref, {
+        nombre: u.displayName || snap.data().nombre || '',
+        metodo,
+        ultimoAcceso: Date.now(),
+      }, { merge: true });
+    } else {
+      await setDoc(ref, {
+        correo: email,
+        nombre: u.displayName || '',
+        metodo,
+        sexo: '',
+        creado: Date.now(),
+        ultimoAcceso: Date.now(),
+      });
+    }
+  } catch (e) { /* el registro de suscriptor es secundario; no debe bloquear el acceso */ }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
@@ -35,6 +64,7 @@ export function AuthProvider({ children }) {
         const r = await resolverRol(u);
         setUser(u);
         setRole(r);
+        registrarSuscriptor(u);
       } else {
         setUser(null);
         setRole(null);
