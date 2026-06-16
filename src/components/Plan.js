@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
 
@@ -97,6 +97,17 @@ export default function Plan({ patient, pdata, onBack }) {
     if (!teniaEq && eqVacios && e0) setEq(plantillaEq(e0).map(String));
     // eslint-disable-next-line
   }, []);
+
+  // Sección C siempre en sintonía con la energía meta (sección B):
+  // al cambiar las kcal, se recalcula la tabla de equivalentes con la plantilla base.
+  // (No corre en el primer render, para no pisar los equivalentes ya guardados de un plan existente.)
+  const primeraRender = useRef(true);
+  useEffect(() => {
+    if (primeraRender.current) { primeraRender.current = false; return; }
+    const e = num(meta.energia);
+    if (e > 0) { setEq(plantillaEq(e).map(String)); setStatus('nuevo'); }
+    // eslint-disable-next-line
+  }, [meta.energia]);
 
   const aplicarPlantilla = () => {
     const e = num(meta.energia) || (isFin(sugerido) ? r0(sugerido) : 0);
@@ -208,7 +219,7 @@ export default function Plan({ patient, pdata, onBack }) {
         </Section>
 
         {/* SECCIÓN C */}
-        <Section n="C" title="Tabla de equivalentes" hint="Plantilla base aplicada; edita el # Eq de cada grupo (recálculo en vivo)." action={<button style={styles.templateBtn} className="nf-tpl" onClick={aplicarPlantilla}>Aplicar plantilla base</button>}>
+        <Section n="C" title="Tabla de equivalentes" hint="Se recalcula automáticamente al cambiar la energía meta (B). También puedes editar el # Eq de cada grupo (recálculo en vivo)." action={<button style={styles.templateBtn} className="nf-tpl" onClick={aplicarPlantilla}>Aplicar plantilla base</button>}>
           <div style={styles.tableScroll}>
             <table style={styles.table}>
               <thead>
