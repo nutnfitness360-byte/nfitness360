@@ -58,7 +58,8 @@ export default function Pacientes() {
   const [inbody, setInbody] = useState(null);
   const [recoTexto, setRecoTexto] = useState('');
   const [bitacoraTexto, setBitacoraTexto] = useState('');
-  const [isakTexto, setIsakTexto] = useState('');
+  const [isakFile, setIsakFile] = useState(null);
+  const [isakBusy, setIsakBusy] = useState(false);
   const [panel, setPanel] = useState(null);
   const [ib, setIb] = useState({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '', agua: '' });
   const [ibFile, setIbFile] = useState(null);
@@ -215,18 +216,31 @@ export default function Pacientes() {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { bitacora: arr }); } catch (e) { setErr(e.message); }
   };
 
-  const addIsak = async () => {
-    const t = isakTexto.trim();
-    if (!t) { setErr('Escribe la nota.'); return; }
-    const arr = [...(sel.isak || []), { texto: t, fecha: Date.now() }];
+  const subirIsak = async () => {
+    if (!isakFile) { setErr('Selecciona el PDF del reporte ISAK.'); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setErr('No está configurada la conexión para subir archivos.'); return; }
+    setIsakBusy(true); setErr('');
     try {
+      const b64 = await fileToBase64(isakFile);
+      const fecha = hoyISO();
+      const filename = 'ISAK_' + (sel.codigo || '') + '_' + fecha + '.pdf';
+      const resp = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveISAK', patient: sel.nombre, correo: (sel.correo || ''), filename, pdfBase64: b64 }),
+        redirect: 'follow',
+      });
+      const data = await resp.json().catch(() => null);
+      if (!data || !data.ok || !data.link) throw new Error((data && data.error) || 'No se recibió el enlace del archivo.');
+      const arr = [...(sel.isak || []), { nombre: data.filename || filename, fecha, link: data.link }];
       await updateDoc(doc(db, 'pacientes', sel.id), { isak: arr });
-      setIsakTexto(''); setErr('');
-    } catch (e) { setErr('No se pudo guardar la nota: ' + e.message); }
+      setIsakFile(null); setErr('');
+    } catch (e) { setErr('No se pudo cargar el reporte ISAK: ' + e.message); }
+    setIsakBusy(false);
   };
 
   const removeIsak = async (i) => {
-    if (!window.confirm('¿Eliminar esta nota?')) return;
+    if (!window.confirm('¿Quitar este reporte de la lista? (El archivo seguirá en Drive.)')) return;
     const arr = (sel.isak || []).filter((_, k) => k !== i);
     try { await updateDoc(doc(db, 'pacientes', sel.id), { isak: arr }); } catch (e) { setErr(e.message); }
   };
@@ -389,7 +403,7 @@ export default function Pacientes() {
             )}
           </div>
 
-          {/* Isak (notas internas, no visibles para el paciente) */}
+          {/* Isak (reportes PDF; visible también para el paciente) */}
           <div className="card" style={panel === 'isak' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'isak' ? null : 'isak')}>
               <span style={S.panelTitle}>Isak</span>
@@ -397,23 +411,29 @@ export default function Pacientes() {
             </button>
             {panel === 'isak' && (
               <div style={S.panelBody}>
-                <div style={S.note}>Notas de texto libre. <b>El paciente no las ve.</b></div>
-                <div style={{ marginBottom: 12 }}>
-                  <textarea style={S.recoArea} rows={3} value={isakTexto} onChange={e => setIsakTexto(e.target.value)}
-                    placeholder="Escribe una nota…" />
-                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addIsak}>+ Agregar nota</button>
-                </div>
-                {(!sel.isak || sel.isak.length === 0)
-                  ? <div className="empty-state">Aún no hay notas.</div>
-                  : [...sel.isak].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
-                    <div key={idx} style={S.recoItem}>
-                      <div style={{ flex: 1 }}>
-                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
-                        <div style={S.recoText}>{r.texto}</div>
+                <div style={S.note}>Reportes ISAK en PDF. Se guardan en Drive y el paciente también puede verlos.</div>
+                <label style={S.upload}>
+                  <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => setIsakFile(e.target.files && e.target.files[0])} />
+                  {isakFile ? ('PDF seleccionado: ' + isakFile.name) : 'Seleccionar PDF del reporte ISAK'}
+                </label>
+                <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={subirIsak} disabled={isakBusy}>
+                  {isakBusy ? 'Cargando…' : 'Cargar reporte ISAK'}
+                </button>
+                <div style={{ marginTop: 14 }}>
+                  {(!sel.isak || sel.isak.length === 0)
+                    ? <div className="empty-state">Aún no hay reportes ISAK.</div>
+                    : [...sel.isak].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                      <div key={idx} style={S.planRow}>
+                        <div style={S.planIcon}>PDF</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Reporte ISAK'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+                        </div>
+                        {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                        <button style={S.rm} onClick={() => removeIsak(idx)} title="Quitar de la lista">×</button>
                       </div>
-                      <button style={S.rm} onClick={() => removeIsak(idx)} title="Eliminar">×</button>
-                    </div>
-                  ))}
+                    ))}
+                </div>
               </div>
             )}
           </div>
