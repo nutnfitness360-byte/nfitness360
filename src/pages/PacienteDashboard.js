@@ -57,6 +57,7 @@ export default function PacienteDashboard() {
   const [citas, setCitas] = useState([]);
   const [expediente, setExpediente] = useState(null);
   const [modalCita, setModalCita] = useState(null);
+  const [confirmarCancel, setConfirmarCancel] = useState(false);
   const [reagendando, setReagendando] = useState(null);
 
   useEffect(() => {
@@ -113,8 +114,10 @@ export default function PacienteDashboard() {
   const puedeReagendar = (c) => horasFaltantes(c) >= 24;
 
   // Botones de la ventanilla
-  const confirmarCancelar = async () => { const c = modalCita; setModalCita(null); await ejecutarCancelacion(c); };
-  const iniciarReagendar = () => { const c = modalCita; setModalCita(null); setReagendando(c); setTab('agendar'); };
+  const pedirConfirmacion = () => setConfirmarCancel(true);
+  const confirmarCancelar = async () => { const c = modalCita; setModalCita(null); setConfirmarCancel(false); await ejecutarCancelacion(c); };
+  const cerrarModal = () => { setModalCita(null); setConfirmarCancel(false); };
+  const iniciarReagendar = () => { const c = modalCita; setModalCita(null); setConfirmarCancel(false); setReagendando(c); setTab('agendar'); };
 
   const fmtFecha = (key) => {
     if (!key) return '';
@@ -129,7 +132,7 @@ export default function PacienteDashboard() {
   const tabs = [
     { id: 'inicio', label: 'Inicio', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg> },
     { id: 'agendar', label: 'Agendar', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg> },
-    { id: 'planes', label: 'Mi plan', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg> },
+    { id: 'planes', label: 'Mis archivos', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg> },
     { id: 'recomendaciones', label: 'Recomendaciones', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/></svg> },
   ];
 
@@ -233,7 +236,7 @@ export default function PacienteDashboard() {
               </button>
               <button style={D.access} onClick={() => setTab('planes')}>
                 {IconPlan}
-                <span style={D.accessLabel}>Mi plan</span>
+                <span style={D.accessLabel}>Mis archivos</span>
                 <span style={D.accessSub}>Consulta tu plan nutricional</span>
               </button>
               <button style={D.access} onClick={() => setTab('recomendaciones')}>
@@ -246,12 +249,12 @@ export default function PacienteDashboard() {
         )}
 
         {tab === 'agendar' && (
-          <Agenda isNutri={false} reagendarDe={reagendando} onReagendado={() => { setReagendando(null); setTab('inicio'); }} />
+          <Agenda isNutri={false} reagendarDe={reagendando} onReagendado={() => { setReagendando(null); setTab('inicio'); }} onSolicitarCancelar={(c) => setModalCita(c)} />
         )}
 
         {tab === 'planes' && (
           <div className="card">
-            <div className="card-title">Mi plan alimenticio</div>
+            <div style={{ background: 'var(--dark)', color: '#fff', fontWeight: 700, fontSize: 14, padding: '10px 14px', borderRadius: 10, marginBottom: 14, letterSpacing: 0.3 }}>Mi plan alimenticio</div>
 
             {expediente && expediente.plan && expediente.plan.totales && (
               <div style={{ background: 'var(--cream)', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
@@ -295,7 +298,7 @@ export default function PacienteDashboard() {
 
         {tab === 'planes' && expediente && (
           <div className="card">
-            <div className="card-title">Reportes ISAK</div>
+            <div style={{ background: 'var(--dark)', color: '#fff', fontWeight: 700, fontSize: 14, padding: '10px 14px', borderRadius: 10, marginBottom: 14, letterSpacing: 0.3 }}>Reportes ISAK</div>
             {(!Array.isArray(expediente.isak) || expediente.isak.length === 0) ? (
               <div className="empty-state">Aún no tienes reportes ISAK.</div>
             ) : (
@@ -340,33 +343,53 @@ export default function PacienteDashboard() {
       </div>
 
       {modalCita && (
-        <div onClick={() => setModalCita(null)}
+        <div onClick={cerrarModal}
           style={{ position: 'fixed', inset: 0, background: 'rgba(26,22,18,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div onClick={e => e.stopPropagation()}
             style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 360, padding: '22px 20px', fontFamily: 'var(--font)' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)', marginBottom: 6 }}>¿Cancelar o reagendar tu cita?</div>
-            <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5, marginBottom: 16 }}>
-              {fmtFecha(modalCita.fecha)} a las {modalCita.hora}.
-            </div>
 
-            {!puedeReagendar(modalCita) && (
-              <div style={{ background: '#fbeae6', color: '#B0593F', fontSize: 11.5, padding: '9px 11px', borderRadius: 8, marginBottom: 14, lineHeight: 1.45 }}>
-                Ya no es posible reagendar: falta menos de 24 h para tu cita. Según las políticas, una cancelación a destiempo o inasistencia se penaliza con el importe total de la consulta.
-              </div>
+            {!confirmarCancel ? (
+              <>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)', marginBottom: 6 }}>¿Cancelar o reagendar tu cita?</div>
+                <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5, marginBottom: 16 }}>
+                  {fmtFecha(modalCita.fecha)} a las {modalCita.hora}.
+                </div>
+
+                {!puedeReagendar(modalCita) && (
+                  <div style={{ background: '#fbeae6', color: '#B0593F', fontSize: 11.5, padding: '9px 11px', borderRadius: 8, marginBottom: 14, lineHeight: 1.45 }}>
+                    Ya no es posible reagendar: falta menos de 24 h para tu cita. Según las políticas, una cancelación a destiempo o inasistencia se penaliza con el importe total de la consulta.
+                  </div>
+                )}
+
+                <button onClick={iniciarReagendar} disabled={!puedeReagendar(modalCita)}
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: puedeReagendar(modalCita) ? 'pointer' : 'not-allowed', border: 'none', background: puedeReagendar(modalCita) ? 'var(--gold)' : 'var(--border)', color: puedeReagendar(modalCita) ? '#fff' : 'var(--stone)' }}>
+                  Reagendar
+                </button>
+                <button onClick={pedirConfirmacion}
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: 'transparent', border: '1px solid #B0593F', color: '#B0593F' }}>
+                  Cancelar cita
+                </button>
+                <button onClick={cerrarModal}
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 10, fontSize: 12.5, fontFamily: 'var(--font)', cursor: 'pointer', background: 'transparent', border: 'none', color: 'var(--stone)' }}>
+                  Volver
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)', marginBottom: 6 }}>¿Seguro que deseas cancelar?</div>
+                <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5, marginBottom: 16 }}>
+                  Cancelarás tu cita del {fmtFecha(modalCita.fecha)} a las {modalCita.hora}. Esta acción no se puede deshacer.
+                </div>
+                <button onClick={confirmarCancelar}
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: '#B0593F', border: 'none', color: '#fff' }}>
+                  Sí, cancelar mi cita
+                </button>
+                <button onClick={() => setConfirmarCancel(false)}
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer', background: 'transparent', border: '1px solid var(--border)', color: 'var(--stone)' }}>
+                  No, volver
+                </button>
+              </>
             )}
-
-            <button onClick={iniciarReagendar} disabled={!puedeReagendar(modalCita)}
-              style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: puedeReagendar(modalCita) ? 'pointer' : 'not-allowed', border: 'none', background: puedeReagendar(modalCita) ? 'var(--gold)' : 'var(--border)', color: puedeReagendar(modalCita) ? '#fff' : 'var(--stone)' }}>
-              Reagendar
-            </button>
-            <button onClick={confirmarCancelar}
-              style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: 'transparent', border: '1px solid #B0593F', color: '#B0593F' }}>
-              Cancelar cita
-            </button>
-            <button onClick={() => setModalCita(null)}
-              style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 10, fontSize: 12.5, fontFamily: 'var(--font)', cursor: 'pointer', background: 'transparent', border: 'none', color: 'var(--stone)' }}>
-              Volver
-            </button>
           </div>
         </div>
       )}
