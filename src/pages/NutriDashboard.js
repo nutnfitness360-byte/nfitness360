@@ -86,27 +86,25 @@ export default function NutriDashboard() {
   const masVende = Object.keys(conteoTipo).sort((a, b) => conteoTipo[b] - conteoTipo[a])[0];
   const hayPrecios = SERVICIOS_NOMBRES.some(s => (precios[s] || 0) > 0);
 
-  // ---- Retención (semáforo por última cita) ----
-  const ultByCorreo = {}, ultByNombre = {};
-  citas.forEach(c => {
-    if (c.estado === 'cancelada') return;
-    const kc = norm(c.pacienteEmail); if (kc) { if (!ultByCorreo[kc] || c.fecha > ultByCorreo[kc]) ultByCorreo[kc] = c.fecha; }
-    const kn = norm(c.pacienteNombre); if (kn) { if (!ultByNombre[kn] || c.fecha > ultByNombre[kn]) ultByNombre[kn] = c.fecha; }
-  });
+  // ---- Retención (semáforo por fecha del último PLAN generado) ----
+  // El reloj de "regreso a consulta" arranca el día en que se generó el plan completo
+  // (entrada más reciente en p.planes): ese día se le envió la información al paciente.
   const retencion = pacientes.map(p => {
-    const ult = ultByCorreo[norm(p.correo)] || ultByNombre[norm(p.nombre)] || null;
+    const planes = Array.isArray(p.planes) ? p.planes : [];
+    let ult = null;
+    planes.forEach(pl => { if (pl && pl.fecha && (!ult || pl.fecha > ult)) ult = pl.fecha; });
     const d = diasDesde(ult, hoy);
-    let color = 'rojo';
-    if (d === null) color = 'rojo';
+    let color;
+    if (d === null) color = 'sinplan';        // aún no tiene plan completo: no cuenta como inactivo
     else if (d <= 30) color = 'verde';
     else if (d <= 45) color = 'amarillo';
     else color = 'rojo';
     return { nombre: p.nombre || '—', ult, dias: d, color };
   }).sort((a, b) => (a.dias === null ? 99999 : a.dias) - (b.dias === null ? 99999 : b.dias));
-  const cuenta = { verde: 0, amarillo: 0, rojo: 0 };
+  const cuenta = { verde: 0, amarillo: 0, rojo: 0, sinplan: 0 };
   retencion.forEach(r => { cuenta[r.color]++; });
-  const totalPac = pacientes.length;
-  const pctRetencion = totalPac ? Math.round(cuenta.verde * 100 / totalPac) : 0;
+  const conPlan = cuenta.verde + cuenta.amarillo + cuenta.rojo;
+  const pctRetencion = conPlan ? Math.round(cuenta.verde * 100 / conPlan) : 0;
 
   // ---- Pacientes por objetivo ----
   const porObjetivo = {};
@@ -114,7 +112,7 @@ export default function NutriDashboard() {
   const objetivos = Object.keys(porObjetivo).map(o => ({ obj: o, n: porObjetivo[o] })).sort((a, b) => b.n - a.n);
   const maxObj = objetivos.reduce((m, o) => Math.max(m, o.n), 0) || 1;
 
-  const COLOR = { verde: '#9AB9AD', amarillo: '#CDA788', rojo: '#B0593F' };
+  const COLOR = { verde: '#9AB9AD', amarillo: '#CDA788', rojo: '#B0593F', sinplan: '#C9BFB4' };
 
   const CitaItem = ({ c }) => (
     <div style={{ borderBottom: '0.5px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
@@ -254,8 +252,9 @@ export default function NutriDashboard() {
                   <div style={D.semItem}><span style={{ ...D.dot, background: COLOR.verde }} /> {cuenta.verde} activos</div>
                   <div style={D.semItem}><span style={{ ...D.dot, background: COLOR.amarillo }} /> {cuenta.amarillo} +30 días</div>
                   <div style={D.semItem}><span style={{ ...D.dot, background: COLOR.rojo }} /> {cuenta.rojo} +45 días</div>
+                  {cuenta.sinplan > 0 && <div style={D.semItem}><span style={{ ...D.dot, background: COLOR.sinplan }} /> {cuenta.sinplan} sin plan</div>}
                 </div>
-                <div style={D.retPct}><b style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 26, fontWeight: 800 }}>{pctRetencion}%</b> de retención <span style={{ color: 'var(--stone)' }}>(pacientes activos)</span></div>
+                <div style={D.retPct}><b style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 26, fontWeight: 800 }}>{pctRetencion}%</b> de retención <span style={{ color: 'var(--stone)' }}>(de pacientes con plan)</span></div>
                 <div style={{ marginTop: 10, maxHeight: 220, overflowY: 'auto' }}>
                   {retencion.length === 0
                     ? <div className="empty-state">Aún no hay pacientes registrados.</div>
@@ -263,7 +262,7 @@ export default function NutriDashboard() {
                       <div key={i} style={D.retRow}>
                         <span style={{ ...D.dot, background: COLOR[r.color] }} />
                         <span style={{ flex: 1, fontSize: 13, color: 'var(--dark)' }}>{r.nombre}</span>
-                        <span style={{ fontSize: 11.5, color: 'var(--stone)' }}>{r.dias === null ? 'Sin citas' : r.dias <= 0 ? 'Cita próxima/hoy' : `Hace ${r.dias} días`}</span>
+                        <span style={{ fontSize: 11.5, color: 'var(--stone)' }}>{r.dias === null ? 'Sin plan aún' : r.dias <= 0 ? 'Plan de hoy' : `Hace ${r.dias} días`}</span>
                       </div>
                     ))}
                 </div>
