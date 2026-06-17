@@ -8,7 +8,6 @@ import Pacientes from '../components/Pacientes';
 
 function initials(name) { return name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'NU'; }
 const SERVICIOS_NOMBRES = ['Primera vez', 'Seguimiento', 'Deportivo', 'Seguimiento deportivo', 'Online', 'Deportivo online'];
-const norm = (s) => (s || '').trim().toLowerCase();
 const money = (n) => '$' + Math.round(n || 0).toLocaleString('es-MX');
 const uid = () => Math.random().toString(36).slice(2, 9);
 
