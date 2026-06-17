@@ -41,8 +41,9 @@ const r0 = (n) => Math.round(n);
 const r1 = (n) => Math.round(n * 10) / 10;
 
 /* Plantilla base: % de la energía total que aporta cada grupo (índice de GRUPOS).
-   Editable después en vivo. Suma = 100%. */
-const PLANTILLA_PCT = { 0: 28, 2: 10, 3: 5, 4: 12, 5: 20, 9: 10, 13: 12, 15: 3 };
+   Editable después en vivo. No incluye azúcares (grupo 15): el cálculo NO los ofrece
+   de inicio; la nutrióloga decide si los agrega y rebalancea. Por eso suma ~97%. */
+const PLANTILLA_PCT = { 0: 28, 2: 10, 3: 5, 4: 12, 5: 20, 9: 10, 13: 12 };
 function plantillaEq(energia) {
   const e = num(energia);
   return GRUPOS.map((g, i) => {
