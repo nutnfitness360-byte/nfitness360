@@ -445,7 +445,7 @@ export default function Menus({ patient, onBack }) {
                     <td style={{ ...S.balTd, textAlign: 'left' }}>{GRUPOS[g][0]}</td>
                     <td style={S.balTd}>{fmt(plan)}</td>
                     <td style={S.balTd}>{fmt(menu)}</td>
-                    <td style={{ ...S.balTd, color: ok ? T.inkSoft : T.danger, fontWeight: 700 }}>{dif > 0 ? '+' : ''}{fmt(dif)}</td>
+                    <td style={{ ...S.balTd, color: ok ? T.sage : T.danger, fontWeight: 700 }}>{dif > 0 ? '+' : ''}{fmt(dif)}</td>
                   </tr>
                 );
               })}
