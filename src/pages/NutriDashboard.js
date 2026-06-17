@@ -102,6 +102,7 @@ export default function NutriDashboard() {
   }).sort((a, b) => (a.dias === null ? 99999 : a.dias) - (b.dias === null ? 99999 : b.dias));
   const cuenta = { verde: 0, amarillo: 0, rojo: 0, sinplan: 0 };
   retencion.forEach(r => { cuenta[r.color]++; });
+  const totalPac = pacientes.length;
   const conPlan = cuenta.verde + cuenta.amarillo + cuenta.rojo;
   const pctRetencion = conPlan ? Math.round(cuenta.verde * 100 / conPlan) : 0;
 
