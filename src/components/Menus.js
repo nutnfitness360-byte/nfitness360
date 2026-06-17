@@ -84,8 +84,9 @@ function compressImage(file, maxW = 620, quality = 0.5) {
 }
 
 const nuevaOpcion = () => ({ nombre: '', prep: '' });
-function nuevoTiempo(def, eqRow) {
-  return { id: uid(), nombre: def?.nombre || 'Nuevo tiempo', hora: def?.hora || '12:00', eq: eqRow || Array(18).fill(0), opciones: [nuevaOpcion(), nuevaOpcion(), nuevaOpcion()], foto: '' };
+const opcionesArr = (n) => Array.from({ length: Math.max(1, n || 1) }, nuevaOpcion);
+function nuevoTiempo(def, eqRow, nOp = 3) {
+  return { id: uid(), nombre: def?.nombre || 'Nuevo tiempo', hora: def?.hora || '12:00', eq: eqRow || Array(18).fill(0), opciones: opcionesArr(nOp), foto: '' };
 }
 
 export default function Menus({ patient, onBack }) {
@@ -93,16 +94,23 @@ export default function Menus({ patient, onBack }) {
   const planEq = Array.isArray(plan.eq) ? plan.eq.map(num) : null;
   const usados = planEq ? planEq.map((v, i) => (v > 0 ? i : -1)).filter(i => i >= 0) : [];
 
+  const savedMenus = plan.menus && Array.isArray(plan.menus.tiempos) && plan.menus.tiempos.length ? plan.menus : null;
+  const savedNOp = savedMenus ? (savedMenus.nOpciones || (savedMenus.tiempos[0]?.opciones?.length) || 3) : 3;
+
   const [tiempos, setTiempos] = useState(() => {
-    const saved = plan.menus && Array.isArray(plan.menus.tiempos) ? plan.menus.tiempos : null;
-    if (saved && saved.length) return saved.map(t => ({ ...t, eq: Array.isArray(t.eq) ? t.eq : Array(18).fill(0), opciones: t.opciones || [nuevaOpcion(), nuevaOpcion(), nuevaOpcion()] }));
-    if (!planEq) return [];
-    const dist = distribuir(planEq, DEFAULT_TIEMPOS.length);
-    return DEFAULT_TIEMPOS.map((d, m) => nuevoTiempo(d, dist[m]));
+    if (savedMenus) return savedMenus.tiempos.map(t => ({ ...t, id: t.id || uid(), eq: Array.isArray(t.eq) ? t.eq : Array(18).fill(0), opciones: (t.opciones && t.opciones.length) ? t.opciones : opcionesArr(savedNOp) }));
+    return []; // los menús nuevos se arman tras la ventana de configuración
   });
-  const [status, setStatus] = useState(plan.menus ? 'guardado' : 'nuevo');
+  const [nOpciones, setNOpciones] = useState(savedNOp);
+  const [status, setStatus] = useState(savedMenus ? 'guardado' : 'nuevo');
   const [rep, setRep] = useState('');
   const [iaBusy, setIaBusy] = useState(false);
+  const [opBusy, setOpBusy] = useState(''); // "idx:oi" de la opción que se está generando
+
+  // Ventana de configuración: aparece al abrir menús cuando aún no hay configuración guardada.
+  const [showCfg, setShowCfg] = useState(!savedMenus);
+  const [cfgNOp, setCfgNOp] = useState(savedNOp);
+  const [cfgTiempos, setCfgTiempos] = useState(() => savedMenus ? savedMenus.tiempos.map(t => ({ nombre: t.nombre, hora: t.hora })) : DEFAULT_TIEMPOS.map(d => ({ ...d })));
 
   const touch = () => setStatus('nuevo');
   const setT = (idx, patch) => { setTiempos(ts => ts.map((t, i) => i === idx ? { ...t, ...patch } : t)); touch(); };
@@ -114,8 +122,27 @@ export default function Menus({ patient, onBack }) {
     const dist = distribuir(planEq, tiempos.length);
     setTiempos(ts => ts.map((t, m) => ({ ...t, eq: dist[m] }))); touch();
   };
-  const addTiempo = () => { setTiempos(ts => [...ts, nuevoTiempo({ nombre: 'Nuevo tiempo', hora: '12:00' }, Array(18).fill(0))]); touch(); };
+  const addTiempo = () => { setTiempos(ts => [...ts, nuevoTiempo({ nombre: 'Nuevo tiempo', hora: '12:00' }, Array(18).fill(0), nOpciones)]); touch(); };
   const delTiempo = (idx) => { setTiempos(ts => ts.filter((_, i) => i !== idx)); touch(); };
+
+  // ── Configuración (ventana emergente): número de tiempos y de opciones ──
+  const cfgSetN = (n) => {
+    n = Math.max(1, Math.min(8, n));
+    setCfgTiempos(ts => {
+      const out = ts.slice(0, n);
+      while (out.length < n) { const i = out.length; const d = DEFAULT_TIEMPOS[i] || { nombre: 'Tiempo ' + (i + 1), hora: '12:00' }; out.push({ ...d }); }
+      return out;
+    });
+  };
+  const cfgSetTiempo = (i, patch) => setCfgTiempos(ts => ts.map((t, k) => k === i ? { ...t, ...patch } : t));
+  const aplicarConfig = () => {
+    const nOp = Math.max(1, Math.min(6, cfgNOp));
+    const defs = cfgTiempos;
+    const dist = planEq ? distribuir(planEq, defs.length) : defs.map(() => Array(18).fill(0));
+    setTiempos(defs.map((d, m) => nuevoTiempo(d, dist[m], nOp)));
+    setNOpciones(nOp);
+    setShowCfg(false); setStatus('nuevo'); setRep('');
+  };
 
   const onFoto = async (idx, e) => {
     const file = e.target.files && e.target.files[0];
@@ -140,7 +167,7 @@ export default function Menus({ patient, onBack }) {
       });
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'generarMenusIA', objetivo: patient.objetivo || '', totales: plan.totales || {}, tiempos: payloadTiempos, nOpciones: 3 }),
+        body: JSON.stringify({ action: 'generarMenusIA', objetivo: patient.objetivo || '', totales: plan.totales || {}, tiempos: payloadTiempos, nOpciones }),
         redirect: 'follow',
       });
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
@@ -148,8 +175,8 @@ export default function Menus({ patient, onBack }) {
       setTiempos(ts => ts.map((t, i) => {
         const r = data.tiempos[i];
         if (!r || !Array.isArray(r.opciones)) return t;
-        const ops = r.opciones.slice(0, 3).map(o => ({ nombre: (o && o.nombre) || '', prep: (o && o.prep) || '' }));
-        while (ops.length < 3) ops.push(nuevaOpcion());
+        const ops = r.opciones.slice(0, nOpciones).map(o => ({ nombre: (o && o.nombre) || '', prep: (o && o.prep) || '' }));
+        while (ops.length < nOpciones) ops.push(nuevaOpcion());
         return { ...t, opciones: ops };
       }));
       setStatus('nuevo');
@@ -160,10 +187,38 @@ export default function Menus({ patient, onBack }) {
     setIaBusy(false);
   };
 
+  const generarOpcionIA = async (idx, oi) => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setRep('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    const t = tiempos[idx];
+    setOpBusy(idx + ':' + oi); setRep('Generando la opción ' + (oi + 1) + ' de ' + t.nombre + '…');
+    try {
+      const en = t.eq.reduce((a, _, g) => ({
+        kcal: a.kcal + num(t.eq[g]) * GRUPOS[g][1], prot: a.prot + num(t.eq[g]) * GRUPOS[g][2],
+        lip: a.lip + num(t.eq[g]) * GRUPOS[g][3], hc: a.hc + num(t.eq[g]) * GRUPOS[g][4],
+      }), { kcal: 0, prot: 0, lip: 0, hc: 0 });
+      const equivalentes = t.eq.map((n, g) => ({ grupo: GRUPOS[g][0], n: round2(num(n)) })).filter(x => x.n > 0);
+      const payloadTiempos = [{ nombre: t.nombre, hora: t.hora, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) } }];
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'generarMenusIA', objetivo: patient.objetivo || '', totales: plan.totales || {}, tiempos: payloadTiempos, nOpciones: 1 }),
+        redirect: 'follow',
+      });
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      const nueva = data && data.ok && Array.isArray(data.tiempos) && data.tiempos[0] && Array.isArray(data.tiempos[0].opciones) ? data.tiempos[0].opciones[0] : null;
+      if (!nueva) throw new Error((data && data.error) || 'No se recibió la opción.');
+      setOpcion(idx, oi, { nombre: nueva.nombre || '', prep: nueva.prep || '' });
+      setRep('Opción ' + (oi + 1) + ' de ' + t.nombre + ' regenerada. Revísala antes de guardar.');
+    } catch (e) {
+      setRep('No se pudo generar la opción: ' + e.message);
+    }
+    setOpBusy('');
+  };
+
   const guardarBorrador = async () => {
     setStatus('guardando'); setRep('Guardando borrador…');
     try {
-      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos } });
+      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos, nOpciones } });
       setStatus('guardado'); setRep('Borrador guardado ✓ (sin generar el reporte). Puedes salir y retomarlo después.');
     } catch (e) {
       setStatus('error'); setRep('No se pudo guardar el borrador: ' + e.message);
@@ -174,7 +229,7 @@ export default function Menus({ patient, onBack }) {
     setStatus('guardando'); setRep('Guardando menús…');
     // 1) Guardar SIEMPRE los menús primero (un fallo del PDF no debe hacer perder el trabajo).
     try {
-      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos } });
+      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos, nOpciones } });
     } catch (e) {
       setStatus('error'); setRep('No se pudieron guardar los menús: ' + e.message); return;
     }
@@ -226,6 +281,46 @@ export default function Menus({ patient, onBack }) {
   return (
     <div style={S.root}>
       <style>{css}</style>
+
+      {showCfg && (
+        <div style={S.modalWrap}>
+          <div style={S.modalCard}>
+            <div style={S.eyebrow}>Configurar menús</div>
+            <h2 style={S.balTitle}>¿Qué menús vamos a armar?</h2>
+            <div style={S.cfgRow}>
+              <span style={S.cfgLbl}>Opciones de menú por tiempo</span>
+              <div style={S.stepper}>
+                <button style={S.stepBtn} onClick={() => setCfgNOp(n => Math.max(1, n - 1))}>−</button>
+                <span style={S.stepVal}>{cfgNOp}</span>
+                <button style={S.stepBtn} onClick={() => setCfgNOp(n => Math.min(6, n + 1))}>+</button>
+              </div>
+            </div>
+            <div style={S.cfgRow}>
+              <span style={S.cfgLbl}>Tiempos de comida</span>
+              <div style={S.stepper}>
+                <button style={S.stepBtn} onClick={() => cfgSetN(cfgTiempos.length - 1)}>−</button>
+                <span style={S.stepVal}>{cfgTiempos.length}</span>
+                <button style={S.stepBtn} onClick={() => cfgSetN(cfgTiempos.length + 1)}>+</button>
+              </div>
+            </div>
+            <div style={S.cfgListLbl}>Nombre y horario de cada tiempo (editables)</div>
+            <div style={S.cfgList}>
+              {cfgTiempos.map((t, i) => (
+                <div key={i} style={S.cfgItem}>
+                  <input style={S.cfgName} value={t.nombre} onChange={e => cfgSetTiempo(i, { nombre: e.target.value })} />
+                  <input style={S.cfgHora} value={t.hora} onChange={e => cfgSetTiempo(i, { hora: e.target.value })} />
+                </div>
+              ))}
+            </div>
+            {savedMenus && <div style={S.cfgWarn}>Reconfigurar regenera la estructura: las opciones de menú que ya tengas escritas se reemplazan por tarjetas vacías.</div>}
+            <div style={S.cfgActions}>
+              {savedMenus && <button style={S.volverBtn} onClick={() => setShowCfg(false)}>Cancelar</button>}
+              <button style={S.primaryBtn} className="nf-primary" onClick={aplicarConfig}>Continuar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <button style={S.back} onClick={onBack}>← {patient.nombre}</button>
       <div style={S.titleRow}>
         <div style={{ flex: 1 }}>
@@ -236,10 +331,11 @@ export default function Menus({ patient, onBack }) {
       </div>
 
       <div style={S.toolbar}>
+        <button style={S.toolBtn} onClick={() => setShowCfg(true)}>Reconfigurar</button>
         <button style={S.toolBtn} onClick={redistribuir}>Redistribuir equivalentes</button>
-        <button style={{ ...S.toolBtn, ...S.iaBtn }} onClick={generarIA} disabled={iaBusy}>{iaBusy ? 'Generando…' : 'Generar menús con IA ✦'}</button>
+        <button style={{ ...S.toolBtn, ...S.iaBtn }} onClick={generarIA} disabled={iaBusy}>{iaBusy ? 'Generando…' : 'Generar todos con IA ✦'}</button>
       </div>
-      <div style={S.iaNote}>La IA propone los platillos ciñéndose a los equivalentes y macros de cada tiempo. <b>Revisa y edita</b> las opciones antes de guardar; la IA solo sugiere.</div>
+      <div style={S.iaNote}>Puedes generar todos los menús de golpe, o regenerar <b>una sola opción</b> con el botón <b>IA ✦</b> de cada tarjeta — así arreglas las que no sirven sin tocar las que ya quedaron bien. La IA solo sugiere: <b>revisa y edita</b> antes de guardar.</div>
 
       <div style={S.card}>
         <div style={S.eyebrow}>Balance por grupo</div>
@@ -303,7 +399,10 @@ export default function Menus({ patient, onBack }) {
               <div style={{ flex: 1 }}>
                 {t.opciones.map((o, oi) => (
                   <div key={oi} style={S.opt}>
-                    <div style={S.optTag}>Opción {oi + 1}</div>
+                    <div style={S.optHead}>
+                      <span style={S.optTag}>Opción {oi + 1}</span>
+                      <button style={S.optIaBtn} onClick={() => generarOpcionIA(idx, oi)} disabled={iaBusy || opBusy === (idx + ':' + oi)}>{opBusy === (idx + ':' + oi) ? 'Generando…' : 'IA ✦'}</button>
+                    </div>
                     <input style={S.optName} placeholder="Nombre del platillo" value={o.nombre} onChange={e => setOpcion(idx, oi, { nombre: e.target.value })} />
                     <textarea style={S.optPrep} rows={2} placeholder="Preparación y gramajes" value={o.prep} onChange={e => setOpcion(idx, oi, { prep: e.target.value })} />
                   </div>
@@ -356,6 +455,20 @@ const styles = {
   balTd: { textAlign: 'right', padding: '7px 10px', color: T.pine, borderBottom: `1px solid ${T.lineSoft || T.line}` },
   balRowBad: { background: '#FBF1EC' },
   balHint: { marginTop: 10, fontSize: 11.5, color: T.inkSoft, lineHeight: 1.5 },
+  modalWrap: { position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 50 },
+  modalCard: { background: T.surface, borderRadius: 16, padding: '22px 22px 20px', width: '100%', maxWidth: 460, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' },
+  cfgRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: `1px solid ${T.lineSoft}` },
+  cfgLbl: { fontSize: 13.5, fontWeight: 600, color: T.pine },
+  stepper: { display: 'flex', alignItems: 'center', gap: 10 },
+  stepBtn: { width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.line}`, background: '#fff', color: T.pine, fontSize: 18, fontWeight: 700, cursor: 'pointer', lineHeight: 1, fontFamily: mono },
+  stepVal: { minWidth: 22, textAlign: 'center', fontSize: 15, fontWeight: 800, color: T.pine },
+  cfgListLbl: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: T.inkSoft, margin: '14px 0 6px' },
+  cfgList: { display: 'flex', flexDirection: 'column', gap: 7 },
+  cfgItem: { display: 'flex', gap: 8 },
+  cfgName: { flex: 1, border: `1px solid ${T.line}`, borderRadius: 7, padding: '7px 10px', fontSize: 13, color: T.pine, fontFamily: mono, background: '#FCFDFC', boxSizing: 'border-box' },
+  cfgHora: { width: 78, border: `1px solid ${T.line}`, borderRadius: 7, padding: '7px 10px', fontSize: 13, color: T.pine, fontFamily: mono, background: '#FCFDFC', boxSizing: 'border-box' },
+  cfgWarn: { marginTop: 12, fontSize: 12, color: T.danger, background: '#F7EAE5', borderRadius: 9, padding: '9px 12px', lineHeight: 1.45 },
+  cfgActions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 },
   toolbar: { display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 },
   toolBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, padding: '9px 15px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: mono },
   iaBtn: { borderColor: T.amber, color: '#211C17', cursor: 'pointer', background: T.amber },
@@ -373,6 +486,8 @@ const styles = {
   eqInput: { width: 42, textAlign: 'center', border: `1px solid ${T.line}`, borderRadius: 6, padding: '5px 3px', fontSize: 13, fontWeight: 700, color: T.pine, background: '#fff', fontFamily: mono },
   optsRow: { display: 'flex', gap: 14, flexWrap: 'wrap' },
   opt: { border: `1px solid ${T.lineSoft}`, borderRadius: 10, padding: '10px 12px', marginBottom: 8 },
+  optHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
+  optIaBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, borderRadius: 7, padding: '3px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: mono, whiteSpace: 'nowrap' },
   optTag: { fontSize: 10, fontWeight: 800, color: T.amber, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 },
   optName: { width: '100%', border: `1px solid ${T.line}`, borderRadius: 7, padding: '8px 10px', fontSize: 13, fontWeight: 600, color: T.pine, fontFamily: mono, background: '#FCFDFC', marginBottom: 6, boxSizing: 'border-box' },
   optPrep: { width: '100%', border: `1px solid ${T.line}`, borderRadius: 7, padding: '8px 10px', fontSize: 12.5, color: T.ink, fontFamily: mono, background: '#FCFDFC', resize: 'vertical', boxSizing: 'border-box' },
