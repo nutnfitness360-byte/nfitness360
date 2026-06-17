@@ -56,11 +56,11 @@ function distribuir(eqArr, nMeals) {
     let sw = w.reduce((a, b) => a + b, 0);
     if (sw <= 0) { meals[Math.min(2, nMeals - 1)][g] = round2(total); continue; }
     w = w.map(x => x / sw);
-    const raw = w.map(x => round2(x * total)); // decimales a 2, sin redondear a entero
-    // Corrige el ínfimo desajuste por redondeo en el tiempo de mayor peso, para que la suma == total exacto
-    const diff = round2(total - raw.reduce((a, b) => a + b, 0));
-    if (diff !== 0) { let mi = 0; for (let m = 1; m < nMeals; m++) if (w[m] > w[mi]) mi = m; raw[mi] = round2(raw[mi] + diff); }
-    for (let m = 0; m < nMeals; m++) meals[m][g] = raw[m];
+    const half = w.map(x => Math.round(x * total * 2) / 2); // a 0.5 más cercano
+    // El sobrante se carga al tiempo de mayor peso para que la suma == total del plan exacto.
+    const diff = round2(total - half.reduce((a, b) => a + b, 0));
+    if (diff !== 0) { let mi = 0; for (let m = 1; m < nMeals; m++) if (w[m] > w[mi]) mi = m; half[mi] = round2(half[mi] + diff); }
+    for (let m = 0; m < nMeals; m++) meals[m][g] = half[m];
   }
   return meals;
 }
@@ -158,6 +158,16 @@ export default function Menus({ patient, onBack }) {
       setRep('No se pudo generar con IA: ' + e.message);
     }
     setIaBusy(false);
+  };
+
+  const guardarBorrador = async () => {
+    setStatus('guardando'); setRep('Guardando borrador…');
+    try {
+      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos } });
+      setStatus('guardado'); setRep('Borrador guardado ✓ (sin generar el reporte). Puedes salir y retomarlo después.');
+    } catch (e) {
+      setStatus('error'); setRep('No se pudo guardar el borrador: ' + e.message);
+    }
   };
 
   const guardar = async () => {
@@ -323,6 +333,7 @@ export default function Menus({ patient, onBack }) {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button style={S.volverBtn} onClick={onBack}>← Atrás</button>
+          <button style={S.draftBtn} onClick={guardarBorrador} disabled={status === 'guardando'}>Guardar borrador</button>
           <button style={S.primaryBtn} className="nf-primary" onClick={guardar} disabled={status === 'guardando'}>{status === 'guardando' ? 'Guardando…' : 'Guardar menús'}</button>
         </div>
       </div>
@@ -377,6 +388,7 @@ const styles = {
   primaryBtn: { background: T.amber, color: '#211C17', border: 'none', padding: '12px 24px', borderRadius: 11, fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: mono },
   reportBtn: { background: T.pine, color: '#fff', border: 'none', padding: '12px 20px', borderRadius: 11, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: mono },
   volverBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.pine}`, padding: '12px 18px', borderRadius: 11, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: mono },
+  draftBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, padding: '12px 18px', borderRadius: 11, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: mono },
   empty: { background: T.mint, border: `1px solid ${T.line}`, borderRadius: 12, padding: '18px', fontSize: 13.5, color: T.ink, lineHeight: 1.6 },
 };
 
