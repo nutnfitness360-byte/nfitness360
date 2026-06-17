@@ -42,24 +42,25 @@ const DEFAULT_TIEMPOS = [
 
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 const r0 = (n) => Math.round(n);
+const round2 = (n) => Math.round((num(n) + Number.EPSILON) * 100) / 100;
+const fmt = (n) => String(round2(n)); // muestra decimales tal cual (2.5, 2, 0.6) sin redondear a entero
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 function distribuir(eqArr, nMeals) {
   const meals = Array.from({ length: nMeals }, () => Array(18).fill(0));
   for (let g = 0; g < 18; g++) {
-    const total = r0(num(eqArr[g]));
+    const total = num(eqArr[g]); // sin redondear: respeta el decimal del plan
     if (!total) continue;
     let w = [];
     for (let m = 0; m < nMeals; m++) w.push(GW[g] && GW[g][m] != null ? GW[g][m] : 0);
     let sw = w.reduce((a, b) => a + b, 0);
-    if (sw <= 0) { meals[Math.min(2, nMeals - 1)][g] = total; continue; }
+    if (sw <= 0) { meals[Math.min(2, nMeals - 1)][g] = round2(total); continue; }
     w = w.map(x => x / sw);
-    const raw = w.map(x => x * total);
-    const fl = raw.map(Math.floor);
-    let rem = total - fl.reduce((a, b) => a + b, 0);
-    const order = raw.map((x, i) => [i, x - Math.floor(x)]).sort((a, b) => b[1] - a[1]);
-    for (let k = 0; k < rem; k++) fl[order[k % order.length][0]]++;
-    for (let m = 0; m < nMeals; m++) meals[m][g] = fl[m];
+    const raw = w.map(x => round2(x * total)); // decimales a 2, sin redondear a entero
+    // Corrige el ínfimo desajuste por redondeo en el tiempo de mayor peso, para que la suma == total exacto
+    const diff = round2(total - raw.reduce((a, b) => a + b, 0));
+    if (diff !== 0) { let mi = 0; for (let m = 1; m < nMeals; m++) if (w[m] > w[mi]) mi = m; raw[mi] = round2(raw[mi] + diff); }
+    for (let m = 0; m < nMeals; m++) meals[m][g] = raw[m];
   }
   return meals;
 }
@@ -105,7 +106,7 @@ export default function Menus({ patient, onBack }) {
 
   const touch = () => setStatus('nuevo');
   const setT = (idx, patch) => { setTiempos(ts => ts.map((t, i) => i === idx ? { ...t, ...patch } : t)); touch(); };
-  const setEqCell = (idx, g, v) => setT(idx, { eq: tiempos[idx].eq.map((x, k) => k === g ? r0(num(v)) : x) });
+  const setEqCell = (idx, g, v) => setT(idx, { eq: tiempos[idx].eq.map((x, k) => k === g ? String(v).replace(',', '.') : x) });
   const setOpcion = (idx, oi, patch) => setT(idx, { opciones: tiempos[idx].opciones.map((o, k) => k === oi ? { ...o, ...patch } : o) });
 
   const redistribuir = () => {
@@ -134,7 +135,7 @@ export default function Menus({ patient, onBack }) {
           kcal: a.kcal + num(t.eq[g]) * GRUPOS[g][1], prot: a.prot + num(t.eq[g]) * GRUPOS[g][2],
           lip: a.lip + num(t.eq[g]) * GRUPOS[g][3], hc: a.hc + num(t.eq[g]) * GRUPOS[g][4],
         }), { kcal: 0, prot: 0, lip: 0, hc: 0 });
-        const equivalentes = t.eq.map((n, g) => ({ grupo: GRUPOS[g][0], n: r0(num(n)) })).filter(x => x.n > 0);
+        const equivalentes = t.eq.map((n, g) => ({ grupo: GRUPOS[g][0], n: round2(num(n)) })).filter(x => x.n > 0);
         return { nombre: t.nombre, hora: t.hora, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) } };
       });
       const res = await fetch(url, {
@@ -194,9 +195,9 @@ export default function Menus({ patient, onBack }) {
     }
   };
 
-  // balance: suma por grupo de todos los tiempos vs total del plan
-  const sumaPorGrupo = (g) => tiempos.reduce((a, t) => a + num(t.eq[g]), 0);
-  const cuadra = planEq ? usados.every(g => sumaPorGrupo(g) === r0(planEq[g])) : false;
+  // balance: suma por grupo de todos los tiempos vs total del plan (con decimales)
+  const sumaPorGrupo = (g) => round2(tiempos.reduce((a, t) => a + num(t.eq[g]), 0));
+  const cuadra = planEq ? usados.every(g => Math.abs(sumaPorGrupo(g) - num(planEq[g])) < 0.01) : false;
 
   const S = styles;
 
@@ -230,6 +231,40 @@ export default function Menus({ patient, onBack }) {
       </div>
       <div style={S.iaNote}>La IA propone los platillos ciñéndose a los equivalentes y macros de cada tiempo. <b>Revisa y edita</b> las opciones antes de guardar; la IA solo sugiere.</div>
 
+      <div style={S.card}>
+        <div style={S.eyebrow}>Balance por grupo</div>
+        <h2 style={S.balTitle}>Distribución del plan vs. menús</h2>
+        <div style={S.balWrap}>
+          <table style={S.balTable}>
+            <thead>
+              <tr>
+                <th style={{ ...S.balTh, textAlign: 'left' }}>Grupo</th>
+                <th style={S.balTh}>Plan</th>
+                <th style={S.balTh}>En menús</th>
+                <th style={S.balTh}>Dif.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usados.map(g => {
+                const plan = round2(num(planEq[g]));
+                const menu = sumaPorGrupo(g);
+                const dif = round2(menu - plan);
+                const ok = Math.abs(dif) < 0.01;
+                return (
+                  <tr key={g} style={ok ? null : S.balRowBad}>
+                    <td style={{ ...S.balTd, textAlign: 'left' }}>{GRUPOS[g][0]}</td>
+                    <td style={S.balTd}>{fmt(plan)}</td>
+                    <td style={S.balTd}>{fmt(menu)}</td>
+                    <td style={{ ...S.balTd, color: ok ? T.inkSoft : T.danger, fontWeight: 700 }}>{dif > 0 ? '+' : ''}{fmt(dif)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={S.balHint}>"En menús" suma lo repartido en todos los tiempos. Cuando la diferencia es 0 en todos los grupos, el reparto cuadra con el plan.</div>
+      </div>
+
       {tiempos.map((t, idx) => {
         const en = t.eq.reduce((a, _, g) => ({
           kcal: a.kcal + num(t.eq[g]) * GRUPOS[g][1], prot: a.prot + num(t.eq[g]) * GRUPOS[g][2],
@@ -249,7 +284,7 @@ export default function Menus({ patient, onBack }) {
               {usados.map(g => (
                 <label key={g} style={S.eqItem}>
                   <span style={S.eqName}>{GSHORT[g]}</span>
-                  <input style={S.eqInput} inputMode="numeric" value={t.eq[g]} onChange={e => setEqCell(idx, g, e.target.value)} />
+                  <input style={S.eqInput} inputMode="decimal" value={t.eq[g]} onChange={e => setEqCell(idx, g, e.target.value)} />
                 </label>
               ))}
             </div>
@@ -303,6 +338,13 @@ const styles = {
   h1: { fontSize: 22, fontWeight: 800, letterSpacing: -0.5, margin: 0, color: T.ink },
   balance: { fontSize: 11.5, fontWeight: 700, padding: '6px 12px', borderRadius: 999, whiteSpace: 'nowrap' },
   balOk: { background: '#E9F1ED', color: '#3E6B5B' }, balBad: { background: '#F7EAE5', color: T.danger },
+  balTitle: { margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: T.pine },
+  balWrap: { overflowX: 'auto' },
+  balTable: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
+  balTh: { textAlign: 'right', padding: '6px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: T.inkSoft, borderBottom: `1px solid ${T.line}` },
+  balTd: { textAlign: 'right', padding: '7px 10px', color: T.pine, borderBottom: `1px solid ${T.lineSoft || T.line}` },
+  balRowBad: { background: '#FBF1EC' },
+  balHint: { marginTop: 10, fontSize: 11.5, color: T.inkSoft, lineHeight: 1.5 },
   toolbar: { display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 },
   toolBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, padding: '9px 15px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: mono },
   iaBtn: { borderColor: T.amber, color: '#211C17', cursor: 'pointer', background: T.amber },
