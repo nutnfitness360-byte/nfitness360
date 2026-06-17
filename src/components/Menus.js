@@ -106,6 +106,7 @@ export default function Menus({ patient, onBack }) {
   const [rep, setRep] = useState('');
   const [iaBusy, setIaBusy] = useState(false);
   const [opBusy, setOpBusy] = useState(''); // "idx:oi" de la opción que se está generando
+  const [dragOver, setDragOver] = useState(null); // idx del tiempo sobre el que se arrastra una imagen
 
   // Ventana de configuración: aparece al abrir menús cuando aún no hay configuración guardada.
   const [showCfg, setShowCfg] = useState(!savedMenus);
@@ -144,11 +145,17 @@ export default function Menus({ patient, onBack }) {
     setShowCfg(false); setStatus('nuevo'); setRep('');
   };
 
-  const onFoto = async (idx, e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
+  const procesarFoto = async (idx, file) => {
+    if (!file || !(file.type || '').startsWith('image/')) return;
     try { const data = await compressImage(file); setT(idx, { foto: data }); }
     catch (_) { setStatus('error'); }
+  };
+  const onFoto = (idx, e) => { procesarFoto(idx, e.target.files && e.target.files[0]); };
+  const onDropFoto = (idx, e) => {
+    e.preventDefault(); setDragOver(null);
+    const dt = e.dataTransfer;
+    const file = dt && dt.files && dt.files[0];
+    procesarFoto(idx, file);
   };
 
   const generarIA = async () => {
@@ -408,11 +415,16 @@ export default function Menus({ patient, onBack }) {
                   </div>
                 ))}
               </div>
-              <div style={S.photoCol}>
+              <div
+                style={{ ...S.photoCol, ...(dragOver === idx ? S.photoColDrag : null) }}
+                onDragOver={e => { e.preventDefault(); if (dragOver !== idx) setDragOver(idx); }}
+                onDragLeave={() => setDragOver(d => (d === idx ? null : d))}
+                onDrop={e => onDropFoto(idx, e)}
+              >
                 <div style={S.photoLabel}>Foto ejemplo</div>
                 {t.foto
                   ? <img src={t.foto} alt="" style={S.photo} />
-                  : <div style={S.photoEmpty}>Sin foto</div>}
+                  : <div style={S.photoEmpty}>{dragOver === idx ? 'Suelta la imagen' : 'Sin foto · arrastra una imagen aquí'}</div>}
                 <label style={S.photoBtn}>
                   <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => onFoto(idx, e)} />
                   {t.foto ? 'Cambiar' : 'Cargar imagen'}
@@ -491,10 +503,11 @@ const styles = {
   optTag: { fontSize: 10, fontWeight: 800, color: T.amber, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 },
   optName: { width: '100%', border: `1px solid ${T.line}`, borderRadius: 7, padding: '8px 10px', fontSize: 13, fontWeight: 600, color: T.pine, fontFamily: mono, background: '#FCFDFC', marginBottom: 6, boxSizing: 'border-box' },
   optPrep: { width: '100%', border: `1px solid ${T.line}`, borderRadius: 7, padding: '8px 10px', fontSize: 12.5, color: T.ink, fontFamily: mono, background: '#FCFDFC', resize: 'vertical', boxSizing: 'border-box' },
-  photoCol: { width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 },
+  photoCol: { width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, borderRadius: 12, padding: 6, transition: 'background .15s' },
+  photoColDrag: { background: T.mint, outline: `2px dashed ${T.amber}` },
+  photoEmpty: { width: 130, height: 130, borderRadius: '50%', border: `2px dashed ${T.line}`, display: 'grid', placeItems: 'center', textAlign: 'center', padding: 10, color: T.inkSoft, fontSize: 11, lineHeight: 1.35, boxSizing: 'border-box' },
   photoLabel: { fontSize: 10, fontWeight: 700, color: T.inkSoft, textTransform: 'uppercase', letterSpacing: 0.4, alignSelf: 'flex-start' },
   photo: { width: 130, height: 130, objectFit: 'cover', borderRadius: '50%', border: `2px solid ${T.amber}` },
-  photoEmpty: { width: 130, height: 130, borderRadius: '50%', border: `2px dashed ${T.line}`, display: 'grid', placeItems: 'center', color: T.inkSoft, fontSize: 11.5 },
   photoBtn: { background: T.amber, color: '#211C17', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: mono },
   photoRm: { background: 'transparent', border: 'none', color: T.inkSoft, fontSize: 11.5, cursor: 'pointer', textDecoration: 'underline' },
   addBtn: { width: '100%', background: '#fff', border: `1px dashed ${T.amber}`, color: T.pine, borderRadius: 11, padding: '12px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: mono, marginBottom: 16 },
