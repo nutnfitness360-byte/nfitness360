@@ -43,6 +43,12 @@ function Linea({ data, field, color, unit }) {
 }
 
 /* ===== componente principal ===== */
+const RECO_CHIPS = [
+  { titulo: 'Estudios', items: ['Estudio QS35', 'Estudio EGO', 'Estudio BH', 'Estudio perfil tiroideo', 'Estudio insulina en suero', 'Índice HOMA', 'Hemoglobina glucosilada'] },
+  { titulo: 'Ejercicio', items: [{ l: 'Fuerza' }, { l: 'Cardio o funcional' }, { l: 'Tiempo', ins: 'Tiempo: ' }, { l: 'Frecuencia', ins: 'Frecuencia: ' }] },
+  { titulo: 'Hidratación', items: ['Agua', 'Electrolitos', 'Bebida deportiva'] },
+];
+
 export default function Pacientes() {
   const [pacientes, setPacientes] = useState([]);
   const [selId, setSelId] = useState(null);
@@ -182,6 +188,16 @@ export default function Pacientes() {
   const removePlan = async (i) => {
     const arr = (sel.planes || []).filter((_, k) => k !== i);
     try { await updateDoc(doc(db, 'pacientes', sel.id), { planes: arr }); } catch (e) { setErr(e.message); }
+  };
+
+  const addChip = (texto) => {
+    const linea = '• ' + texto;
+    setRecoTexto(prev => {
+      const lineas = prev ? prev.split('\n') : [];
+      if (lineas.some(x => x.trim() === linea.trim())) return prev; // ya está
+      const base = prev && !prev.endsWith('\n') ? prev + '\n' : prev;
+      return base + linea + '\n';
+    });
   };
 
   const addReco = async () => {
@@ -493,9 +509,23 @@ export default function Pacientes() {
             {panel === 'reco' && (
               <div style={S.panelBody}>
                 <div style={S.note}>Notas de bitácora para el paciente. Se guardan con la fecha y hora en que las publicas, y el paciente las verá en su sección "Recomendaciones".</div>
+                <div style={S.chipGroups}>
+                  {RECO_CHIPS.map(grupo => (
+                    <div key={grupo.titulo} style={S.chipGroup}>
+                      <div style={S.chipLabel}>{grupo.titulo}</div>
+                      <div style={S.chipRow}>
+                        {grupo.items.map(it => {
+                          const label = typeof it === 'string' ? it : it.l;
+                          const ins = typeof it === 'string' ? it : (it.ins || it.l);
+                          return <button key={label} type="button" style={S.chip} onClick={() => addChip(ins)}>+ {label}</button>;
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
                 <div style={{ marginBottom: 12 }}>
-                  <textarea style={S.recoArea} rows={3} value={recoTexto} onChange={e => setRecoTexto(e.target.value)}
-                    placeholder="Escribe una recomendación para el paciente…" />
+                  <textarea style={S.recoArea} rows={4} value={recoTexto} onChange={e => setRecoTexto(e.target.value)}
+                    placeholder="Escribe una recomendación para el paciente, o agrégala con los botones de arriba…" />
                   <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addReco}>+ Agregar recomendación</button>
                 </div>
                 {(!sel.recomendaciones || sel.recomendaciones.length === 0)
@@ -733,6 +763,11 @@ const styles = {
   metricVal: { fontSize: 26, fontWeight: 800, color: 'var(--dark)', marginTop: 4, lineHeight: 1.1 },
   metricUnit: { fontSize: 12, fontWeight: 600, color: 'var(--stone)' },
   recoArea: { width: '100%', border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', resize: 'vertical', boxSizing: 'border-box' },
+  chipGroups: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 },
+  chipGroup: { display: 'flex', flexDirection: 'column', gap: 6 },
+  chipLabel: { fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)' },
+  chipRow: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+  chip: { background: 'var(--cream)', border: '1px solid var(--gold)', borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 600, color: 'var(--dark)', cursor: 'pointer', fontFamily: 'var(--font)' },
   recoItem: { display: 'flex', alignItems: 'flex-start', gap: 10, border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, background: 'var(--cream)' },
   recoDate: { fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 },
   recoText: { fontSize: 13, color: 'var(--dark)', lineHeight: 1.5, whiteSpace: 'pre-wrap' },
