@@ -107,6 +107,10 @@ export default function Menus({ patient, onBack }) {
   const [iaBusy, setIaBusy] = useState(false);
   const [opBusy, setOpBusy] = useState(''); // "idx:oi" de la opción que se está generando
   const [dragOver, setDragOver] = useState(null); // idx del tiempo sobre el que se arrastra una imagen
+  const [listas, setListas] = useState(null);
+  const [listaBusy, setListaBusy] = useState(false);
+  const [showLista, setShowLista] = useState(false);
+  const [listaErr, setListaErr] = useState('');
 
   // Ventana de configuración: aparece al abrir menús cuando aún no hay configuración guardada.
   const [showCfg, setShowCfg] = useState(!savedMenus);
@@ -222,6 +226,46 @@ export default function Menus({ patient, onBack }) {
     setOpBusy('');
   };
 
+  // ── Lista del súper: una lista por opción, para 5 días ──
+  const generarListaSuper = async () => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setRep('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    const opciones = [];
+    for (let oi = 0; oi < nOpciones; oi++) {
+      const platillos = tiempos
+        .map(t => ({ tiempo: t.nombre, nombre: (t.opciones[oi] && t.opciones[oi].nombre) || '', prep: (t.opciones[oi] && t.opciones[oi].prep) || '' }))
+        .filter(p => p.nombre || p.prep);
+      if (platillos.length) opciones.push({ opcion: oi + 1, platillos });
+    }
+    if (!opciones.length) { setRep('Primero escribe o genera los platillos de los menús.'); return; }
+    setListaBusy(true); setShowLista(true); setListas(null); setListaErr('');
+    try {
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'listaSuperIA', dias: 5, objetivo: patient.objetivo || '', opciones }),
+        redirect: 'follow',
+      });
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      if (!data.ok || !Array.isArray(data.listas)) throw new Error(data.error || 'No se recibió la lista.');
+      setListas(data.listas);
+    } catch (e) {
+      setListaErr('No se pudo generar la lista: ' + e.message);
+    }
+    setListaBusy(false);
+  };
+  const listaATexto = (L) => {
+    let s = 'LISTA DEL SÚPER · Opción ' + L.opcion + ' · 5 días\n';
+    (L.categorias || []).forEach(c => {
+      s += '\n' + (c.nombre || '').toUpperCase() + '\n';
+      (c.items || []).forEach(it => { s += '• ' + it.insumo + (it.cantidad ? ' — ' + it.cantidad : '') + '\n'; });
+    });
+    return s.trim();
+  };
+  const copiarLista = (L) => {
+    try { navigator.clipboard.writeText(listaATexto(L)); setRep('Lista de la Opción ' + L.opcion + ' copiada al portapapeles.'); }
+    catch (_) { setRep('No se pudo copiar automáticamente; selecciona y copia el texto.'); }
+  };
+
   const guardarBorrador = async () => {
     setStatus('guardando'); setRep('Guardando borrador…');
     try {
@@ -328,6 +372,38 @@ export default function Menus({ patient, onBack }) {
         </div>
       )}
 
+      {showLista && (
+        <div style={S.modalWrap}>
+          <div style={S.modalCard}>
+            <div style={S.eyebrow}>Lista del súper</div>
+            <h2 style={S.balTitle}>Insumos para 5 días, por opción</h2>
+            {listaBusy && <div style={S.listaMsg}>Leyendo los menús y armando la lista con IA…</div>}
+            {listaErr && <div style={S.cfgWarn}>{listaErr}</div>}
+            {!listaBusy && !listaErr && listas && listas.map(L => (
+              <div key={L.opcion} style={S.listaBlock}>
+                <div style={S.listaHead}>
+                  <span>Opción {L.opcion}</span>
+                  <button style={S.optIaBtn} onClick={() => copiarLista(L)}>Copiar</button>
+                </div>
+                {(L.categorias || []).map((c, ci) => (
+                  <div key={ci} style={S.listaCat}>
+                    <div style={S.listaCatName}>{c.nombre}</div>
+                    <ul style={S.listaUl}>
+                      {(c.items || []).map((it, ii) => (
+                        <li key={ii} style={S.listaLi}>{it.insumo}{it.cantidad ? ' — ' + it.cantidad : ''}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div style={S.cfgActions}>
+              <button style={S.volverBtn} onClick={() => setShowLista(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <button style={S.back} onClick={onBack}>← {patient.nombre}</button>
       <div style={S.titleRow}>
         <div style={{ flex: 1 }}>
@@ -341,6 +417,7 @@ export default function Menus({ patient, onBack }) {
         <button style={S.toolBtn} onClick={() => setShowCfg(true)}>Reconfigurar</button>
         <button style={S.toolBtn} onClick={redistribuir}>Redistribuir equivalentes</button>
         <button style={{ ...S.toolBtn, ...S.iaBtn }} onClick={generarIA} disabled={iaBusy}>{iaBusy ? 'Generando…' : 'Generar todos con IA ✦'}</button>
+        <button style={S.toolBtn} onClick={generarListaSuper} disabled={listaBusy}>{listaBusy ? 'Generando…' : 'Lista del súper'}</button>
       </div>
       <div style={S.iaNote}>Puedes generar todos los menús de golpe, o regenerar <b>una sola opción</b> con el botón <b>IA ✦</b> de cada tarjeta — así arreglas las que no sirven sin tocar las que ya quedaron bien. La IA solo sugiere: <b>revisa y edita</b> antes de guardar.</div>
 
@@ -481,6 +558,13 @@ const styles = {
   cfgHora: { width: 78, border: `1px solid ${T.line}`, borderRadius: 7, padding: '7px 10px', fontSize: 13, color: T.pine, fontFamily: mono, background: '#FCFDFC', boxSizing: 'border-box' },
   cfgWarn: { marginTop: 12, fontSize: 12, color: T.danger, background: '#F7EAE5', borderRadius: 9, padding: '9px 12px', lineHeight: 1.45 },
   cfgActions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 },
+  listaMsg: { fontSize: 13, color: T.inkSoft, padding: '14px 0' },
+  listaBlock: { border: `1px solid ${T.lineSoft}`, borderRadius: 12, padding: '12px 14px', marginBottom: 12 },
+  listaHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 14, fontWeight: 800, color: T.pine, marginBottom: 8 },
+  listaCat: { marginBottom: 8 },
+  listaCatName: { fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, color: T.amber, marginBottom: 3 },
+  listaUl: { margin: 0, paddingLeft: 18 },
+  listaLi: { fontSize: 13, color: T.ink, lineHeight: 1.5 },
   toolbar: { display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 },
   toolBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, padding: '9px 15px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: mono },
   iaBtn: { borderColor: T.amber, color: '#211C17', cursor: 'pointer', background: T.amber },
