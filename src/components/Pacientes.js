@@ -10,6 +10,11 @@ import InBodyModal from './InBodyModal';
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const MESES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const fmtMes = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} ${MESES[d.getMonth()]}`; };
+const bitacoraToApego = (bit) => (bit || []).filter(b => typeof b.apego === 'number').map(b => {
+  const d = new Date(b.fecha);
+  const iso = isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return { fecha: iso, apego: b.apego };
+});
 const fmtSello = (ts) => { const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
 const fileToBase64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
 const fmtFecha = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} de ${MESES_L[d.getMonth()]} de ${d.getFullYear()}`; };
@@ -66,6 +71,7 @@ export default function Pacientes() {
   const [inbody, setInbody] = useState(null);
   const [recoTexto, setRecoTexto] = useState('');
   const [bitacoraTexto, setBitacoraTexto] = useState('');
+  const [bitacoraApego, setBitacoraApego] = useState('');
   const [isakFile, setIsakFile] = useState(null);
   const [isakBusy, setIsakBusy] = useState(false);
   const [panel, setPanel] = useState(null);
@@ -248,10 +254,13 @@ export default function Pacientes() {
   const addBitacora = async () => {
     const t = bitacoraTexto.trim();
     if (!t) { setErr('Escribe la nota de la consulta.'); return; }
-    const arr = [...(sel.bitacora || []), { texto: t, fecha: Date.now() }];
+    const entry = { texto: t, fecha: Date.now() };
+    const ap = parseFloat(bitacoraApego);
+    if (isFinite(ap)) entry.apego = ap;
+    const arr = [...(sel.bitacora || []), entry];
     try {
       await updateDoc(doc(db, 'pacientes', sel.id), { bitacora: arr });
-      setBitacoraTexto(''); setErr('');
+      setBitacoraTexto(''); setBitacoraApego(''); setErr('');
     } catch (e) { setErr('No se pudo guardar la nota: ' + e.message); }
   };
 
@@ -351,6 +360,8 @@ export default function Pacientes() {
   /* ----- VISTA: dashboard de un paciente ----- */
   if (sel) {
     const m = last(sel.mediciones);
+    const apegoData = bitacoraToApego(sel.bitacora);
+    const ultApego = apegoData.length ? apegoData[apegoData.length - 1].apego : null;
     if (sub === 'plan') {
       const pdata = inbody
         ? { peso: inbody.peso || (m ? m.peso : ''), talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: inbody.grasa || (m ? m.grasa : ''), tmb: inbody.tmb || '' }
@@ -430,6 +441,7 @@ export default function Pacientes() {
             <ChartCard title="Masa grasa" unit=" kg" valor={m ? m.grasaKg : null}><Linea data={sel.mediciones} field="grasaKg" color="#B0593F" unit="" /></ChartCard>
             <ChartCard title="Grasa visceral" unit="" valor={m ? m.visceral : null}><Linea data={sel.mediciones} field="visceral" color="#36302B" unit="" /></ChartCard>
             <ChartCard title="Agua corporal total" unit=" L" valor={m ? m.agua : null}><Linea data={sel.mediciones} field="agua" color="#5B7C99" unit="" /></ChartCard>
+            <ChartCard title="Apego al plan" unit="%" valor={ultApego}><Linea data={apegoData} field="apego" color="#3E6B5B" unit="%" /></ChartCard>
           </div>
         </div>
 
@@ -606,6 +618,9 @@ export default function Pacientes() {
                 <div style={{ marginBottom: 12 }}>
                   <textarea style={S.recoArea} rows={3} value={bitacoraTexto} onChange={e => setBitacoraTexto(e.target.value)}
                     placeholder="Anota lo que comente el paciente, observaciones, acuerdos…" />
+                  <div style={{ marginTop: 8, maxWidth: 200 }}>
+                    <Field l="% apego al plan (opcional)"><input style={S.inp} inputMode="decimal" value={bitacoraApego} onChange={e => setBitacoraApego(e.target.value)} placeholder="Ej. 100" /></Field>
+                  </div>
                   <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addBitacora}>+ Agregar nota</button>
                 </div>
                 {(!sel.bitacora || sel.bitacora.length === 0)
