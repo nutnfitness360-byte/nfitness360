@@ -20,6 +20,9 @@ const DUR_POR_ID = Object.fromEntries(SERVICIOS.map(s => [s.id, s.dur]));
 // Objetivo (independiente del tipo de consulta)
 const OBJETIVOS = ['Aumento de masa muscular','Baja de grasa','Recomposición corporal','Salud','Rendimiento deportivo','Otro'];
 
+// Etiqueta legible del método de pago (para mostrarlo en el renglón de la cita)
+const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
+
 // ---- Disponibilidad ----
 // Bloqueados: domingo (0), martes (2) y jueves (4)
 const DOW_BLOQ = new Set([0, 2, 4]);
@@ -306,6 +309,20 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                 <div style={{flex:1}}>
                   <div className="cita-nombre">{c.pacienteNombre}</div>
                   <div className="cita-motivo">{(c.tipoNombre || c.motivo)}{c.objetivo ? ' · ' + c.objetivo : ''}</div>
+                  {c.estado !== 'cancelada' && c.estadoPago && (
+                    <div style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        display: 'inline-block', padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                        background: c.estadoPago === 'pagado' ? '#E9F1ED' : '#F7EAE5',
+                        color: c.estadoPago === 'pagado' ? '#3E6B5B' : '#B0593F',
+                      }}>
+                        {c.estadoPago === 'pagado' ? 'Pagado' : 'Pendiente de pago'}
+                      </span>
+                      {c.metodoPago && METODO_LABEL[c.metodoPago] && c.estadoPago !== 'pagado' && (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--stone)' }}>· {METODO_LABEL[c.metodoPago]}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>
                 {c.estado !== 'cancelada' && (
