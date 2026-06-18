@@ -57,6 +57,8 @@ export default function Pacientes() {
   const [busca, setBusca] = useState('');
   const [menuId, setMenuId] = useState(null);
   const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' });
+  const [editMed, setEditMed] = useState({ fecha: '', peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', tmb: '' });
+  const [openEdit, setOpenEdit] = useState(false);
   const [plan, setPlan] = useState({ nombre: '', fecha: hoyISO(), link: '' });
   const [openMed, setOpenMed] = useState(false);
   const [openPlan, setOpenPlan] = useState(false);
@@ -173,6 +175,33 @@ export default function Pacientes() {
     try {
       await updateDoc(doc(db, 'pacientes', sel.id), { mediciones: arr });
       setMed({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' }); setOpenMed(false); setErr('');
+    } catch (e) { setErr('No se pudo guardar: ' + e.message); }
+  };
+
+  // Editar la ÚLTIMA medición (corrige una lectura errónea del InBody/PDF).
+  const abrirEditarUltima = () => {
+    const u = last((sel.mediciones || []).slice().sort((a, b) => a.fecha.localeCompare(b.fecha)));
+    if (!u) return;
+    const v = (x) => (x === 0 || x ? String(x) : '');
+    setEditMed({ fecha: u.fecha || hoyISO(), peso: v(u.peso), grasa: v(u.grasa), musculo: v(u.musculo), grasaKg: v(u.grasaKg), visceral: v(u.visceral), agua: v(u.agua), tmb: v(u.tmb) });
+    setOpenMed(false); setErr(''); setOpenEdit(true);
+  };
+
+  const guardarEditUltima = async () => {
+    if (!editMed.fecha || editMed.peso === '') { setErr('Fecha y peso son necesarios.'); return; }
+    const base = [...(sel.mediciones || [])].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    if (!base.length) { setOpenEdit(false); return; }
+    base.pop(); // quita la última (la más reciente), que es la que estamos editando
+    const num = (x) => (x === '' || x === null || x === undefined || isNaN(+x)) ? undefined : +x;
+    const edited = { fecha: editMed.fecha, peso: +editMed.peso, grasa: +editMed.grasa || 0, musculo: +editMed.musculo || 0 };
+    if (num(editMed.grasaKg) !== undefined) edited.grasaKg = +editMed.grasaKg;
+    if (num(editMed.visceral) !== undefined) edited.visceral = +editMed.visceral;
+    if (num(editMed.agua) !== undefined) edited.agua = +editMed.agua;
+    if (num(editMed.tmb) !== undefined) edited.tmb = +editMed.tmb;
+    const arr = [...base, edited].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), { mediciones: arr });
+      setOpenEdit(false); setErr('');
     } catch (e) { setErr('No se pudo guardar: ' + e.message); }
   };
 
@@ -368,7 +397,10 @@ export default function Pacientes() {
         <div className="card">
           <div style={S.titleRow}>
             <div className="card-title" style={{ margin: 0 }}>Seguimiento</div>
-            <button style={S.smallBtn} onClick={() => setOpenMed(v => !v)}>{openMed ? 'Cancelar' : '+ Medición'}</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {m && <button style={S.smallBtn} onClick={openEdit ? () => setOpenEdit(false) : abrirEditarUltima}>{openEdit ? 'Cancelar' : 'Editar última'}</button>}
+              <button style={S.smallBtn} onClick={() => { setOpenEdit(false); setOpenMed(v => !v); }}>{openMed ? 'Cancelar' : '+ Medición'}</button>
+            </div>
           </div>
           {openMed && (
             <div style={S.formRow}>
@@ -377,6 +409,18 @@ export default function Pacientes() {
               <Field l="% grasa"><input style={S.inp} inputMode="decimal" value={med.grasa} onChange={e => setMed({ ...med, grasa: e.target.value })} /></Field>
               <Field l="Músculo (kg)"><input style={S.inp} inputMode="decimal" value={med.musculo} onChange={e => setMed({ ...med, musculo: e.target.value })} /></Field>
               <button style={S.saveBtn} onClick={addMedicion}>Guardar</button>
+            </div>
+          )}
+          {openEdit && (
+            <div style={S.formRow}>
+              <Field l="Fecha"><input type="date" style={S.inp} value={editMed.fecha} onChange={e => setEditMed({ ...editMed, fecha: e.target.value })} /></Field>
+              <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={editMed.peso} onChange={e => setEditMed({ ...editMed, peso: e.target.value })} /></Field>
+              <Field l="% grasa"><input style={S.inp} inputMode="decimal" value={editMed.grasa} onChange={e => setEditMed({ ...editMed, grasa: e.target.value })} /></Field>
+              <Field l="Músculo (kg)"><input style={S.inp} inputMode="decimal" value={editMed.musculo} onChange={e => setEditMed({ ...editMed, musculo: e.target.value })} /></Field>
+              <Field l="Masa grasa (kg)"><input style={S.inp} inputMode="decimal" value={editMed.grasaKg} onChange={e => setEditMed({ ...editMed, grasaKg: e.target.value })} /></Field>
+              <Field l="Grasa visceral"><input style={S.inp} inputMode="decimal" value={editMed.visceral} onChange={e => setEditMed({ ...editMed, visceral: e.target.value })} /></Field>
+              <Field l="Agua (L)"><input style={S.inp} inputMode="decimal" value={editMed.agua} onChange={e => setEditMed({ ...editMed, agua: e.target.value })} /></Field>
+              <button style={S.saveBtn} onClick={guardarEditUltima}>Guardar cambios</button>
             </div>
           )}
           <div style={S.chartGrid}>
