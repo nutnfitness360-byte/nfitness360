@@ -401,13 +401,18 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
             {!isNutri && servSel && (
               <div className="fg"><label>Forma de pago</label>
                 {servSel.online ? (
-                  <div className="empty-state" style={{ textAlign: 'left' }}>Esta consulta es en línea: el pago se realiza por Stripe al confirmar la cita.</div>
+                  <div className="empty-state" style={{ textAlign: 'center' }}>Esta consulta es en línea: el pago se realiza por Stripe al confirmar la cita.</div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {[['efectivo', 'Efectivo (en consultorio)'], ['tarjeta', 'Tarjeta (en consultorio)'], ['transferencia', 'Transferencia'], ['stripe', 'Pagar en línea ahora (Stripe)']].map(([val, lbl]) => (
-                      <label key={val} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                        <input type="radio" name="metodoPago" checked={mMetodoPago === val} onChange={() => setMMetodoPago(val)} />
-                        {lbl}
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                    {[['efectivo', 'Efectivo (en consultorio)'], ['tarjeta', 'Tarjeta (en consultorio)'], ['transferencia', 'Transferencia'], ['stripe', 'Pagar en línea ahora (Stripe)']].map(([val, lbl], i) => (
+                      <label key={val} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                        padding: '13px 12px', cursor: 'pointer', textAlign: 'center',
+                        borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                        background: mMetodoPago === val ? 'rgba(205,167,136,0.14)' : 'transparent',
+                      }}>
+                        <input type="radio" name="metodoPago" checked={mMetodoPago === val} onChange={() => setMMetodoPago(val)} style={{ margin: 0, flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{lbl}</span>
                       </label>
                     ))}
                   </div>
