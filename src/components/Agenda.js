@@ -310,7 +310,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                   <div className="cita-nombre">{c.pacienteNombre}</div>
                   <div className="cita-motivo">{(c.tipoNombre || c.motivo)}{c.objetivo ? ' · ' + c.objetivo : ''}</div>
                   {c.estado !== 'cancelada' && c.estadoPago && (
-                    <div style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
                       <span style={{
                         display: 'inline-block', padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700,
                         background: c.estadoPago === 'pagado' ? '#E9F1ED' : '#F7EAE5',
@@ -320,6 +320,12 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                       </span>
                       {c.metodoPago && METODO_LABEL[c.metodoPago] && c.estadoPago !== 'pagado' && (
                         <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--stone)' }}>· {METODO_LABEL[c.metodoPago]}</span>
+                      )}
+                      {isNutri && c.estadoPago !== 'pagado' && (
+                        <button onClick={() => updateDoc(doc(db, 'citas', c.id), { estadoPago: 'pagado' })} title="Marcar como pagada"
+                          style={{ padding: '2px 9px', background: '#E9F1ED', border: '1px solid #3E6B5B', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#3E6B5B', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif' }}>
+                          Marcar pagado
+                        </button>
                       )}
                     </div>
                   )}
