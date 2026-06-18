@@ -434,70 +434,6 @@ export default function Pacientes() {
         </div>
 
         <div style={S.panelGrid}>
-          {/* Seguimientos (notas internas de consulta, no visibles para el paciente) */}
-          <div className="card" style={panel === 'bitacora' ? S.panelOpen : S.panel}>
-            <button style={S.panelHead} onClick={() => setPanel(p => p === 'bitacora' ? null : 'bitacora')}>
-              <span style={S.panelTitle}>Seguimientos</span>
-              <span style={panel === 'bitacora' ? S.chevOpen : S.chev}>⌄</span>
-            </button>
-            {panel === 'bitacora' && (
-              <div style={S.panelBody}>
-                <div style={S.note}>Notas de seguimiento de la consulta (texto libre). <b>El paciente no las ve.</b></div>
-                <div style={{ marginBottom: 12 }}>
-                  <textarea style={S.recoArea} rows={3} value={bitacoraTexto} onChange={e => setBitacoraTexto(e.target.value)}
-                    placeholder="Anota lo que comente el paciente, observaciones, acuerdos…" />
-                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addBitacora}>+ Agregar nota</button>
-                </div>
-                {(!sel.bitacora || sel.bitacora.length === 0)
-                  ? <div className="empty-state">Aún no hay notas de consulta.</div>
-                  : [...sel.bitacora].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
-                    <div key={idx} style={S.recoItem}>
-                      <div style={{ flex: 1 }}>
-                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
-                        <div style={S.recoText}>{r.texto}</div>
-                      </div>
-                      <button style={S.rm} onClick={() => removeBitacora(idx)} title="Eliminar">×</button>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-
-          {/* Isak (reportes PDF; visible también para el paciente) */}
-          <div className="card" style={panel === 'isak' ? S.panelOpen : S.panel}>
-            <button style={S.panelHead} onClick={() => setPanel(p => p === 'isak' ? null : 'isak')}>
-              <span style={S.panelTitle}>Isak</span>
-              <span style={panel === 'isak' ? S.chevOpen : S.chev}>⌄</span>
-            </button>
-            {panel === 'isak' && (
-              <div style={S.panelBody}>
-                <div style={S.note}>Reportes ISAK en PDF. Se guardan en Drive y el paciente también puede verlos.</div>
-                <label style={S.upload}>
-                  <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => setIsakFile(e.target.files && e.target.files[0])} />
-                  {isakFile ? ('PDF seleccionado: ' + isakFile.name) : 'Seleccionar PDF del reporte ISAK'}
-                </label>
-                <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={subirIsak} disabled={isakBusy}>
-                  {isakBusy ? 'Cargando…' : 'Cargar reporte ISAK'}
-                </button>
-                <div style={{ marginTop: 14 }}>
-                  {(!sel.isak || sel.isak.length === 0)
-                    ? <div className="empty-state">Aún no hay reportes ISAK.</div>
-                    : [...sel.isak].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
-                      <div key={idx} style={S.planRow}>
-                        <div style={S.planIcon}>PDF</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Reporte ISAK'}</div>
-                          <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
-                        </div>
-                        {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
-                        <button style={S.rm} onClick={() => removeIsak(idx)} title="Quitar de la lista">×</button>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Historial clínico */}
           <div className="card" style={panel === 'historia' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'historia' ? null : 'historia')}>
@@ -544,45 +480,37 @@ export default function Pacientes() {
             )}
           </div>
 
-          {/* Recomendaciones */}
-          <div className="card" style={panel === 'reco' ? S.panelOpen : S.panel}>
-            <button style={S.panelHead} onClick={() => setPanel(p => p === 'reco' ? null : 'reco')}>
-              <span style={S.panelTitle}>Recomendaciones</span>
-              <span style={panel === 'reco' ? S.chevOpen : S.chev}>⌄</span>
+          {/* Isak (reportes PDF; visible también para el paciente) */}
+          <div className="card" style={panel === 'isak' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'isak' ? null : 'isak')}>
+              <span style={S.panelTitle}>ISAK</span>
+              <span style={panel === 'isak' ? S.chevOpen : S.chev}>⌄</span>
             </button>
-            {panel === 'reco' && (
+            {panel === 'isak' && (
               <div style={S.panelBody}>
-                <div style={S.note}>Notas de bitácora para el paciente. Se guardan con la fecha y hora en que las publicas, y el paciente las verá en su sección "Recomendaciones".</div>
-                <div style={S.chipGroups}>
-                  {RECO_CHIPS.map(grupo => (
-                    <div key={grupo.titulo} style={S.chipGroup}>
-                      <div style={S.chipLabel}>{grupo.titulo}</div>
-                      <div style={S.chipRow}>
-                        {grupo.items.map(it => {
-                          const label = typeof it === 'string' ? it : it.l;
-                          const ins = typeof it === 'string' ? it : (it.ins || it.l);
-                          return <button key={label} type="button" style={S.chip} onClick={() => addChip(ins)}>+ {label}</button>;
-                        })}
+                <div style={S.note}>Reportes ISAK en PDF. Se guardan en Drive y el paciente también puede verlos.</div>
+                <label style={S.upload}>
+                  <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => setIsakFile(e.target.files && e.target.files[0])} />
+                  {isakFile ? ('PDF seleccionado: ' + isakFile.name) : 'Seleccionar PDF del reporte ISAK'}
+                </label>
+                <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={subirIsak} disabled={isakBusy}>
+                  {isakBusy ? 'Cargando…' : 'Cargar reporte ISAK'}
+                </button>
+                <div style={{ marginTop: 14 }}>
+                  {(!sel.isak || sel.isak.length === 0)
+                    ? <div className="empty-state">Aún no hay reportes ISAK.</div>
+                    : [...sel.isak].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                      <div key={idx} style={S.planRow}>
+                        <div style={S.planIcon}>PDF</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Reporte ISAK'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+                        </div>
+                        {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                        <button style={S.rm} onClick={() => removeIsak(idx)} title="Quitar de la lista">×</button>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
-                <div style={{ marginBottom: 12 }}>
-                  <textarea style={S.recoArea} rows={4} value={recoTexto} onChange={e => setRecoTexto(e.target.value)}
-                    placeholder="Escribe una recomendación para el paciente, o agrégala con los botones de arriba…" />
-                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addReco}>+ Agregar recomendación</button>
-                </div>
-                {(!sel.recomendaciones || sel.recomendaciones.length === 0)
-                  ? <div className="empty-state">Aún no hay recomendaciones.</div>
-                  : [...sel.recomendaciones].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
-                    <div key={idx} style={S.recoItem}>
-                      <div style={{ flex: 1 }}>
-                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
-                        <div style={S.recoText}>{r.texto}</div>
-                      </div>
-                      <button style={S.rm} onClick={() => removeReco(idx)} title="Eliminar">×</button>
-                    </div>
-                  ))}
               </div>
             )}
           </div>
@@ -609,7 +537,7 @@ export default function Pacientes() {
           {/* Menús */}
           <div className="card" style={panel === 'menus' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'menus' ? null : 'menus')}>
-              <span style={S.panelTitle}>Menús por tiempo de comida</span>
+              <span style={S.panelTitle}>Menús o equivalencias</span>
               <span style={panel === 'menus' ? S.chevOpen : S.chev}>⌄</span>
             </button>
             {panel === 'menus' && (
@@ -666,6 +594,78 @@ export default function Pacientes() {
               </div>
             )}
           </div>
+          {/* Seguimientos (notas internas de consulta, no visibles para el paciente) */}
+          <div className="card" style={panel === 'bitacora' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'bitacora' ? null : 'bitacora')}>
+              <span style={S.panelTitle}>Seguimientos</span>
+              <span style={panel === 'bitacora' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'bitacora' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Notas de seguimiento de la consulta (texto libre). <b>El paciente no las ve.</b></div>
+                <div style={{ marginBottom: 12 }}>
+                  <textarea style={S.recoArea} rows={3} value={bitacoraTexto} onChange={e => setBitacoraTexto(e.target.value)}
+                    placeholder="Anota lo que comente el paciente, observaciones, acuerdos…" />
+                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addBitacora}>+ Agregar nota</button>
+                </div>
+                {(!sel.bitacora || sel.bitacora.length === 0)
+                  ? <div className="empty-state">Aún no hay notas de consulta.</div>
+                  : [...sel.bitacora].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                    <div key={idx} style={S.recoItem}>
+                      <div style={{ flex: 1 }}>
+                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
+                        <div style={S.recoText}>{r.texto}</div>
+                      </div>
+                      <button style={S.rm} onClick={() => removeBitacora(idx)} title="Eliminar">×</button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          {/* Recomendaciones */}
+          <div className="card" style={panel === 'reco' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'reco' ? null : 'reco')}>
+              <span style={S.panelTitle}>Recomendaciones</span>
+              <span style={panel === 'reco' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'reco' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Notas de bitácora para el paciente. Se guardan con la fecha y hora en que las publicas, y el paciente las verá en su sección "Recomendaciones".</div>
+                <div style={S.chipGroups}>
+                  {RECO_CHIPS.map(grupo => (
+                    <div key={grupo.titulo} style={S.chipGroup}>
+                      <div style={S.chipLabel}>{grupo.titulo}</div>
+                      <div style={S.chipRow}>
+                        {grupo.items.map(it => {
+                          const label = typeof it === 'string' ? it : it.l;
+                          const ins = typeof it === 'string' ? it : (it.ins || it.l);
+                          return <button key={label} type="button" style={S.chip} onClick={() => addChip(ins)}>+ {label}</button>;
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <textarea style={S.recoArea} rows={4} value={recoTexto} onChange={e => setRecoTexto(e.target.value)}
+                    placeholder="Escribe una recomendación para el paciente, o agrégala con los botones de arriba…" />
+                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addReco}>+ Agregar recomendación</button>
+                </div>
+                {(!sel.recomendaciones || sel.recomendaciones.length === 0)
+                  ? <div className="empty-state">Aún no hay recomendaciones.</div>
+                  : [...sel.recomendaciones].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                    <div key={idx} style={S.recoItem}>
+                      <div style={{ flex: 1 }}>
+                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
+                        <div style={S.recoText}>{r.texto}</div>
+                      </div>
+                      <button style={S.rm} onClick={() => removeReco(idx)} title="Eliminar">×</button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
         </div>
 
         <button style={{ ...S.back, marginTop: 16, marginBottom: 0 }} onClick={volver}>← Atrás</button>
