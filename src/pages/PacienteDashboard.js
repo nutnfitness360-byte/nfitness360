@@ -177,6 +177,10 @@ export default function PacienteDashboard() {
   const planes = expediente && Array.isArray(expediente.planes) ? [...expediente.planes].reverse() : [];
   const medics = expediente && Array.isArray(expediente.mediciones) ? expediente.mediciones : [];
   const ultMed = medics.length ? medics[medics.length - 1] : null;
+  const apegoData = (expediente && Array.isArray(expediente.bitacora) ? expediente.bitacora : [])
+    .filter(b => typeof b.apego === 'number')
+    .map(b => { const d = new Date(b.fecha); const iso = isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; return { fecha: iso, apego: b.apego }; });
+  const ultApego = apegoData.length ? apegoData[apegoData.length - 1].apego : null;
 
   const tabs = [
     { id: 'inicio', label: 'Inicio', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg> },
@@ -299,6 +303,11 @@ export default function PacienteDashboard() {
                 <div style={D.tileTitle}>Agua corporal total</div>
                 <div style={D.tileValue}>{ultMed && typeof ultMed.agua === 'number' ? ultMed.agua : '—'}<span style={D.tileUnit}> L</span></div>
                 <Linea data={medics} field="agua" color="#5B7C99" unit="" />
+              </div>
+              <div style={D.tile}>
+                <div style={D.tileTitle}>Apego al plan</div>
+                <div style={D.tileValue}>{ultApego != null ? ultApego : '—'}<span style={D.tileUnit}> %</span></div>
+                <Linea data={apegoData} field="apego" color="#3E6B5B" unit="%" />
               </div>
             </div>
 
