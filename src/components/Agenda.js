@@ -424,11 +424,11 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                     {[['efectivo', 'Efectivo (en consultorio)'], ['tarjeta', 'Tarjeta (en consultorio)'], ['transferencia', 'Transferencia'], ['stripe', 'Pagar en línea ahora (Stripe)']].map(([val, lbl], i) => (
                       <label key={val} style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                        padding: '13px 14px', cursor: 'pointer',
+                        padding: '13px 14px', cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal',
                         borderTop: i === 0 ? 'none' : '1px solid var(--border)',
                         background: mMetodoPago === val ? 'rgba(205,167,136,0.14)' : 'transparent',
                       }}>
-                        <input type="radio" name="metodoPago" checked={mMetodoPago === val} onChange={() => setMMetodoPago(val)} style={{ margin: 0, flexShrink: 0 }} />
+                        <input type="radio" name="metodoPago" checked={mMetodoPago === val} onChange={() => setMMetodoPago(val)} style={{ width: 16, height: 16, minWidth: 16, flex: '0 0 auto', margin: 0 }} />
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)', minWidth: 0, textAlign: 'center', whiteSpace: 'normal', lineHeight: 1.3 }}>{lbl}</span>
                       </label>
                     ))}
