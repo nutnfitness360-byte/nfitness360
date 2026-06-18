@@ -106,7 +106,6 @@ export default function PacienteDashboard() {
       }
       limpiarUrl();
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
