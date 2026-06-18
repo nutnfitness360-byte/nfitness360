@@ -40,17 +40,37 @@ const isFin = (v) => typeof v === 'number' && isFinite(v);
 const r0 = (n) => Math.round(n);
 const r1 = (n) => Math.round(n * 10) / 10;
 
-/* Plantilla base: % de la energía total que aporta cada grupo (índice de GRUPOS).
-   Editable después en vivo. No incluye azúcares (grupo 15): el cálculo NO los ofrece
-   de inicio; la nutrióloga decide si los agrega y rebalancea. Por eso suma ~97%. */
-const PLANTILLA_PCT = { 0: 28, 2: 10, 3: 5, 4: 12, 5: 20, 9: 10, 13: 12 };
-function plantillaEq(energia) {
+/* Propuesta automática de equivalentes.
+   En vez de repartir un % fijo de energía por grupo (lo que dejaba la proteína corta),
+   apunta a las METAS de macros (P/L/C) para que las tres queden dentro de 90–110%.
+   Da una base de variedad y ajusta tres "palancas":
+     · Carbohidrato → Cereales y tubérculos (0)
+     · Proteína     → Prod. animales muy bajo en grasa (5)
+     · Lípidos      → Grasas (13)
+   El orden importa: primero carbos (aportan algo de proteína), luego proteína,
+   luego grasa, descontando en cada paso lo que ya aportan los grupos anteriores.
+   No incluye azúcares (15): la nutrióloga decide si los agrega y rebalancea. */
+function plantillaEq(energia, pPpct, pLpct, pCpct) {
   const e = num(energia);
-  return GRUPOS.map((g, i) => {
-    const pct = PLANTILLA_PCT[i];
-    if (!pct || !e || !g[1]) return 0;
-    return Math.round((pct / 100 * e) / g[1]);
-  });
+  const eq = GRUPOS.map(() => 0);
+  if (!e) return eq;
+  const metaP = (num(pPpct) / 100 * e) / 4;   // g proteína meta
+  const metaL = (num(pLpct) / 100 * e) / 9;   // g lípidos meta
+  const metaC = (num(pCpct) / 100 * e) / 4;   // g carbohidrato meta
+  const P = 2, L = 3, C = 4;                   // posición de cada macro dentro de un grupo
+  // Base de variedad (cantidades fijas razonables)
+  eq[3] = 3; // Verdura
+  eq[4] = 2; // Fruta
+  eq[2] = 1; // Leguminosas
+  eq[9] = 1; // Leche descremada
+  const suma = (m) => eq.reduce((a, n, i) => a + n * GRUPOS[i][m], 0);
+  // 1) Carbohidrato → Cereales y tubérculos (0)
+  eq[0] = Math.max(0, Math.round((metaC - suma(C)) / GRUPOS[0][C]));
+  // 2) Proteína → Prod. animales muy bajo en grasa (5), descontando lo ya aportado
+  eq[5] = Math.max(0, Math.round((metaP - suma(P)) / GRUPOS[5][P]));
+  // 3) Lípidos → Grasas (13), descontando lo ya aportado (incluye grasa del grupo 5)
+  eq[13] = Math.max(0, Math.round((metaL - suma(L)) / GRUPOS[13][L]));
+  return eq;
 }
 
 const FACTORES = [
@@ -95,7 +115,7 @@ export default function Plan({ patient, pdata, onBack }) {
     // Plan nuevo (sin equivalentes guardados): aplicar la plantilla base.
     const teniaEq = Array.isArray(saved.eq) && saved.eq.some(v => num(v) > 0);
     const eqVacios = eq.every(v => num(v) === 0);
-    if (!teniaEq && eqVacios && e0) setEq(plantillaEq(e0).map(String));
+    if (!teniaEq && eqVacios && e0) setEq(plantillaEq(e0, num(meta.pP), num(meta.pL), num(meta.pC)).map(String));
     // eslint-disable-next-line
   }, []);
 
@@ -106,7 +126,7 @@ export default function Plan({ patient, pdata, onBack }) {
   useEffect(() => {
     if (primeraRender.current) { primeraRender.current = false; return; }
     const e = num(meta.energia);
-    if (e > 0) { setEq(plantillaEq(e).map(String)); setStatus('nuevo'); }
+    if (e > 0) { setEq(plantillaEq(e, num(meta.pP), num(meta.pL), num(meta.pC)).map(String)); setStatus('nuevo'); }
     // eslint-disable-next-line
   }, [meta.energia]);
 
