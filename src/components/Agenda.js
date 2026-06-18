@@ -89,6 +89,8 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   // Autocompletado de pacientes (solo nutrióloga)
   const [pacientesList, setPacientesList] = useState([]);
   const [showSug, setShowSug] = useState(false);
+  const [precios, setPrecios] = useState({});
+  const [mMetodoPago, setMMetodoPago] = useState('efectivo');
 
   useEffect(() => {
     // Se cargan TODAS las citas para calcular la disponibilidad real (slots ocupados).
@@ -102,6 +104,12 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
     const qp = query(collection(db, 'pacientes'), orderBy('codigo', 'asc'));
     return onSnapshot(qp, snap => setPacientesList(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
   }, [isNutri]);
+
+  useEffect(() => {
+    return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
+      const d = (snap && snap.data()) || {}; setPrecios(d.precios || {});
+    }, () => {});
+  }, []);
 
   const emailUser = (user.email || '').toLowerCase();
   const esPropia = (c) => isNutri || (c.pacienteEmail || '').toLowerCase() === emailUser;
@@ -118,6 +126,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const abrirModal = () => {
     setMPaciente(''); setMPacienteEmail(''); setMTipo(null);
     setMObjetivo(OBJETIVOS[0]); setMObjetivoOtro(''); setMHora(null); setMNotas('');
+    setMMetodoPago('efectivo');
     setShowSug(false); setShowModal(true);
   };
   const cerrarModal = () => setShowModal(false);
@@ -134,6 +143,12 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
     const objetivoFinal = mObjetivo === 'Otro' ? (mObjetivoOtro.trim() || 'Otro') : mObjetivo;
     const correo = (isNutri ? mPacienteEmail : user.email || '').toLowerCase();
     const pacienteNombre = isNutri ? mPaciente.trim() : (user.displayName || user.email.split('@')[0]);
+    const reagOrigen = reagendarDe || reagendarLocal;
+    // Pago en línea (Stripe) cuando: lo agenda el paciente, no es reagendado, y es online (obligatorio) o eligió "Pagar en línea".
+    const usaStripe = !isNutri && !reagOrigen && (servSel.online || mMetodoPago === 'stripe');
+    const metodo = isNutri ? 'consultorio' : (reagOrigen ? 'reagendado' : (servSel.online ? 'stripe' : mMetodoPago));
+    const precio = precios[servSel.nombre] || 0;
+    if (usaStripe && !(precio > 0)) { alert('Esta consulta aún no tiene precio configurado. Avísale a la nutrióloga para poder cobrar en línea.'); return; }
     setSaving(true);
     try {
       // 1) Guardar la cita en la base de datos (rápido y prioritario).
@@ -147,11 +162,38 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
         objetivo: objetivoFinal,
         motivo: servSel.nombre, // compatibilidad con vistas previas
         notas: mNotas,
-        estado: 'confirmada',
+        estado: usaStripe ? 'pendiente_pago' : 'confirmada',
+        metodoPago: metodo,
+        estadoPago: 'pendiente',
+        monto: precio || null,
         pacienteEmail: correo,
         pacienteNombre: pacienteNombre,
         creadoEn: Timestamp.now(),
       });
+      // Pago en línea (Stripe): crea la sesión y redirige; la cita se confirma al volver (en el inicio del paciente).
+      if (usaStripe) {
+        const urlAS = process.env.REACT_APP_APPSCRIPT_URL;
+        try {
+          const base = window.location.origin;
+          const successUrl = base + '/?pago=ok&cita=' + ref.id + '&session={CHECKOUT_SESSION_ID}';
+          const cancelUrl = base + '/?pago=cancelado&cita=' + ref.id;
+          const res = await fetch(urlAS, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'crearCheckoutStripe', montoCentavos: Math.round(precio * 100), descripcion: 'Consulta ' + servSel.nombre, correo: correo, citaId: ref.id, successUrl: successUrl, cancelUrl: cancelUrl }), redirect: 'follow',
+          });
+          let dp; try { dp = JSON.parse(await res.text()); } catch (_) { dp = null; }
+          if (dp && dp.ok && dp.url) { window.location.href = dp.url; return; }
+          alert('No se pudo iniciar el pago: ' + ((dp && dp.error) || 'intenta de nuevo.'));
+          try { await updateDoc(doc(db, 'citas', ref.id), { estado: 'cancelada', estadoPago: 'cancelado' }); } catch (e) {}
+          setSaving(false);
+          return;
+        } catch (e) {
+          alert('No se pudo iniciar el pago. Intenta de nuevo.');
+          try { await updateDoc(doc(db, 'citas', ref.id), { estado: 'cancelada', estadoPago: 'cancelado' }); } catch (e2) {}
+          setSaving(false);
+          return;
+        }
+      }
       // 2) Crear el evento en Google Calendar + enviar el correo (vía Apps Script).
       //    Guardamos el eventId devuelto para poder cancelar (borrar) el evento luego.
       const url = process.env.REACT_APP_APPSCRIPT_URL;
@@ -177,7 +219,6 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
         } catch (e) { /* el evento/correo es secundario; la cita ya quedó guardada */ }
       }
       // Si venimos de "Reagendar": cancelar la cita anterior ahora que la nueva ya quedó.
-      const reagOrigen = reagendarDe || reagendarLocal;
       if (reagOrigen && reagOrigen.id) {
         try { await cancelarEnServidor(reagOrigen, isNutri ? 'nutriologa' : 'paciente'); } catch (e) { /* la nueva ya quedó; el aviso de cancelación es secundario */ }
       }
@@ -357,10 +398,27 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
               <textarea value={mNotas} onChange={e=>setMNotas(e.target.value)} placeholder={isNutri ? 'Observaciones…' : 'Cuéntanos tu objetivo…'} />
             </div>
 
+            {!isNutri && servSel && (
+              <div className="fg"><label>Forma de pago</label>
+                {servSel.online ? (
+                  <div className="empty-state" style={{ textAlign: 'left' }}>Esta consulta es en línea: el pago se realiza por Stripe al confirmar la cita.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {[['efectivo', 'Efectivo (en consultorio)'], ['tarjeta', 'Tarjeta (en consultorio)'], ['transferencia', 'Transferencia'], ['stripe', 'Pagar en línea ahora (Stripe)']].map(([val, lbl]) => (
+                      <label key={val} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                        <input type="radio" name="metodoPago" checked={mMetodoPago === val} onChange={() => setMMetodoPago(val)} />
+                        {lbl}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="btn-row">
               <button className="btn-cancel" onClick={cerrarModal}>Cancelar</button>
               <button className="btn-save" onClick={guardar} disabled={saving || !servSel || !mHora || (isNutri && !mPacienteEmail)}>
-                {saving ? 'Guardando...' : (isNutri ? 'Guardar cita' : 'Confirmar cita')}
+                {saving ? 'Guardando...' : (isNutri ? 'Guardar cita' : (((servSel && servSel.online) || mMetodoPago === 'stripe') ? 'Pagar y agendar' : 'Confirmar cita'))}
               </button>
             </div>
           </div>
