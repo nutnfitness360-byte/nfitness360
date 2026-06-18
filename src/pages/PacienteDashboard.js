@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import Topbar from '../components/Topbar';
 import PerfilPaciente from '../components/PerfilPaciente';
@@ -59,6 +59,55 @@ export default function PacienteDashboard() {
   const [modalCita, setModalCita] = useState(null);
   const [confirmarCancel, setConfirmarCancel] = useState(false);
   const [reagendando, setReagendando] = useState(null);
+  const [pagoMsg, setPagoMsg] = useState('');
+
+  // Al volver de Stripe: confirma el pago y agenda (o cancela si se abandonó el pago).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pago = params.get('pago');
+    if (!pago) return;
+    const citaId = params.get('cita');
+    const session = params.get('session');
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    const limpiarUrl = () => window.history.replaceState({}, '', window.location.pathname);
+    (async () => {
+      try {
+        if (pago === 'ok' && citaId && session && url) {
+          const res = await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'verificarPagoStripe', sessionId: session }), redirect: 'follow',
+          });
+          let d; try { d = JSON.parse(await res.text()); } catch (_) { d = null; }
+          if (d && d.ok && d.pagado) {
+            await updateDoc(doc(db, 'citas', citaId), { estado: 'confirmada', estadoPago: 'pagado' });
+            // Ya con el pago confirmado, crea el evento de Calendar + correo de confirmación.
+            try {
+              const snap = await getDoc(doc(db, 'citas', citaId));
+              const c = snap.exists() ? snap.data() : null;
+              if (c && !c.eventId) {
+                const r2 = await fetch(url, {
+                  method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                  body: JSON.stringify({ action: 'crearCita', paciente: c.pacienteNombre, correo: c.pacienteEmail, fecha: c.fecha, hora: c.hora, dur: c.dur, tipoNombre: c.tipoNombre, online: c.online, objetivo: c.objetivo, notas: c.notas }), redirect: 'follow',
+                });
+                let d2; try { d2 = JSON.parse(await r2.text()); } catch (_) { d2 = null; }
+                if (d2 && d2.eventId) { try { await updateDoc(doc(db, 'citas', citaId), { eventId: d2.eventId }); } catch (e) {} }
+              }
+            } catch (e) { /* el evento/correo es secundario; la cita ya quedó pagada */ }
+            setPagoMsg('¡Pago confirmado! Tu cita quedó agendada. Te llegará el correo de confirmación.');
+          } else {
+            setPagoMsg('Recibimos tu regreso de la página de pago, pero todavía no podemos confirmar el cobro. Si el cargo se realizó, tu cita se reflejará en breve; si no, puedes intentar agendar de nuevo.');
+          }
+        } else if (pago === 'cancelado' && citaId) {
+          try { await updateDoc(doc(db, 'citas', citaId), { estado: 'cancelada', estadoPago: 'cancelado' }); } catch (e) {}
+          setPagoMsg('El pago no se completó, así que la cita no quedó agendada. Puedes intentarlo de nuevo cuando quieras.');
+        }
+      } catch (e) {
+        setPagoMsg('Ocurrió un detalle al confirmar el pago. Si el cargo se realizó, tu cita se reflejará en breve.');
+      }
+      limpiarUrl();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const q = query(collection(db, 'citas'), where('pacienteEmail', '==', user.email));
@@ -166,6 +215,15 @@ export default function PacienteDashboard() {
 
   return (
     <div className="app">
+      {pagoMsg && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }} onClick={() => setPagoMsg('')}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '24px 22px', maxWidth: 380, width: '100%', textAlign: 'center', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--dark)', marginBottom: 8 }}>Pago</div>
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--dark)', margin: 0 }}>{pagoMsg}</p>
+            <button onClick={() => setPagoMsg('')} style={{ marginTop: 16, background: '#CDA788', color: '#211C17', border: 'none', borderRadius: 11, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font)' }}>Entendido</button>
+          </div>
+        </div>
+      )}
       <Topbar role="paciente" user={user} onPerfil={() => setTab('perfil')} />
 
       <div className="content">
