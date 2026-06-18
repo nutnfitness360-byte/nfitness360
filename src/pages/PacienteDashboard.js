@@ -7,6 +7,7 @@ import PerfilPaciente from '../components/PerfilPaciente';
 import Agenda from '../components/Agenda';
 
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
+const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
 const MESES_MINI = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const fmtMesP = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} ${MESES_MINI[d.getMonth()]}`; };
 const fmtSello = (ts) => { const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
@@ -232,18 +233,34 @@ export default function PacienteDashboard() {
             <div className="card">
               <div className="card-title">Próximas citas</div>
               {proxima ? (
-                <div className="cita-item" style={{ paddingTop: 0 }}>
-                  <div className="cita-hora">{proxima.hora}</div>
-                  <div style={{ flex: 1 }}>
-                    <div className="cita-nombre">{proxima.tipoNombre || proxima.motivo}</div>
-                    <div className="cita-motivo">Tu próxima cita · {fmtFecha(proxima.fecha)}</div>
+                <div className="cita-item" style={{ paddingTop: 0, flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className="cita-hora">{proxima.hora}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="cita-nombre">{proxima.tipoNombre || proxima.motivo}</div>
+                      <div className="cita-motivo">Tu próxima cita · {fmtFecha(proxima.fecha)}</div>
+                    </div>
+                    <span className={`badge b-${proxima.estado === 'confirmada' ? 'confirm' : proxima.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{proxima.estado}</span>
                   </div>
-                  <span className={`badge b-${proxima.estado === 'confirmada' ? 'confirm' : proxima.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{proxima.estado}</span>
-                  {proxima.estado !== 'cancelada' && (
-                    <button onClick={() => setModalCita(proxima)} title="Cancelar o reagendar"
-                      style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid #B0593F', borderRadius: 8, fontSize: 11, fontWeight: 600, color: '#B0593F', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
-                      Cancelar
-                    </button>
+                  {(proxima.estadoPago || proxima.estado !== 'cancelada') && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                      {proxima.estadoPago ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: proxima.estadoPago === 'pagado' ? '#E9F1ED' : '#F7EAE5', color: proxima.estadoPago === 'pagado' ? '#3E6B5B' : '#B0593F' }}>
+                            {proxima.estadoPago === 'pagado' ? 'Pagado' : 'Pendiente de pago'}
+                          </span>
+                          {proxima.metodoPago && METODO_LABEL[proxima.metodoPago] && proxima.estadoPago !== 'pagado' && (
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--stone)' }}>· {METODO_LABEL[proxima.metodoPago]}</span>
+                          )}
+                        </span>
+                      ) : <span />}
+                      {proxima.estado !== 'cancelada' && (
+                        <button onClick={() => setModalCita(proxima)} title="Cancelar o reagendar"
+                          style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #B0593F', borderRadius: 8, fontSize: 11, fontWeight: 600, color: '#B0593F', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               ) : (
