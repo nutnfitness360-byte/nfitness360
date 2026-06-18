@@ -84,7 +84,7 @@ function baseSeed() {
     },
     ejercicio: {
       tipo: "", dias: "", tiempoDia: "", intensidad: "",
-      comeAntes: "No", queComeAntes: "", comeDespues: "No", queComeDespues: "",
+      comeAntes: "No", queComeAntes: "", comeDurante: "No", queComeDurante: "", comeDespues: "No", queComeDespues: "",
       hidratacion: "", notas: "",
     },
   };
@@ -137,7 +137,7 @@ function histParts(data) {
 
   const content =
     card("1", "Datos generales", rows([
-      ["Peso (kg)", d.peso], ["Talla (cm)", d.talla], ["Correo electrónico", d.correo],
+      ["Correo electrónico", d.correo],
       ["Ocupación", d.ocupacion], ["Objetivo", d.objetivo],
     ])) +
     card("2", "Evaluación bioquímica", rows([["¿De cuándo son los estudios?", b.fecha]]) + bioTable + anaTable +
@@ -162,6 +162,7 @@ function histParts(data) {
       ["Tiempo de actividad al día", ej.tiempoDia], ["Intensidad", ej.intensidad],
       ["Hidratación", ej.hidratacion],
       ["¿Come antes de entrenar?", ej.comeAntes === "Sí" ? "Sí — " + (ej.queComeAntes || "—") : "No"],
+      ["¿Come durante el entrenamiento?", ej.comeDurante === "Sí" ? "Sí — " + (ej.queComeDurante || "—") : "No"],
       ["¿Come después de entrenar?", ej.comeDespues === "Sí" ? "Sí — " + (ej.queComeDespues || "—") : "No"],
       ["Notas", ej.notas],
     ])) +
@@ -500,14 +501,6 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
                 <option>Femenino</option><option>Masculino</option>
               </select>
             </Field>
-            <Field label="Peso (kg)">
-              <input style={styles.input} inputMode="decimal" value={data.datos.peso} placeholder="kg"
-                onChange={(e) => setField("datos", "peso", e.target.value)} />
-            </Field>
-            <Field label="Talla (cm)">
-              <input style={styles.input} inputMode="decimal" value={data.datos.talla} placeholder="cm"
-                onChange={(e) => setField("datos", "talla", e.target.value)} />
-            </Field>
             <Field label="Correo electrónico" full>
               <input style={styles.input} value={data.datos.correo} placeholder="correo@ejemplo.com"
                 onChange={(e) => setField("datos", "correo", e.target.value)} />
@@ -544,8 +537,8 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
             </Field>
           </Grid>
           <p style={styles.note}>
-            Peso, talla, edad y sexo alimentan las ecuaciones de gasto energético (Mifflin-St Jeor y
-            Harris-Benedict) del módulo de cálculo.
+            La edad y el sexo, junto con el peso y la talla registrados en el expediente (InBody),
+            alimentan las ecuaciones de gasto energético (Mifflin-St Jeor y Harris-Benedict) del módulo de cálculo.
           </p>
         </Section>
 
@@ -795,6 +788,17 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
               <input style={styles.input} value={data.ejercicio.queComeAntes}
                 disabled={data.ejercicio.comeAntes !== "Sí"} placeholder="Si aplica…"
                 onChange={(e) => setField("ejercicio", "queComeAntes", e.target.value)} />
+            </Field>
+            <Field label="¿Come algo DURANTE el entrenamiento?">
+              <select style={styles.input} value={data.ejercicio.comeDurante}
+                onChange={(e) => setField("ejercicio", "comeDurante", e.target.value)}>
+                <option>No</option><option>Sí</option>
+              </select>
+            </Field>
+            <Field label="¿Qué come durante?">
+              <input style={styles.input} value={data.ejercicio.queComeDurante}
+                disabled={data.ejercicio.comeDurante !== "Sí"} placeholder="Si aplica…"
+                onChange={(e) => setField("ejercicio", "queComeDurante", e.target.value)} />
             </Field>
             <Field label="¿Come algo DESPUÉS de entrenar?">
               <select style={styles.input} value={data.ejercicio.comeDespues}
