@@ -116,6 +116,8 @@ export default function Menus({ patient, onBack }) {
   const [showCfg, setShowCfg] = useState(!savedMenus);
   const [cfgNOp, setCfgNOp] = useState(savedNOp);
   const [cfgTiempos, setCfgTiempos] = useState(() => savedMenus ? savedMenus.tiempos.map(t => ({ nombre: t.nombre, hora: t.hora })) : DEFAULT_TIEMPOS.map(d => ({ ...d })));
+  const [cfgDragIdx, setCfgDragIdx] = useState(null);
+  const [cfgOverIdx, setCfgOverIdx] = useState(null);
 
   const touch = () => setStatus('nuevo');
   const setT = (idx, patch) => { setTiempos(ts => ts.map((t, i) => i === idx ? { ...t, ...patch } : t)); touch(); };
@@ -140,6 +142,16 @@ export default function Menus({ patient, onBack }) {
     });
   };
   const cfgSetTiempo = (i, patch) => setCfgTiempos(ts => ts.map((t, k) => k === i ? { ...t, ...patch } : t));
+  const cfgReordenar = (from, to) => {
+    setCfgTiempos(ts => {
+      if (from == null || to == null || to < 0 || to >= ts.length || from === to) return ts;
+      const out = ts.slice();
+      const [m] = out.splice(from, 1);
+      out.splice(to, 0, m);
+      return out;
+    });
+  };
+  const cfgMover = (i, dir) => cfgReordenar(i, i + dir);
   const aplicarConfig = () => {
     const nOp = Math.max(1, Math.min(6, cfgNOp));
     const defs = cfgTiempos;
@@ -357,9 +369,20 @@ export default function Menus({ patient, onBack }) {
             <div style={S.cfgListLbl}>Nombre y horario de cada tiempo (editables)</div>
             <div style={S.cfgList}>
               {cfgTiempos.map((t, i) => (
-                <div key={i} style={S.cfgItem}>
+                <div key={i}
+                  style={{ ...S.cfgItem, ...(cfgOverIdx === i && cfgDragIdx !== null && cfgDragIdx !== i ? S.cfgItemOver : null) }}
+                  onDragOver={e => { e.preventDefault(); if (cfgOverIdx !== i) setCfgOverIdx(i); }}
+                  onDrop={e => { e.preventDefault(); cfgReordenar(cfgDragIdx, i); setCfgDragIdx(null); setCfgOverIdx(null); }}>
+                  <span style={S.cfgHandle} title="Arrastra para reordenar" draggable
+                    onDragStart={() => setCfgDragIdx(i)} onDragEnd={() => { setCfgDragIdx(null); setCfgOverIdx(null); }}>
+                    <svg width="12" height="18" viewBox="0 0 12 18" aria-hidden="true">
+                      {[[3, 3], [9, 3], [3, 9], [9, 9], [3, 15], [9, 15]].map(([x, y]) => <circle key={x + '-' + y} cx={x} cy={y} r="1.5" fill="currentColor" />)}
+                    </svg>
+                  </span>
                   <input style={S.cfgName} value={t.nombre} onChange={e => cfgSetTiempo(i, { nombre: e.target.value })} />
                   <input style={S.cfgHora} value={t.hora} onChange={e => cfgSetTiempo(i, { hora: e.target.value })} />
+                  <button style={{ ...S.cfgArrow, ...(i === 0 ? S.cfgArrowOff : null) }} disabled={i === 0} title="Subir" onClick={() => cfgMover(i, -1)}>↑</button>
+                  <button style={{ ...S.cfgArrow, ...(i === cfgTiempos.length - 1 ? S.cfgArrowOff : null) }} disabled={i === cfgTiempos.length - 1} title="Bajar" onClick={() => cfgMover(i, 1)}>↓</button>
                 </div>
               ))}
             </div>
@@ -553,7 +576,11 @@ const styles = {
   stepVal: { minWidth: 22, textAlign: 'center', fontSize: 15, fontWeight: 800, color: T.pine },
   cfgListLbl: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: T.inkSoft, margin: '14px 0 6px' },
   cfgList: { display: 'flex', flexDirection: 'column', gap: 7 },
-  cfgItem: { display: 'flex', gap: 8 },
+  cfgItem: { display: 'flex', gap: 8, alignItems: 'center' },
+  cfgItemOver: { outline: `2px dashed ${T.amber}`, outlineOffset: 2, borderRadius: 8 },
+  cfgHandle: { display: 'flex', alignItems: 'center', cursor: 'grab', color: T.inkSoft, flexShrink: 0, padding: '0 1px' },
+  cfgArrow: { width: 28, height: 28, flexShrink: 0, borderRadius: 7, border: `1px solid ${T.line}`, background: '#fff', color: T.pine, fontSize: 13, fontWeight: 700, cursor: 'pointer', lineHeight: 1, fontFamily: mono, padding: 0 },
+  cfgArrowOff: { opacity: 0.35, cursor: 'default' },
   cfgName: { flex: 1, border: `1px solid ${T.line}`, borderRadius: 7, padding: '7px 10px', fontSize: 13, color: T.pine, fontFamily: mono, background: '#FCFDFC', boxSizing: 'border-box' },
   cfgHora: { width: 78, border: `1px solid ${T.line}`, borderRadius: 7, padding: '7px 10px', fontSize: 13, color: T.pine, fontFamily: mono, background: '#FCFDFC', boxSizing: 'border-box' },
   cfgWarn: { marginTop: 12, fontSize: 12, color: T.danger, background: '#F7EAE5', borderRadius: 9, padding: '9px 12px', lineHeight: 1.45 },
