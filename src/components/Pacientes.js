@@ -61,6 +61,7 @@ export default function Pacientes() {
   const [nuevo, setNuevo] = useState(false);
   const [busca, setBusca] = useState('');
   const [menuId, setMenuId] = useState(null);
+  const [menuReabrir, setMenuReabrir] = useState(null);
   const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' });
   const [editMed, setEditMed] = useState({ fecha: '', peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', tmb: '' });
   const [openEdit, setOpenEdit] = useState(false);
@@ -369,7 +370,7 @@ export default function Pacientes() {
       return <Plan patient={sel} pdata={pdata} onBack={volver} />;
     }
     if (sub === 'menus') {
-      return <Menus patient={sel} onBack={volver} />;
+      return <Menus key={menuReabrir ? ('h-' + (menuReabrir.fecha || '') + (menuReabrir.nombre || '')) : 'actual'} patient={sel} onBack={volver} initialMenus={menuReabrir} />;
     }
     return (
       <div>
@@ -556,13 +557,29 @@ export default function Pacientes() {
               <div style={S.panelBody}>
                 <div style={S.titleRow}>
                   <div style={S.note}>Reparte los equivalentes del plan en los tiempos de comida y arma las opciones de menú.</div>
-                  <button style={S.smallBtn} onClick={() => irSub('menus')}>Abrir menús</button>
+                  <button style={S.smallBtn} onClick={() => { setMenuReabrir(null); irSub('menus'); }}>Abrir menús</button>
                 </div>
                 {!(sel.plan && sel.plan.eq)
                   ? <div className="empty-state">Primero calcula y guarda el plan.</div>
                   : (sel.plan.menus && sel.plan.menus.tiempos
                     ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>{sel.plan.menus.tiempos.length} tiempos de comida configurados.</div>
                     : <div className="empty-state">Aún no hay menús generados.</div>)}
+                {Array.isArray(sel.menusHistorial) && sel.menusHistorial.length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={S.note}>Menús anteriores · reábrelos para editar o abre su PDF.</div>
+                    {[...sel.menusHistorial].map((mh, idx) => ({ mh, idx })).reverse().map(({ mh, idx }) => (
+                      <div key={idx} style={S.planRow}>
+                        <div style={S.planIcon}>PDF</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{mh.nombre || 'Menú'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{mh.fecha ? fmtFecha(mh.fecha) : ''}{mh.tiempos ? ' · ' + mh.tiempos.length + ' tiempos' : ''}</div>
+                        </div>
+                        <button style={S.smallBtn} onClick={() => { setMenuReabrir(mh); irSub('menus'); }}>Reabrir</button>
+                        {mh.link && <a href={mh.link} target="_blank" rel="noreferrer" style={S.openBtn}>PDF</a>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
