@@ -89,12 +89,14 @@ function nuevoTiempo(def, eqRow, nOp = 3) {
   return { id: uid(), nombre: def?.nombre || 'Nuevo tiempo', hora: def?.hora || '12:00', eq: eqRow || Array(18).fill(0), opciones: opcionesArr(nOp), foto: '' };
 }
 
-export default function Menus({ patient, onBack }) {
+export default function Menus({ patient, onBack, initialMenus = null }) {
   const plan = patient.plan || {};
   const planEq = Array.isArray(plan.eq) ? plan.eq.map(num) : null;
   const usados = planEq ? planEq.map((v, i) => (v > 0 ? i : -1)).filter(i => i >= 0) : [];
 
-  const savedMenus = plan.menus && Array.isArray(plan.menus.tiempos) && plan.menus.tiempos.length ? plan.menus : null;
+  const savedMenus = (initialMenus && Array.isArray(initialMenus.tiempos) && initialMenus.tiempos.length)
+    ? initialMenus
+    : (plan.menus && Array.isArray(plan.menus.tiempos) && plan.menus.tiempos.length ? plan.menus : null);
   const savedNOp = savedMenus ? (savedMenus.nOpciones || (savedMenus.tiempos[0]?.opciones?.length) || 3) : 3;
 
   const [tiempos, setTiempos] = useState(() => {
@@ -314,6 +316,13 @@ export default function Menus({ patient, onBack }) {
       if (data.ok && data.link) {
         const nuevo = { nombre: baseNombre, fecha: new Date().toISOString().slice(0, 10), link: data.link };
         await updateDoc(doc(db, 'pacientes', patient.id), { planes: [...(patient.planes || []), nuevo] });
+        // Archiva este menú (contenido editable + PDF) en el historial para poder reabrirlo después.
+        try {
+          const tiemposSnap = tiempos.map(t => ({ ...t, foto: '' })); // sin imágenes, para no inflar el documento
+          const snap = { fecha: new Date().toISOString().slice(0, 10), nombre: baseNombre, link: data.link, tiempos: tiemposSnap, nOpciones };
+          const hist = [...(patient.menusHistorial || []), snap].slice(-24);
+          await updateDoc(doc(db, 'pacientes', patient.id), { menusHistorial: hist });
+        } catch (e) { /* el historial es secundario; no debe bloquear el guardado */ }
         setRep('Menús guardados y reporte subido a Drive (registrado en Planes) ✓');
       } else {
         setRep('Menús guardados ✓, pero el PDF no se pudo subir: ' + (data.error || 'no se recibió enlace.'));
