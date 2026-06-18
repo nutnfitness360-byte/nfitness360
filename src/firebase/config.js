@@ -16,3 +16,6 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
+// Forzar que Google pregunte SIEMPRE qué cuenta usar (evita reutilizar la sesión
+// anterior del navegador; importante para la confidencialidad entre nutrióloga y paciente).
+googleProvider.setCustomParameters({ prompt: 'select_account' });
