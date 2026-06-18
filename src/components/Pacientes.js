@@ -854,7 +854,7 @@ const styles = {
   panelTitle: { fontSize: 14, fontWeight: 700, color: 'var(--dark)', lineHeight: 1.3 },
   chev: { color: 'var(--stone)', fontSize: 16, transition: 'transform .15s', flexShrink: 0 },
   chevOpen: { color: 'var(--gold)', fontSize: 16, transform: 'rotate(180deg)', flexShrink: 0 },
-  panelBody: { padding: '0 16px 16px' },
+  panelBody: { padding: '14px 16px 16px', borderTop: '1px solid var(--border)' },
   upload: { display: 'block', textAlign: 'center', background: 'var(--cream)', border: '1px dashed var(--gold)', borderRadius: 10, padding: '14px', fontSize: 13, fontWeight: 600, color: 'var(--dark)', cursor: 'pointer', marginBottom: 12 },
   chartCard: { border: '0.5px solid var(--border)', borderRadius: 12, padding: '10px 12px', background: '#fff' },
   chartTop: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 },
