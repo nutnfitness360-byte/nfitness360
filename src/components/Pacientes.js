@@ -305,14 +305,15 @@ export default function Pacientes() {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr }); } catch (e) { setErr(e.message); }
   };
 
-  const generarPDFReco = async () => {
+  const generarPDFReco = async (reco) => {
     const url = process.env.REACT_APP_APPSCRIPT_URL;
     if (!url) { setRecoPdfMsg('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
-    if (!sel.recomendaciones || !sel.recomendaciones.length) { setRecoPdfMsg('No hay recomendaciones para generar el PDF.'); return; }
+    if (!reco || !reco.texto) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
     setRecoPdfMsg('Generando PDF…');
     try {
-      const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: sel.recomendaciones, fecha: Date.now() });
-      const filename = `Recomendaciones_${(sel.nombre || 'paciente').replace(/[^\w\-]+/g, '_')}.pdf`;
+      const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now() });
+      const stamp = (reco.fecha && !isNaN(new Date(reco.fecha).getTime())) ? new Date(reco.fecha).getTime() : Date.now();
+      const filename = `Recomendacion_${(sel.nombre || 'paciente').replace(/[^\w\-]+/g, '_')}_${stamp}.pdf`;
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'saveRecomendaciones', patient: sel.nombre || 'Paciente', correo: sel.correo || '', filename, html }),
@@ -801,7 +802,6 @@ export default function Pacientes() {
                     placeholder="Escribe una recomendación para el paciente, o agrégala con los botones de arriba…" />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
                     <button style={S.saveBtn} onClick={addReco}>+ Agregar recomendación</button>
-                    <button style={S.smallBtn} onClick={generarPDFReco}>Generar PDF</button>
                     {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
                   </div>
                 </div>
@@ -813,6 +813,7 @@ export default function Pacientes() {
                         <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
                         <div style={S.recoText}>{r.texto}</div>
                       </div>
+                      <button style={S.smallBtn} onClick={() => generarPDFReco(r)} title="Generar PDF de esta recomendación">PDF</button>
                       <button style={S.rm} onClick={() => removeReco(idx)} title="Eliminar">×</button>
                     </div>
                   ))}
