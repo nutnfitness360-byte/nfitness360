@@ -67,15 +67,16 @@ export const esPorciones = (t) => (t && t.porciones != null) ? !!t.porciones : /
 // Texto del bloque, armado solo desde los equivalentes (t.eq) y la tabla de equivalentes.
 export function generarPorcionesTexto(eq) {
   eq = Array.isArray(eq) ? eq : [];
+  const fmt = (n) => String(Math.round(n * 100) / 100); // 0.5 -> "0.5", 2 -> "2"
   const lineas = [];
   for (const c of PORCIONES_CFG) {
-    const rac = Math.round(c.groups.reduce((a, g) => a + num(eq[g]), 0));
+    const rac = c.groups.reduce((a, g) => a + num(eq[g]), 0);
     if (rac <= 0) continue;
     if (c.libre) {
       lineas.push(`Verduras ${c.texto}`);
     } else {
       const ejs = c.ej.map(e => `${Math.round(e.g * rac)} ${e.u || 'g'} de ${e.n}`).join(' ó ');
-      lineas.push(`${rac} ${c.cat}: ${ejs}`);
+      lineas.push(`${fmt(rac)} ${c.cat}: ${ejs}`);
     }
   }
   return lineas.join('\n');
