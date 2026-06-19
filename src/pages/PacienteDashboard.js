@@ -436,15 +436,13 @@ export default function PacienteDashboard() {
               ← Atrás
             </button>
             <div className="card-title">Recomendaciones</div>
-            {expediente && Array.isArray(expediente.recomendaciones) && expediente.recomendaciones.length > 0 && (
-              <div style={{ margin: '4px 0 14px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <button onClick={generarPDFReco}
-                  style={{ background: '#221C16', color: '#EEE4DA', border: 'none', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '8px 16px', borderRadius: 8 }}>
-                  Generar PDF
-                </button>
-                {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
-              </div>
-            )}
+            <div style={{ margin: '4px 0 14px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button onClick={generarPDFReco}
+                style={{ background: '#221C16', color: '#EEE4DA', border: 'none', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '8px 16px', borderRadius: 8 }}>
+                Generar PDF
+              </button>
+              {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
+            </div>
             {(!expediente || !Array.isArray(expediente.recomendaciones) || expediente.recomendaciones.length === 0) ? (
               <div className="empty-state">
                 <div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>💡</div>
