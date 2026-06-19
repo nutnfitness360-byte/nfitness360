@@ -20,6 +20,67 @@ const EQUIV_DB = {
   Verduras: ["Espinaca", "Calabaza", "Brócoli", "Jitomate", "Pepino", "Lechuga", "Nopal", "Zanahoria", "Pimiento", "Chayote", "Betabel", "Espárragos"],
   Legumbres: ["Frijoles (85g)", "Lentejas (90g)", "Garbanzo (80g)", "Haba (85g)", "Alubia (90g)", "Humus (75g)", "Soya texturizada (30g)"],
 };
+
+// ---- Bloque "Porciones / equivalencias" para un tiempo de comida (p. ej. Comida) ----
+// Las RACIONES salen de los equivalentes del tiempo (t.eq). El GRAMAJE de cada ejemplo
+// sale de la tabla de equivalentes (gramos por 1 equivalente) × raciones. Sin IA.
+// Categorías consolidadas -> índices de grupo (GSHORT) + ejemplos representativos.
+const PORCIONES_CFG = [
+  { cat: 'Verduras', groups: [3], libre: true, texto: 'diferentes en sopa, ensalada, cocidas o al grill' },
+  { cat: 'Proteínas', groups: [5, 6, 7, 8], ej: [
+      { n: 'pollo, res o cerdo magro cocido', g: 30 },
+      { n: 'pechuga de pavo', g: 40 },
+      { n: 'atún en agua', g: 35 },
+      { n: 'huevo', g: 50 },
+    ] },
+  { cat: 'Cereales', groups: [0, 1], ej: [
+      { n: 'arroz cocido', g: 45 },
+      { n: 'pasta cocida', g: 50 },
+      { n: 'papa o camote cocido', g: 70 },
+      { n: 'tortilla de maíz', g: 30 },
+    ] },
+  { cat: 'Leguminosas', groups: [2], ej: [
+      { n: 'frijol, lenteja o garbanzo cocido', g: 85 },
+      { n: 'hummus', g: 75 },
+    ] },
+  { cat: 'Grasas', groups: [13, 14], ej: [
+      { n: 'aguacate', g: 55 },
+      { n: 'aceite de oliva', g: 5 },
+      { n: 'almendras', g: 12 },
+    ] },
+  { cat: 'Fruta', groups: [4], ej: [
+      { n: 'manzana o naranja', g: 130 },
+      { n: 'fruta picada (melón, papaya o sandía)', g: 150 },
+      { n: 'plátano', g: 54 },
+    ] },
+  { cat: 'Lácteos', groups: [9, 10, 11, 12], ej: [
+      { n: 'yogurt griego', g: 200 },
+      { n: 'leche light', g: 240, u: 'ml' },
+      { n: 'jocoque', g: 75 },
+    ] },
+];
+
+// ¿Este tiempo se muestra como porciones (una sola opción) en vez de N opciones?
+// Por defecto: SÍ cuando el tiempo se llama "Comida"; si hay marca explícita, manda la marca.
+export const esPorciones = (t) => (t && t.porciones != null) ? !!t.porciones : /comida/i.test((t && t.nombre) || '');
+
+// Texto del bloque, armado solo desde los equivalentes (t.eq) y la tabla de equivalentes.
+export function generarPorcionesTexto(eq) {
+  eq = Array.isArray(eq) ? eq : [];
+  const lineas = [];
+  for (const c of PORCIONES_CFG) {
+    const rac = Math.round(c.groups.reduce((a, g) => a + num(eq[g]), 0));
+    if (rac <= 0) continue;
+    if (c.libre) {
+      lineas.push(`Verduras ${c.texto}`);
+    } else {
+      const ejs = c.ej.map(e => `${Math.round(e.g * rac)} ${e.u || 'g'} de ${e.n}`).join(' ó ');
+      lineas.push(`${rac} ${c.cat}: ${ejs}`);
+    }
+  }
+  return lineas.join('\n');
+}
+
 const ICONS = {
   Cereales: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="M12 9c0-2.2 1.6-3.8 3.8-3.8C15.8 7.4 14.2 9 12 9Z"/><path d="M12 9c0-2.2-1.6-3.8-3.8-3.8C8.2 7.4 9.8 9 12 9Z"/><path d="M12 14c0-1.8 1.4-3.1 3.2-3.1C15.2 12.7 13.8 14 12 14Z"/><path d="M12 14c0-1.8-1.4-3.1-3.2-3.1C8.8 12.7 10.2 14 12 14Z"/></svg>',
   Frutas: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8c-3-2-7 0-7 5s4 8 7 6c3 2 7-1 7-6s-4-7-7-5Z"/><path d="M12 8V4.5"/><path d="M12 5c1.2-1.4 3-1.4 4-1-.3 1.7-2 2.4-4 2"/></svg>',
@@ -41,10 +102,29 @@ const fechaLarga = () => {
   return `${d.getDate()} · ${M[d.getMonth()].toUpperCase()} · ${d.getFullYear()}`;
 };
 
+function porcionLineHTML(line) {
+  const i = line.indexOf(':');
+  if (i >= 0) return `<b>${esc(line.slice(0, i + 1))}</b>${esc(line.slice(i + 1))}`;
+  const sp = line.indexOf(' ');
+  if (sp > 0) return `<b>${esc(line.slice(0, sp))}</b>${esc(line.slice(sp))}`;
+  return `<b>${esc(line)}</b>`;
+}
+
 function mealRow(t) {
   const circle = t.foto
     ? `<div class="circle"><img src="${t.foto}" alt=""/></div>`
     : `<div class="circle ph">${PLATE}</div>`;
+  if (esPorciones(t)) {
+    const txt = (t.porcionesTexto && t.porcionesTexto.trim()) ? t.porcionesTexto : generarPorcionesTexto(t.eq);
+    const cuerpo = txt.split('\n').filter(l => l.trim()).map(l => `<div class="pcline">${porcionLineHTML(l)}</div>`).join('');
+    return `<div class="rw">
+      <div class="mcell">${circle}<div class="mname">${esc(t.nombre)}</div><div class="mtime">${esc(t.hora)}</div></div>
+      <div class="opts"><div class="pcbox">
+        <div class="pchead">Porciones generales para armar tu comida</div>
+        <div class="pcbody">${cuerpo}</div>
+      </div></div>
+    </div>`;
+  }
   const ops = (t.opciones || []).slice(0, 3);
   while (ops.length < 3) ops.push({ nombre: '', prep: '' });
   const cols = ops.map((o, k) => `
@@ -153,6 +233,10 @@ ${FONT_CSS}
 .ohead{background:${TAUPE2};color:#fff;font-size:10px;letter-spacing:2px;font-weight:700;text-transform:uppercase;text-align:center;padding:5px;}
 .obox{background:#fff;border:1px solid ${LINE};border-top:none;padding:9px 11px;flex:1;}
 .dn{font-weight:800;color:${TAUPE};font-size:12px;margin-bottom:4px;} .od{font-size:10.5px;color:${INK};line-height:1.5;}
+.pcbox{flex:1;display:flex;flex-direction:column;}
+.pchead{background:${TAUPE2};color:#fff;font-size:10px;letter-spacing:2px;font-weight:700;text-transform:uppercase;text-align:center;padding:6px;}
+.pcbody{background:#fff;border:1px solid ${LINE};border-top:none;padding:13px 16px;flex:1;}
+.pcline{font-size:12px;line-height:1.85;color:${INK};margin-bottom:7px;} .pcline:last-child{margin-bottom:0;} .pcline b{color:${TAUPE};font-weight:800;}
 .ptitle{font-size:28px;font-weight:800;letter-spacing:5px;color:${TAUPE};margin-bottom:8mm;}
 .eqt{width:100%;border-collapse:collapse;font-size:13px;} .eqt th{background:${TAUPE2};color:#fff;padding:11px 8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:center;} .eqt th.l{text-align:left;padding-left:16px;}
 .eqt td{padding:9px 8px;text-align:center;border-bottom:1px solid ${LINE};background:#fff;font-size:13px;} .eqt td.l{text-align:left;font-weight:700;padding-left:16px;} .eqt td.tt{font-weight:800;color:${TAUPE};background:#FBF7F2;}
