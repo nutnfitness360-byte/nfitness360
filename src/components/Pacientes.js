@@ -5,6 +5,7 @@ import Plan from './Plan';
 import Menus from './Menus';
 import HistoriaClinica from './HistoriaClinica';
 import InBodyModal from './InBodyModal';
+import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 
 /* ===== utilidades ===== */
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -64,7 +65,11 @@ export default function Pacientes() {
   const [menuReabrir, setMenuReabrir] = useState(null);
   const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' });
   const [editMed, setEditMed] = useState({ fecha: '', peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', tmb: '' });
+  const [editApego, setEditApego] = useState('');
   const [openEdit, setOpenEdit] = useState(false);
+  const [openInfo, setOpenInfo] = useState(false);
+  const [infoForm, setInfoForm] = useState({ edad: '', sexo: '', estatura: '', contacto: '', objetivo: '' });
+  const [recoPdfMsg, setRecoPdfMsg] = useState('');
   const [plan, setPlan] = useState({ nombre: '', fecha: hoyISO(), link: '' });
   const [openMed, setOpenMed] = useState(false);
   const [openPlan, setOpenPlan] = useState(false);
@@ -175,6 +180,38 @@ export default function Pacientes() {
     } catch (e) { setErr('No se pudo eliminar: ' + e.message); }
   };
 
+  // Editar los datos de "Información general" (no las mediciones de peso/grasa).
+  const abrirEditarInfo = () => {
+    setInfoForm({
+      edad: (sel.edad === 0 || sel.edad) ? String(sel.edad) : '',
+      sexo: sel.sexo || '',
+      estatura: (sel.estatura === 0 || sel.estatura) ? String(sel.estatura) : '',
+      contacto: sel.contacto || '',
+      objetivo: sel.objetivo || '',
+    });
+    setErr(''); setOpenInfo(true);
+  };
+  const guardarInfo = async () => {
+    const patch = {
+      edad: infoForm.edad === '' ? null : (parseInt(infoForm.edad, 10) || null),
+      sexo: infoForm.sexo || '',
+      estatura: infoForm.estatura === '' ? null : (parseFloat(infoForm.estatura) || null),
+      contacto: infoForm.contacto || '',
+      objetivo: infoForm.objetivo || '',
+    };
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), patch);
+      setOpenInfo(false); setErr('');
+    } catch (e) { setErr('No se pudo guardar: ' + e.message); }
+  };
+
+  // Índice de la última nota de bitácora con un % de apego numérico.
+  const lastApegoIdx = (bit) => {
+    const b = bit || [];
+    for (let k = b.length - 1; k >= 0; k--) if (typeof b[k].apego === 'number') return k;
+    return -1;
+  };
+
   const addMedicion = async () => {
     if (!med.fecha || !med.peso) { setErr('Fecha y peso son necesarios.'); return; }
     const nm = { fecha: med.fecha, peso: +med.peso, grasa: +med.grasa || 0, musculo: +med.musculo || 0 };
@@ -191,6 +228,8 @@ export default function Pacientes() {
     if (!u) return;
     const v = (x) => (x === 0 || x ? String(x) : '');
     setEditMed({ fecha: u.fecha || hoyISO(), peso: v(u.peso), grasa: v(u.grasa), musculo: v(u.musculo), grasaKg: v(u.grasaKg), visceral: v(u.visceral), agua: v(u.agua), tmb: v(u.tmb) });
+    const ai = lastApegoIdx(sel.bitacora);
+    setEditApego(ai >= 0 ? String(sel.bitacora[ai].apego) : '');
     setOpenMed(false); setErr(''); setOpenEdit(true);
   };
 
@@ -206,8 +245,22 @@ export default function Pacientes() {
     if (num(editMed.agua) !== undefined) edited.agua = +editMed.agua;
     if (num(editMed.tmb) !== undefined) edited.tmb = +editMed.tmb;
     const arr = [...base, edited].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const updates = { mediciones: arr };
+    // % de apego: edita el valor más reciente (o lo asigna a la última nota si no hay).
+    const apRaw = (editApego || '').trim();
+    if (apRaw !== '') {
+      const ap = parseFloat(apRaw);
+      if (isFinite(ap)) {
+        const bit = [...(sel.bitacora || [])];
+        const ai = lastApegoIdx(bit);
+        if (ai >= 0) bit[ai] = { ...bit[ai], apego: ap };
+        else if (bit.length) bit[bit.length - 1] = { ...bit[bit.length - 1], apego: ap };
+        else bit.push({ texto: '', apego: ap, fecha: Date.now() });
+        updates.bitacora = bit;
+      }
+    }
     try {
-      await updateDoc(doc(db, 'pacientes', sel.id), { mediciones: arr });
+      await updateDoc(doc(db, 'pacientes', sel.id), updates);
       setOpenEdit(false); setErr('');
     } catch (e) { setErr('No se pudo guardar: ' + e.message); }
   };
@@ -250,6 +303,28 @@ export default function Pacientes() {
     if (!window.confirm('¿Eliminar esta recomendación?')) return;
     const arr = (sel.recomendaciones || []).filter((_, k) => k !== i);
     try { await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr }); } catch (e) { setErr(e.message); }
+  };
+
+  const generarPDFReco = async () => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setRecoPdfMsg('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    if (!sel.recomendaciones || !sel.recomendaciones.length) { setRecoPdfMsg('No hay recomendaciones para generar el PDF.'); return; }
+    setRecoPdfMsg('Generando PDF…');
+    try {
+      const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: sel.recomendaciones, fecha: Date.now() });
+      const filename = `Recomendaciones_${(sel.nombre || 'paciente').replace(/[^\w\-]+/g, '_')}.pdf`;
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveRecomendaciones', patient: sel.nombre || 'Paciente', correo: sel.correo || '', filename, html }),
+        redirect: 'follow',
+      });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      if (!d.ok || !d.link) throw new Error(d.error || 'No se recibió el enlace del PDF.');
+      setRecoPdfMsg('PDF generado y guardado en Drive ✓');
+      window.open(d.link, '_blank', 'noopener');
+    } catch (e) {
+      setRecoPdfMsg('No se pudo generar: ' + e.message);
+    }
   };
 
   const addBitacora = async () => {
@@ -331,7 +406,7 @@ export default function Pacientes() {
         if (data.link) updates.inbodyArchivos = [...(sel.inbodyArchivos || []), { nombre: data.filename || filename, fecha: nm.fecha, link: data.link }];
         await updateDoc(doc(db, 'pacientes', sel.id), updates);
         setIbFile(null);
-        setIbMsg('InBody leído y guardado ✓ — revisa los valores en las gráficas y, si algo quedó mal, usa “Editar última” en Seguimiento.');
+        setIbMsg('InBody leído y guardado ✓ — revisa los valores en las gráficas y, si algo quedó mal, usa “Editar última” en Gráficas de avance.');
       } else {
         // La lectura falló; si el PDF alcanzó a guardarse, al menos registramos el archivo.
         if (data && data.link) {
@@ -406,22 +481,43 @@ export default function Pacientes() {
         </div>
 
         <div className="card">
-          <div className="card-title">Información general</div>
-          <div style={S.infoGrid}>
-            <Info l="Edad" v={sel.edad ? sel.edad + ' años' : '—'} />
-            <Info l="Sexo" v={sel.sexo || '—'} />
-            <Info l="Estatura" v={sel.estatura ? sel.estatura + ' cm' : '—'} />
-            <Info l="Inicio" v={sel.inicio ? fmtFecha(sel.inicio) : '—'} />
-            <Info l="Contacto" v={sel.contacto || '—'} />
-            <Info l="Objetivo" v={sel.objetivo || '—'} />
+          <div style={S.titleRow}>
+            <div className="card-title" style={{ margin: 0 }}>Información general</div>
+            <button style={S.smallBtn} onClick={openInfo ? () => setOpenInfo(false) : abrirEditarInfo}>{openInfo ? 'Cancelar' : 'Editar'}</button>
           </div>
+          {openInfo ? (
+            <div style={S.formRow}>
+              <Field l="Edad (años)"><input style={S.inp} inputMode="numeric" value={infoForm.edad} onChange={e => setInfoForm({ ...infoForm, edad: e.target.value })} /></Field>
+              <Field l="Sexo">
+                <select style={S.inp} value={infoForm.sexo} onChange={e => setInfoForm({ ...infoForm, sexo: e.target.value })}>
+                  <option value="">—</option>
+                  <option value="Femenino">Femenino</option>
+                  <option value="Masculino">Masculino</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </Field>
+              <Field l="Estatura (cm)"><input style={S.inp} inputMode="decimal" value={infoForm.estatura} onChange={e => setInfoForm({ ...infoForm, estatura: e.target.value })} /></Field>
+              <Field l="Contacto"><input style={S.inp} value={infoForm.contacto} onChange={e => setInfoForm({ ...infoForm, contacto: e.target.value })} /></Field>
+              <Field l="Objetivo"><input style={S.inp} value={infoForm.objetivo} onChange={e => setInfoForm({ ...infoForm, objetivo: e.target.value })} /></Field>
+              <button style={S.saveBtn} onClick={guardarInfo}>Guardar cambios</button>
+            </div>
+          ) : (
+            <div style={S.infoGrid}>
+              <Info l="Edad" v={sel.edad ? sel.edad + ' años' : '—'} />
+              <Info l="Sexo" v={sel.sexo || '—'} />
+              <Info l="Estatura" v={sel.estatura ? sel.estatura + ' cm' : '—'} />
+              <Info l="Inicio" v={sel.inicio ? fmtFecha(sel.inicio) : '—'} />
+              <Info l="Contacto" v={sel.contacto || '—'} />
+              <Info l="Objetivo" v={sel.objetivo || '—'} />
+            </div>
+          )}
         </div>
 
         <CorreoVinculo patient={sel} key={'cv-' + sel.id} />
 
         <div className="card">
           <div style={S.titleRow}>
-            <div className="card-title" style={{ margin: 0 }}>Seguimiento</div>
+            <div className="card-title" style={{ margin: 0 }}>Gráficas de avance</div>
             <div style={{ display: 'flex', gap: 8 }}>
               {m && <button style={S.smallBtn} onClick={openEdit ? () => setOpenEdit(false) : abrirEditarUltima}>{openEdit ? 'Cancelar' : 'Editar última'}</button>}
               <button style={S.smallBtn} onClick={() => { setOpenEdit(false); setOpenMed(v => !v); }}>{openMed ? 'Cancelar' : '+ Medición'}</button>
@@ -445,6 +541,7 @@ export default function Pacientes() {
               <Field l="Masa grasa (kg)"><input style={S.inp} inputMode="decimal" value={editMed.grasaKg} onChange={e => setEditMed({ ...editMed, grasaKg: e.target.value })} /></Field>
               <Field l="Grasa visceral"><input style={S.inp} inputMode="decimal" value={editMed.visceral} onChange={e => setEditMed({ ...editMed, visceral: e.target.value })} /></Field>
               <Field l="Agua (L)"><input style={S.inp} inputMode="decimal" value={editMed.agua} onChange={e => setEditMed({ ...editMed, agua: e.target.value })} /></Field>
+              <Field l="% apego al plan"><input style={S.inp} inputMode="decimal" value={editApego} onChange={e => setEditApego(e.target.value)} placeholder="Ej. 100" /></Field>
               <button style={S.saveBtn} onClick={guardarEditUltima}>Guardar cambios</button>
             </div>
           )}
@@ -487,7 +584,7 @@ export default function Pacientes() {
             </button>
             {panel === 'inbody' && (
               <div style={S.panelBody}>
-                <div style={S.note}>Sube el PDF del InBody y el sistema lo lee automáticamente (IA): extrae peso, % de grasa, masa muscular, masa grasa, grasa visceral, agua y TMB, y alimenta las gráficas. Si algún valor sale mal, corrígelo con “Editar última” en Seguimiento.</div>
+                <div style={S.note}>Sube el PDF del InBody y el sistema lo lee automáticamente (IA): extrae peso, % de grasa, masa muscular, masa grasa, grasa visceral, agua y TMB, y alimenta las gráficas. Si algún valor sale mal, corrígelo con “Editar última” en Gráficas de avance.</div>
                 <label style={S.upload}>
                   <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => { setIbFile(e.target.files && e.target.files[0]); setIbMsg(''); }} />
                   {ibFile ? ('PDF seleccionado: ' + ibFile.name) : 'Seleccionar PDF del InBody'}
@@ -685,6 +782,10 @@ export default function Pacientes() {
             {panel === 'reco' && (
               <div style={S.panelBody}>
                 <div style={S.note}>Notas de bitácora para el paciente. Se guardan con la fecha y hora en que las publicas, y el paciente las verá en su sección "Recomendaciones".</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 12px', flexWrap: 'wrap' }}>
+                  <button style={S.smallBtn} onClick={generarPDFReco} disabled={!sel.recomendaciones || !sel.recomendaciones.length}>Generar PDF</button>
+                  {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
+                </div>
                 <div style={S.chipGroups}>
                   {RECO_CHIPS.map(grupo => (
                     <div key={grupo.titulo} style={S.chipGroup}>
