@@ -628,7 +628,7 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
                 const dif = round2(menu - plan);
                 const ok = Math.abs(dif) < 0.01;
                 return (
-                  <tr key={g} style={ok ? null : S.balRowBad}>
+                  <tr key={g} style={ok ? S.balRowOk : S.balRowBad}>
                     <td style={{ ...S.balTd, textAlign: 'left' }}>{GRUPOS[g][0]}</td>
                     <td style={S.balTd}>{fmt(plan)}</td>
                     <td style={S.balTd}>{fmt(menu)}</td>
@@ -749,6 +749,7 @@ const styles = {
   balTh: { textAlign: 'right', padding: '6px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: T.inkSoft, borderBottom: `1px solid ${T.line}` },
   balTd: { textAlign: 'right', padding: '7px 10px', color: T.pine, borderBottom: `1px solid ${T.lineSoft || T.line}` },
   balRowBad: { background: '#FBF1EC' },
+  balRowOk: { background: '#EDF4EF' },
   balHint: { marginTop: 10, fontSize: 11.5, color: T.inkSoft, lineHeight: 1.5 },
   modalWrap: { position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 50 },
   modalCard: { background: T.surface, borderRadius: 16, padding: '22px 22px 20px', width: '100%', maxWidth: 460, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' },
