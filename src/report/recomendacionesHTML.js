@@ -34,7 +34,7 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha } = {}
     body { margin:0; font-family: Arial, Helvetica, sans-serif; color:#4A443E; background:#FFFFFF; }
     .doc { padding:34px 40px; }
     .hdr { display:flex; align-items:center; }
-    .hdr img { height:44px; width:auto; display:block; }
+    .hdr img { height:53px; width:auto; display:block; }
     .gold { height:2px; background:#CDA788; margin:20px 0 22px; }
     .eyebrow { font-size:11px; letter-spacing:4px; color:#A1968C; font-weight:bold; }
     .rule { height:2px; width:46px; background:#CDA788; margin:9px 0 18px; }
@@ -53,7 +53,7 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha } = {}
       <div class="gold"></div>
       <div class="eyebrow">RECOMENDACIONES</div>
       <div class="rule"></div>
-      <div class="meta"><span><b>Paciente:</b> ${esc(nombre || "—")}</span><span><b>Fecha:</b> ${esc(fechaDoc)}</span></div>
+      <div class="meta"><span><b>Paciente:</b> ${esc(nombre || "—")}</span><span><b>Fecha de impresión:</b> ${esc(fechaDoc)}</span></div>
       ${items || vacio}
       <div class="ftr">
         <div class="fnut">Lic. N. Natalia Flores</div>
