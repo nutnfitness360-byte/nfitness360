@@ -286,6 +286,8 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
   const [anaStatus, setAnaStatus] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pdfStatus, setPdfStatus] = useState("");
+  const [kcalBusy, setKcalBusy] = useState(false);
+  const [kcalErr, setKcalErr] = useState("");
   const sectionRefs = useRef({});
   const analisisInput = useRef(null);
 
@@ -357,6 +359,27 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
         setAnaStatus('Análisis subido a Drive ✓');
       } else { setAnaStatus('Error: ' + (d.error || 'no se recibió enlace.')); }
     } catch (e) { setAnaStatus('No se pudo subir: ' + e.message); }
+  };
+
+  const calcularKcalHabitual = async () => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setKcalErr("Falta configurar REACT_APP_APPSCRIPT_URL en Vercel."); return; }
+    const dieta = (data.dietetica.dieta || []).filter((r) => (r.alimentos || "").trim());
+    if (!dieta.length) { setKcalErr("Captura la dieta habitual (al menos un tiempo con alimentos)."); return; }
+    setKcalBusy(true); setKcalErr("");
+    try {
+      const res = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "kcalHabitualIA", dieta: dieta.map((r) => ({ momento: r.momento || "", alimentos: r.alimentos || "" })) }),
+        redirect: "follow",
+      });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: "Respuesta no válida del servidor." }; }
+      if (!d.ok) throw new Error(d.error || "No se pudo calcular.");
+      setField("dietetica", "kcalHabitual", { kcal: d.kcal, prot: d.prot, lip: d.lip, hc: d.hc, equivalentes: d.equivalentes || {}, fecha: Date.now() });
+    } catch (e) {
+      setKcalErr("No se pudo calcular: " + e.message);
+    }
+    setKcalBusy(false);
   };
 
   const guardar = () => { setConfirmOpen(true); };
@@ -735,6 +758,56 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           <button style={styles.addBtn} onClick={() => addRow("dietetica", "dieta", { momento: "", alimentos: "" })}>
             + Agregar tiempo
           </button>
+
+          <div style={{ marginTop: 16 }}>
+            <button
+              style={{ ...styles.addBtn, marginTop: 0, background: T.pine, color: "#fff" }}
+              onClick={calcularKcalHabitual}
+              disabled={kcalBusy}>
+              {kcalBusy ? "Calculando…" : "Calcular kcal habituales ✦"}
+            </button>
+            <div style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 6, lineHeight: 1.5 }}>
+              La IA estima los equivalentes del SMAE de la dieta habitual y calcula kcal y macros. Sirve de referencia para definir las kcal del nuevo plan. Recalcula si editas la dieta.
+            </div>
+            {kcalErr && <div style={{ marginTop: 8, fontSize: 12.5, color: T.danger }}>{kcalErr}</div>}
+
+            {data.dietetica.kcalHabitual && (
+              <div style={{ marginTop: 12, border: `1px solid ${T.line}`, borderRadius: 12, padding: "14px 16px", background: T.surface }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: T.inkSoft, marginBottom: 10 }}>Dieta habitual estimada</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+                  <div style={{ flex: "1 1 130px", background: T.mint, borderRadius: 9, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 12, color: T.inkSoft }}>Energía</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: T.pine }}>{Math.round(data.dietetica.kcalHabitual.kcal || 0).toLocaleString("es-MX")} kcal</div>
+                  </div>
+                  <div style={{ flex: "1 1 90px", background: "#FAFBFA", border: `1px solid ${T.line}`, borderRadius: 9, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 12, color: T.inkSoft }}>Proteína</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: T.ink }}>{Math.round(data.dietetica.kcalHabitual.prot || 0)} g</div>
+                  </div>
+                  <div style={{ flex: "1 1 90px", background: "#FAFBFA", border: `1px solid ${T.line}`, borderRadius: 9, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 12, color: T.inkSoft }}>Lípidos</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: T.ink }}>{Math.round(data.dietetica.kcalHabitual.lip || 0)} g</div>
+                  </div>
+                  <div style={{ flex: "1 1 90px", background: "#FAFBFA", border: `1px solid ${T.line}`, borderRadius: 9, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 12, color: T.inkSoft }}>Hidratos</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: T.ink }}>{Math.round(data.dietetica.kcalHabitual.hc || 0)} g</div>
+                  </div>
+                </div>
+                {data.dietetica.kcalHabitual.equivalentes && Object.keys(data.dietetica.kcalHabitual.equivalentes).length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11.5, color: T.inkSoft, marginBottom: 6 }}>Equivalentes estimados por grupo</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {Object.entries(data.dietetica.kcalHabitual.equivalentes).map(([g, n]) => (
+                        <span key={g} style={{ fontSize: 12, background: T.mint, color: T.pine, borderRadius: 7, padding: "4px 10px", fontWeight: 600 }}>{g} · {n}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 12, lineHeight: 1.5 }}>
+                  Estimación a partir de la dieta habitual capturada. Sirve de referencia para definir las kcal del nuevo plan; ajústala con tu criterio clínico.
+                </div>
+              </div>
+            )}
+          </div>
 
           <Grid style={{ marginTop: 18 }}>
             <Field label="Hora en que despierta">
