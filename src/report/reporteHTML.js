@@ -57,7 +57,7 @@ function mealRow(t) {
   </div>`;
 }
 
-export function buildReportHTML({ nombre, objetivo, plan, tiempos }) {
+export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus = true, incluirEquivalencias = true, listas = null }) {
   plan = plan || {};
   tiempos = Array.isArray(tiempos) ? tiempos : [];
   const planEq = Array.isArray(plan.eq) ? plan.eq.map(num) : Array(18).fill(0);
@@ -102,11 +102,27 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos }) {
   const refCols = Object.entries(EQUIV_DB).map(([grp, items]) =>
     `<div class="gcol"><div class="gcirc">${ICONS[grp] || ''}</div><div class="glabel">${esc(grp)}</div><ul>${items.map(it => `<li>${esc(it)}</li>`).join('')}</ul></div>`
   ).join('');
-  const refPage = `<div class="page last">
+  const refPage = `<div class="page">
     <div class="ptitle">EQUIVALENCIAS · 1 RACIÓN EQUIVALE A:</div>
     <div class="gwrap" style="grid-template-columns:repeat(${Object.keys(EQUIV_DB).length},1fr);">${refCols}</div>
     <img class="corner" src="${LOGO}"/>
   </div>`;
+
+  // páginas de lista del súper: una por opción (solo si se incluyen menús y hay listas)
+  const listaPages = (incluirMenus && Array.isArray(listas) && listas.length)
+    ? listas.map(L => {
+        const cats = (L.categorias || []).map(c => `
+          <div class="lcat"><h4>${esc(c.nombre || '')}</h4>
+            ${(c.items || []).map(it => `<div class="litem"><span>${esc(it.insumo || '')}</span><span class="qty">${esc(it.cantidad || '')}</span></div>`).join('')}
+          </div>`).join('');
+        return `<div class="page">
+          <div class="ptitle">LISTA DEL SÚPER</div>
+          <div class="lhead">OPCIÓN ${esc(String(L.opcion || ''))} · 5 DÍAS</div>
+          <div class="lwrap">${cats}</div>
+          <img class="corner" src="${LOGO}"/>
+        </div>`;
+      })
+    : [];
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"/><style>
 ${FONT_CSS}
@@ -144,10 +160,16 @@ ${FONT_CSS}
 .gcirc{width:58px;height:58px;border-radius:50%;background:#fff;border:2px solid ${TAN};display:flex;align-items:center;justify-content:center;color:${TAUPE};margin-bottom:7px;}
 .glabel{background:${TAUPE2};color:#fff;font-size:10.5px;letter-spacing:1px;font-weight:700;text-transform:uppercase;padding:5px;text-align:center;width:100%;margin-bottom:7px;}
 .gcol ul{margin:0;padding-left:15px;align-self:flex-start;} .gcol li{font-size:9.5px;color:${SOFT};line-height:1.65;}
+.lhead{font-size:12px;letter-spacing:2px;color:${SOFT};font-weight:600;margin:-6mm 0 7mm;}
+.lwrap{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start;}
+.lcat{background:#fff;border:1px solid ${LINE};border-radius:4px;padding:11px 13px;}
+.lcat h4{margin:0 0 8px;font-size:11px;letter-spacing:1px;color:${TAN};text-transform:uppercase;font-weight:800;}
+.litem{display:flex;justify-content:space-between;gap:8px;font-size:11px;line-height:1.85;color:${INK};}
+.litem .qty{color:${SOFT};white-space:nowrap;}
 </style></head><body>
 <div class="page cover"><div class="cdate">${esc(fechaLarga())}</div><img class="clogo" src="${LOGO}"/><div class="cname">${esc(nom)}</div></div>
-${menuPages.join('')}
-${eqPage}
-${refPage}
+${incluirMenus ? menuPages.join('') : ''}
+${incluirEquivalencias ? (eqPage + refPage) : ''}
+${listaPages.join('')}
 </body></html>`;
 }
