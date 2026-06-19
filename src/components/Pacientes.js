@@ -528,6 +528,7 @@ export default function Pacientes() {
             )}
           </div>
 
+          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
           {/* Plan nutricional */}
           <div className="card" style={panel === 'plan' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'plan' ? null : 'plan')}>
@@ -623,6 +624,7 @@ export default function Pacientes() {
               </div>
             )}
           </div>
+          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
           {/* Seguimientos (notas internas de consulta, no visibles para el paciente) */}
           <div className="card" style={panel === 'bitacora' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'bitacora' ? null : 'bitacora')}>
@@ -698,6 +700,7 @@ export default function Pacientes() {
             )}
           </div>
 
+          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
         </div>
 
         <button style={{ ...S.back, marginTop: 16, marginBottom: 0 }} onClick={volver}>← Atrás</button>
@@ -848,8 +851,9 @@ const styles = {
   recoDate: { fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 },
   recoText: { fontSize: 13, color: 'var(--dark)', lineHeight: 1.5, whiteSpace: 'pre-wrap' },
   panelGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, alignItems: 'start' },
-  panel: { padding: 0, overflow: 'hidden', border: '1px solid rgba(54,48,43,0.14)' },
-  panelOpen: { padding: 0, overflow: 'hidden', gridColumn: '1 / -1', border: '1px solid rgba(54,48,43,0.14)' },
+  panel: { padding: 0, overflow: 'hidden' },
+  panelOpen: { padding: 0, overflow: 'hidden', gridColumn: '1 / -1' },
+  rowSep: { gridColumn: '1 / -1', height: 2, background: 'var(--gold)', borderRadius: 2, margin: '2px 0' },
   panelHead: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', padding: '16px 16px', textAlign: 'left' },
   panelTitle: { fontSize: 14, fontWeight: 700, color: 'var(--dark)', lineHeight: 1.3 },
   chev: { color: 'var(--stone)', fontSize: 16, transition: 'transform .15s', flexShrink: 0 },
