@@ -25,59 +25,35 @@ const EQUIV_DB = {
 // Las RACIONES salen de los equivalentes del tiempo (t.eq). El GRAMAJE de cada ejemplo
 // sale de la tabla de equivalentes (gramos por 1 equivalente) × raciones. Sin IA.
 // Categorías consolidadas -> índices de grupo (GSHORT) + ejemplos representativos.
+const fmtRac = (n) => String(Math.round(n * 100) / 100);            // 0.5 -> "0.5", 2 -> "2"
+const grPorc = (perEq, r) => Math.round(perEq * r);                 // gramos = gramaje/equiv × raciones
+const cntPorc = (r, w) => `${fmtRac(r)} ${w}${Math.round(r * 100) / 100 > 1 ? 's' : ''}`; // "2 tortillas", "1 cdita", "0.5 pieza"
+
+// Plantillas con la FORMA de escribir de la nutrióloga. `ej(r)` devuelve el texto
+// que va después de "{raciones} {Grupo}:" (las verduras van libres, sin conteo).
 const PORCIONES_CFG = [
-  { cat: 'Verduras', groups: [3], libre: true, texto: 'diferentes en sopa, ensalada, cocidas o al grill' },
-  { cat: 'Proteínas', groups: [5, 6, 7, 8], ej: [
-      { n: 'pollo, res o cerdo magro cocido', g: 30 },
-      { n: 'pechuga de pavo', g: 40 },
-      { n: 'atún en agua', g: 35 },
-      { n: 'huevo', g: 50 },
-    ] },
-  { cat: 'Cereales', groups: [0, 1], ej: [
-      { n: 'arroz cocido', g: 45 },
-      { n: 'pasta cocida', g: 50 },
-      { n: 'papa o camote cocido', g: 70 },
-      { n: 'tortilla de maíz', g: 30 },
-    ] },
-  { cat: 'Leguminosas', groups: [2], ej: [
-      { n: 'frijol, lenteja o garbanzo cocido', g: 85 },
-      { n: 'hummus', g: 75 },
-    ] },
-  { cat: 'Grasas', groups: [13, 14], ej: [
-      { n: 'aguacate', g: 55 },
-      { n: 'aceite de oliva', g: 5 },
-      { n: 'almendras', g: 12 },
-    ] },
-  { cat: 'Fruta', groups: [4], ej: [
-      { n: 'manzana o naranja', g: 130 },
-      { n: 'fruta picada (melón, papaya o sandía)', g: 150 },
-      { n: 'plátano', g: 54 },
-    ] },
-  { cat: 'Lácteos', groups: [9, 10, 11, 12], ej: [
-      { n: 'yogurt griego', g: 200 },
-      { n: 'leche light', g: 240, u: 'ml' },
-      { n: 'jocoque', g: 75 },
-    ] },
+  { cat: 'Verduras', uno: 'Verdura', groups: [3], libre: true, ej: () => 'diferentes ya sean en sopa, ensalada, cocidas o al grill' },
+  { cat: 'Proteínas', uno: 'Proteína', groups: [5, 6, 7, 8], ej: (r) => `${grPorc(30, r)}g ya cocida en cualquier guisado (preferir carnes blancas; nada frito, empanizado, capeado ni crudo)` },
+  { cat: 'Cereales', uno: 'Cereal', groups: [0, 1], ej: (r) => `${grPorc(50, r)}g de arroz integral o pasta cocida ó ${cntPorc(r, 'tortilla')} de maíz ó ${cntPorc(r, 'paquete')} de salmas ó ${grPorc(70, r)}g de papa o camote cocido` },
+  { cat: 'Leguminosas', uno: 'Leguminosa', groups: [2], ej: (r) => `${grPorc(80, r)}g de frijol, lenteja o garbanzo cocido` },
+  { cat: 'Grasas', uno: 'Grasa', groups: [13, 14], ej: (r) => `${grPorc(30, r)}g de aguacate ó ${cntPorc(r, 'cdita')} de aceite de oliva ó ${cntPorc(r, 'cdita')} de mayonesa de aguacate` },
+  { cat: 'Frutas', uno: 'Fruta', groups: [4], ej: (r) => `${cntPorc(r, 'pieza')} de fruta o ${grPorc(150, r)}g de fruta picada (melón, papaya o sandía)` },
+  { cat: 'Lácteos', uno: 'Lácteo', groups: [9, 10, 11, 12], ej: (r) => `${grPorc(200, r)}g de yogurt griego ó ${grPorc(240, r)}ml de leche light` },
 ];
 
 // ¿Este tiempo se muestra como porciones (una sola opción) en vez de N opciones?
 // Por defecto: SÍ cuando el tiempo se llama "Comida"; si hay marca explícita, manda la marca.
 export const esPorciones = (t) => (t && t.porciones != null) ? !!t.porciones : /comida/i.test((t && t.nombre) || '');
 
-// Texto del bloque, armado solo desde los equivalentes (t.eq) y la tabla de equivalentes.
+// Texto del bloque, armado solo desde los equivalentes (t.eq), con la forma de la nutrióloga.
 export function generarPorcionesTexto(eq) {
   eq = Array.isArray(eq) ? eq : [];
-  const fmt = (n) => String(Math.round(n * 100) / 100); // 0.5 -> "0.5", 2 -> "2"
   const lineas = [];
   for (const c of PORCIONES_CFG) {
     const rac = c.groups.reduce((a, g) => a + num(eq[g]), 0);
     if (rac <= 0) continue;
-    if (c.libre) {
-      lineas.push(`Verduras ${c.texto}`);
-    } else {
-      const ejs = c.ej.map(e => `${Math.round(e.g * rac)} ${e.u || 'g'} de ${e.n}`).join(' ó ');
-      lineas.push(`${fmt(rac)} ${c.cat}: ${ejs}`);
-    }
+    if (c.libre) lineas.push(`Verduras ${c.ej(rac)}`);
+    else lineas.push(`${fmtRac(rac)} ${Math.round(rac * 100) / 100 <= 1 ? c.uno : c.cat}: ${c.ej(rac)}`);
   }
   return lineas.join('\n');
 }
