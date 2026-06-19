@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
-import { buildReportHTML } from '../report/reporteHTML';
+import { buildReportHTML, generarPorcionesTexto, esPorciones } from '../report/reporteHTML';
 
 /* ============================================================
    NFITNESS 360 — Menús por tiempo de comida
@@ -126,6 +126,14 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
   const setT = (idx, patch) => { setTiempos(ts => ts.map((t, i) => i === idx ? { ...t, ...patch } : t)); touch(); };
   const setEqCell = (idx, g, v) => setT(idx, { eq: tiempos[idx].eq.map((x, k) => k === g ? String(v).replace(',', '.') : x) });
   const setOpcion = (idx, oi, patch) => setT(idx, { opciones: tiempos[idx].opciones.map((o, k) => k === oi ? { ...o, ...patch } : o) });
+  const setPorciones = (idx, val) => {
+    const t = tiempos[idx];
+    const patch = { porciones: val };
+    if (val && t.porcionesTexto == null) patch.porcionesTexto = generarPorcionesTexto(t.eq); // prellenar al activar
+    setT(idx, patch);
+  };
+  const setPorcionesTexto = (idx, val) => setT(idx, { porcionesTexto: val });
+  const regenerarPorciones = (idx) => setT(idx, { porcionesTexto: generarPorcionesTexto(tiempos[idx].eq) });
 
   const redistribuir = () => {
     if (!planEq) return;
@@ -181,9 +189,12 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
     const url = process.env.REACT_APP_APPSCRIPT_URL;
     if (!url) { setRep('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
     if (!planEq) return;
+    const idxIA = tiempos.map((t, i) => esPorciones(t) ? -1 : i).filter(i => i >= 0);
+    if (!idxIA.length) { setRep('No hay tiempos con opciones para generar (los tiempos en modo porciones no usan IA).'); return; }
     setIaBusy(true); setRep('Generando menús con IA… (puede tardar unos segundos)');
     try {
-      const payloadTiempos = tiempos.map(t => {
+      const payloadTiempos = idxIA.map(i => {
+        const t = tiempos[i];
         const en = t.eq.reduce((a, _, g) => ({
           kcal: a.kcal + num(t.eq[g]) * GRUPOS[g][1], prot: a.prot + num(t.eq[g]) * GRUPOS[g][2],
           lip: a.lip + num(t.eq[g]) * GRUPOS[g][3], hc: a.hc + num(t.eq[g]) * GRUPOS[g][4],
@@ -198,13 +209,17 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
       });
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (!data.ok || !Array.isArray(data.tiempos)) throw new Error(data.error || 'No se recibieron menús.');
-      setTiempos(ts => ts.map((t, i) => {
-        const r = data.tiempos[i];
-        if (!r || !Array.isArray(r.opciones)) return t;
-        const ops = r.opciones.slice(0, nOpciones).map(o => ({ nombre: (o && o.nombre) || '', prep: (o && o.prep) || '' }));
-        while (ops.length < nOpciones) ops.push(nuevaOpcion());
-        return { ...t, opciones: ops };
-      }));
+      setTiempos(ts => {
+        const next = ts.slice();
+        idxIA.forEach((origIdx, k) => {
+          const r = data.tiempos[k];
+          if (!r || !Array.isArray(r.opciones)) return;
+          const ops = r.opciones.slice(0, nOpciones).map(o => ({ nombre: (o && o.nombre) || '', prep: (o && o.prep) || '' }));
+          while (ops.length < nOpciones) ops.push(nuevaOpcion());
+          next[origIdx] = { ...next[origIdx], opciones: ops };
+        });
+        return next;
+      });
       setStatus('nuevo');
       setRep('Menús generados por IA. Revísalos y edítalos antes de guardar.');
     } catch (e) {
@@ -246,6 +261,7 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
     const opciones = [];
     for (let oi = 0; oi < nOpciones; oi++) {
       const platillos = tiempos
+        .filter(t => !esPorciones(t))
         .map(t => ({ tiempo: t.nombre, nombre: (t.opciones[oi] && t.opciones[oi].nombre) || '', prep: (t.opciones[oi] && t.opciones[oi].prep) || '' }))
         .filter(p => p.nombre || p.prep);
       if (platillos.length) opciones.push({ opcion: oi + 1, platillos });
@@ -573,9 +589,28 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
               ))}
             </div>
 
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0 12px', fontSize: 13, fontWeight: 700, color: T.pine, cursor: 'pointer' }}>
+              <input type="checkbox" checked={esPorciones(t)} onChange={e => setPorciones(idx, e.target.checked)} />
+              Porciones (equivalencias) — una sola opción, sin IA
+            </label>
+
             <div style={S.optsRow}>
               <div style={{ flex: 1 }}>
-                {t.opciones.map((o, oi) => (
+                {esPorciones(t) ? (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                      <span style={S.optTag}>Porciones generales para armar la comida</span>
+                      <button style={S.optIaBtn} onClick={() => regenerarPorciones(idx)}>Regenerar desde equivalentes</button>
+                    </div>
+                    <textarea
+                      style={{ width: '100%', minHeight: 130, padding: '10px 12px', border: `1px solid ${T.line}`, borderRadius: 9, fontSize: 13, lineHeight: 1.6, fontFamily: mono, color: T.ink, resize: 'vertical', boxSizing: 'border-box' }}
+                      placeholder="Ejemplo por grupo (se genera desde los equivalentes; edítalo libremente)"
+                      value={t.porcionesTexto != null ? t.porcionesTexto : generarPorcionesTexto(t.eq)}
+                      onChange={e => setPorcionesTexto(idx, e.target.value)}
+                    />
+                    <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 6, lineHeight: 1.5 }}>Una línea por grupo. Las raciones salen de los equivalentes de arriba y el gramaje de la tabla de equivalentes. Se separan las opciones con " ó " (sin coma).</div>
+                  </div>
+                ) : t.opciones.map((o, oi) => (
                   <div key={oi} style={S.opt}>
                     <div style={S.optHead}>
                       <span style={S.optTag}>Opción {oi + 1}</span>
