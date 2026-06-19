@@ -316,16 +316,24 @@ export default function Pacientes() {
     const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
     try {
       await updateDoc(doc(db, 'pacientes', sel.id), { mediciones: arr });
-      // Respaldo del PDF en Drive (carpeta "InBody" del paciente). Es secundario.
+      // Respaldo del PDF en Drive (carpeta "InBody" del paciente) + registro del enlace para listarlo.
       if (ibFile) {
         try {
           const b64 = await fileToBase64(ibFile);
           const url = process.env.REACT_APP_APPSCRIPT_URL;
-          if (url) await fetch(url, {
-            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'saveInBody', patient: sel.nombre, correo: (sel.correo || ''), filename: 'InBody_' + (sel.codigo || '') + '_' + nm.fecha + '.pdf', pdfBase64: b64 }),
-            redirect: 'follow',
-          });
+          if (url) {
+            const filename = 'InBody_' + (sel.codigo || '') + '_' + nm.fecha + '.pdf';
+            const res = await fetch(url, {
+              method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'saveInBody', patient: sel.nombre, correo: (sel.correo || ''), filename, pdfBase64: b64 }),
+              redirect: 'follow',
+            });
+            let data; try { data = JSON.parse(await res.text()); } catch (_) { data = null; }
+            if (data && data.ok && data.link) {
+              const reg = { nombre: data.filename || filename, fecha: nm.fecha, link: data.link };
+              await updateDoc(doc(db, 'pacientes', sel.id), { inbodyArchivos: [...(sel.inbodyArchivos || []), reg] });
+            }
+          }
         } catch (e) { /* el respaldo en Drive es secundario; la medición ya quedó guardada */ }
       }
       setIb({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '', agua: '' });
@@ -489,6 +497,21 @@ export default function Pacientes() {
                   <Field l="Agua corporal total (L)"><input style={S.inp} inputMode="decimal" value={ib.agua} onChange={e => setIb({ ...ib, agua: e.target.value })} placeholder="38.5" /></Field>
                 </div>
                 <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={guardarInBody} disabled={ibBusy}>{ibBusy ? 'Guardando…' : 'Guardar InBody'}</button>
+                <div style={{ marginTop: 16 }}>
+                  <div style={S.note}>Archivos InBody cargados (respaldo en Drive).</div>
+                  {(!sel.inbodyArchivos || sel.inbodyArchivos.length === 0)
+                    ? <div className="empty-state">Aún no hay archivos de InBody cargados.</div>
+                    : [...sel.inbodyArchivos].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                      <div key={idx} style={S.planRow}>
+                        <div style={S.planIcon}>PDF</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'InBody'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+                        </div>
+                        {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                      </div>
+                    ))}
+                </div>
               </div>
             )}
           </div>
@@ -520,7 +543,6 @@ export default function Pacientes() {
                           <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
                         </div>
                         {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
-                        <button style={S.rm} onClick={() => removeIsak(idx)} title="Quitar de la lista">×</button>
                       </div>
                     ))}
                 </div>
