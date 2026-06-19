@@ -116,7 +116,7 @@ export default function Pacientes() {
   }, []);
 
   const irNuevo = () => { setErr(''); pushNav(); setNuevo(true); };
-  const irSub = (s) => { pushNav(); setSub(s); };
+  const irSub = (s) => { pushNav(); setPanel(null); setSub(s); };
 
   const nextCodigo = () => {
     let mx = 0;
