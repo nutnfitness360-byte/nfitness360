@@ -112,6 +112,7 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
   const [listas, setListas] = useState(null);
   const [listaBusy, setListaBusy] = useState(false);
   const [showLista, setShowLista] = useState(false);
+  const [showScope, setShowScope] = useState(false);
   const [listaErr, setListaErr] = useState('');
 
   // Ventana de configuración: aparece al abrir menús cuando aún no hay configuración guardada.
@@ -241,9 +242,7 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
   };
 
   // ── Lista del súper: una lista por opción, para 5 días ──
-  const generarListaSuper = async () => {
-    const url = process.env.REACT_APP_APPSCRIPT_URL;
-    if (!url) { setRep('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+  const construirOpcionesLista = () => {
     const opciones = [];
     for (let oi = 0; oi < nOpciones; oi++) {
       const platillos = tiempos
@@ -251,17 +250,28 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
         .filter(p => p.nombre || p.prep);
       if (platillos.length) opciones.push({ opcion: oi + 1, platillos });
     }
-    if (!opciones.length) { setRep('Primero escribe o genera los platillos de los menús.'); return; }
+    return opciones;
+  };
+  const pedirListasIA = async () => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) throw new Error('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.');
+    const opciones = construirOpcionesLista();
+    if (!opciones.length) return [];
+    const res = await fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'listaSuperIA', dias: 5, objetivo: patient.objetivo || '', opciones }),
+      redirect: 'follow',
+    });
+    let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+    if (!data.ok || !Array.isArray(data.listas)) throw new Error(data.error || 'No se recibió la lista.');
+    return data.listas;
+  };
+
+  const generarListaSuper = async () => {
+    if (!construirOpcionesLista().length) { setRep('Primero escribe o genera los platillos de los menús.'); return; }
     setListaBusy(true); setShowLista(true); setListas(null); setListaErr('');
     try {
-      const res = await fetch(url, {
-        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'listaSuperIA', dias: 5, objetivo: patient.objetivo || '', opciones }),
-        redirect: 'follow',
-      });
-      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
-      if (!data.ok || !Array.isArray(data.listas)) throw new Error(data.error || 'No se recibió la lista.');
-      setListas(data.listas);
+      setListas(await pedirListasIA());
     } catch (e) {
       setListaErr('No se pudo generar la lista: ' + e.message);
     }
@@ -290,7 +300,10 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
     }
   };
 
-  const guardar = async () => {
+  const guardarConAlcance = async (scope) => {
+    setShowScope(false);
+    const incluirMenus = scope !== 'equivalencias';
+    const incluirEquivalencias = scope !== 'menus';
     setStatus('guardando'); setRep('Guardando menús…');
     // 1) Guardar SIEMPRE los menús primero (un fallo del PDF no debe hacer perder el trabajo).
     try {
@@ -303,8 +316,21 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
     const url = process.env.REACT_APP_APPSCRIPT_URL;
     if (!url) { setRep('Menús guardados ✓ (no se generó PDF: falta REACT_APP_APPSCRIPT_URL).'); return; }
     try {
+      // Lista del súper: SOLO si se incluyen menús (en "Equivalencias" no se ejecuta la IA, para no gastar créditos).
+      let listasReporte = null;
+      if (incluirMenus) {
+        if (Array.isArray(listas) && listas.length) {
+          listasReporte = listas; // ya generada antes; se reutiliza sin volver a llamar a la IA
+        } else {
+          try {
+            setRep('Generando la lista del súper con IA…');
+            listasReporte = await pedirListasIA();
+            setListas(listasReporte);
+          } catch (e) { listasReporte = null; /* si falla la lista, el reporte se genera igual, sin ella */ }
+        }
+      }
       setRep('Generando y subiendo el PDF a Drive…');
-      const html = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos });
+      const html = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos, incluirMenus, incluirEquivalencias, listas: listasReporte });
       const fechaTxt = new Date().toLocaleDateString('es-MX').replace(/\//g, '-');
       const baseNombre = 'Plan nutricional ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt;
       const filename = baseNombre + '.pdf';
@@ -323,7 +349,8 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
           const hist = [...(patient.menusHistorial || []), snap].slice(-24);
           await updateDoc(doc(db, 'pacientes', patient.id), { menusHistorial: hist });
         } catch (e) { /* el historial es secundario; no debe bloquear el guardado */ }
-        setRep('Menús guardados y reporte subido a Drive (registrado en Planes) ✓');
+        const faltoLista = incluirMenus && (!listasReporte || !listasReporte.length);
+        setRep('Menús guardados y reporte subido a Drive (registrado en Planes) ✓' + (faltoLista ? ' — nota: no se incluyó la lista del súper (sin platillos o falló la IA).' : ''));
       } else {
         setRep('Menús guardados ✓, pero el PDF no se pudo subir: ' + (data.error || 'no se recibió enlace.'));
       }
@@ -399,6 +426,41 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
             <div style={S.cfgActions}>
               {savedMenus && <button style={S.volverBtn} onClick={() => setShowCfg(false)}>Cancelar</button>}
               <button style={S.primaryBtn} className="nf-primary" onClick={aplicarConfig}>Continuar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showScope && (
+        <div style={S.modalWrap}>
+          <div style={{ ...S.modalCard, maxWidth: 430 }}>
+            <div style={S.eyebrow}>Guardar plan</div>
+            <h2 style={{ ...S.balTitle, marginBottom: 4 }}>¿Deseas imprimir menús y equivalencias en el mismo plan?</h2>
+            <div style={{ fontSize: 12, color: T.inkSoft, marginBottom: 16 }}>Elige qué hojas incluir en el reporte del plan.</div>
+
+            <button
+              style={{ width: '100%', textAlign: 'left', background: T.amber, color: '#211C17', border: 'none', borderRadius: 10, padding: '13px 14px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: mono, marginBottom: 10 }}
+              onClick={() => guardarConAlcance('menus')}
+            >Menús
+              <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.92, marginTop: 2 }}>Todo el reporte SIN las hojas de equivalencias · incluye la lista del súper</div>
+            </button>
+
+            <button
+              style={{ width: '100%', textAlign: 'left', background: '#fff', color: '#211C17', border: `1.5px solid ${T.amber}`, borderRadius: 10, padding: '13px 14px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: mono, marginBottom: 10 }}
+              onClick={() => guardarConAlcance('equivalencias')}
+            >Equivalencias
+              <div style={{ fontSize: 11, fontWeight: 400, color: T.inkSoft, marginTop: 2 }}>Todo el reporte SIN las hojas de menús · sin lista del súper</div>
+            </button>
+
+            <button
+              style={{ width: '100%', textAlign: 'left', background: T.pine, color: '#fff', border: 'none', borderRadius: 10, padding: '13px 14px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: mono, marginBottom: 14 }}
+              onClick={() => guardarConAlcance('ambos')}
+            >Ambos
+              <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>Todo el plan como está configurado · incluye la lista del súper</div>
+            </button>
+
+            <div style={S.cfgActions}>
+              <button style={S.volverBtn} onClick={() => setShowScope(false)}>Cancelar</button>
             </div>
           </div>
         </div>
@@ -554,7 +616,7 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
         <div style={{ display: 'flex', gap: 10 }}>
           <button style={S.volverBtn} onClick={onBack}>← Atrás</button>
           <button style={S.draftBtn} onClick={guardarBorrador} disabled={status === 'guardando'}>Guardar borrador</button>
-          <button style={S.primaryBtn} className="nf-primary" onClick={guardar} disabled={status === 'guardando'}>{status === 'guardando' ? 'Guardando…' : 'Guardar menús'}</button>
+          <button style={S.primaryBtn} className="nf-primary" onClick={() => setShowScope(true)} disabled={status === 'guardando'}>{status === 'guardando' ? 'Guardando…' : 'Guardar menús'}</button>
         </div>
       </div>
     </div>
