@@ -83,7 +83,7 @@ function baseSeed() {
       dieta: TIEMPOS.map((t) => ({ momento: t, alimentos: "" })),
     },
     ejercicio: {
-      tipo: "", dias: "", tiempoDia: "", intensidad: "",
+      tipo: "", horario: "", dias: "", tiempoDia: "", intensidad: "",
       comeAntes: "No", queComeAntes: "", comeDurante: "No", queComeDurante: "", comeDespues: "No", queComeDespues: "",
       hidratacion: "", notas: "",
     },
@@ -158,7 +158,7 @@ function histParts(data) {
     ]) + `<div class="subh">Dieta habitual</div>` + dietaTable +
       rows([["Hora en que despierta", di.despierta], ["Hora en que se duerme", di.duerme]])) +
     card("7", "Ejercicio", rows([
-      ["Tipo de ejercicio", ej.tipo], ["Días por semana", ej.dias],
+      ["Tipo de ejercicio", ej.tipo], ["Horario de ejercicio", ej.horario], ["Días por semana", ej.dias],
       ["Tiempo de actividad al día", ej.tiempoDia], ["Intensidad", ej.intensidad],
       ["Hidratación", ej.hidratacion],
       ["¿Come antes de entrenar?", ej.comeAntes === "Sí" ? "Sí — " + (ej.queComeAntes || "—") : "No"],
@@ -825,10 +825,14 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
         <Section reg={reg("ejercicio")} sid="ejercicio" title="Ejercicio" n="7"
           hint="Actividad física y alimentación alrededor del entrenamiento.">
           <Grid>
-            <Field label="Tipo de ejercicio" full>
+            <Field label="Tipo de ejercicio">
               <input style={styles.input} value={data.ejercicio.tipo}
                 placeholder="Fuerza, cardio, deporte, clases…"
                 onChange={(e) => setField("ejercicio", "tipo", e.target.value)} />
+            </Field>
+            <Field label="Horario de ejercicio">
+              <input style={styles.input} value={data.ejercicio.horario} placeholder="Ej. 7:00 am"
+                onChange={(e) => setField("ejercicio", "horario", e.target.value)} />
             </Field>
             <Field label="Días por semana">
               <input style={styles.input} value={data.ejercicio.dias} placeholder="Ej. 4"
