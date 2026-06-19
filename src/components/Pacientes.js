@@ -782,10 +782,6 @@ export default function Pacientes() {
             {panel === 'reco' && (
               <div style={S.panelBody}>
                 <div style={S.note}>Notas de bitácora para el paciente. Se guardan con la fecha y hora en que las publicas, y el paciente las verá en su sección "Recomendaciones".</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 12px', flexWrap: 'wrap' }}>
-                  <button style={S.smallBtn} onClick={generarPDFReco} disabled={!sel.recomendaciones || !sel.recomendaciones.length}>Generar PDF</button>
-                  {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
-                </div>
                 <div style={S.chipGroups}>
                   {RECO_CHIPS.map(grupo => (
                     <div key={grupo.titulo} style={S.chipGroup}>
@@ -803,7 +799,11 @@ export default function Pacientes() {
                 <div style={{ marginBottom: 12 }}>
                   <textarea style={S.recoArea} rows={4} value={recoTexto} onChange={e => setRecoTexto(e.target.value)}
                     placeholder="Escribe una recomendación para el paciente, o agrégala con los botones de arriba…" />
-                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addReco}>+ Agregar recomendación</button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+                    <button style={S.saveBtn} onClick={addReco}>+ Agregar recomendación</button>
+                    <button style={S.smallBtn} onClick={generarPDFReco}>Generar PDF</button>
+                    {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
+                  </div>
                 </div>
                 {(!sel.recomendaciones || sel.recomendaciones.length === 0)
                   ? <div className="empty-state">Aún no hay recomendaciones.</div>
