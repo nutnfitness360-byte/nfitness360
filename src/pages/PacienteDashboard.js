@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import Topbar from '../components/Topbar';
 import PerfilPaciente from '../components/PerfilPaciente';
 import Agenda from '../components/Agenda';
+import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
 const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
@@ -61,6 +62,7 @@ export default function PacienteDashboard() {
   const [confirmarCancel, setConfirmarCancel] = useState(false);
   const [reagendando, setReagendando] = useState(null);
   const [pagoMsg, setPagoMsg] = useState('');
+  const [recoPdfMsg, setRecoPdfMsg] = useState('');
 
   // Al volver de Stripe: confirma el pago y agenda (o cancela si se abandonó el pago).
   useEffect(() => {
@@ -126,6 +128,31 @@ export default function PacienteDashboard() {
   const hoyKey = new Date().toISOString().slice(0, 10);
   const proxima = citas.find(c => c.fecha >= hoyKey && c.estado !== 'cancelada');
   const nombre = user?.displayName?.split(' ')[0] || 'bienvenida';
+
+  const generarPDFReco = async () => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setRecoPdfMsg('No se pudo generar el PDF (configuración del servidor).'); return; }
+    if (!expediente || !Array.isArray(expediente.recomendaciones) || !expediente.recomendaciones.length) {
+      setRecoPdfMsg('Aún no tienes recomendaciones para generar el PDF.'); return;
+    }
+    setRecoPdfMsg('Generando tu PDF…');
+    try {
+      const nombrePac = expediente.nombre || user?.displayName || 'Paciente';
+      const html = buildRecomendacionesHTML({ nombre: nombrePac, recomendaciones: expediente.recomendaciones, fecha: Date.now() });
+      const filename = `Recomendaciones_${String(nombrePac).replace(/[^\w\-]+/g, '_')}.pdf`;
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveRecomendaciones', patient: nombrePac, correo: (expediente.correo || user?.email || '').toLowerCase(), filename, html }),
+        redirect: 'follow',
+      });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      if (!d.ok || !d.link) throw new Error(d.error || 'No se recibió el enlace del PDF.');
+      setRecoPdfMsg('');
+      window.open(d.link, '_blank', 'noopener');
+    } catch (e) {
+      setRecoPdfMsg('No se pudo generar el PDF. Intenta de nuevo.');
+    }
+  };
 
   // Cancelación en servidor (sin confirm; la confirmación es la ventanilla).
   const ejecutarCancelacion = async (c) => {
@@ -409,6 +436,15 @@ export default function PacienteDashboard() {
               ← Atrás
             </button>
             <div className="card-title">Recomendaciones</div>
+            {expediente && Array.isArray(expediente.recomendaciones) && expediente.recomendaciones.length > 0 && (
+              <div style={{ margin: '4px 0 14px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <button onClick={generarPDFReco}
+                  style={{ background: '#221C16', color: '#EEE4DA', border: 'none', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '8px 16px', borderRadius: 8 }}>
+                  Generar PDF
+                </button>
+                {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
+              </div>
+            )}
             {(!expediente || !Array.isArray(expediente.recomendaciones) || expediente.recomendaciones.length === 0) ? (
               <div className="empty-state">
                 <div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>💡</div>
