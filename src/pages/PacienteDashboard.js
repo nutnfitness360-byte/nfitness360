@@ -121,7 +121,17 @@ export default function PacienteDashboard() {
     if (!user?.email) return;
     const q = query(collection(db, 'pacientes'), where('correo', '==', user.email.toLowerCase()));
     return onSnapshot(q,
-      snap => setExpediente(snap.docs.length ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null),
+      snap => {
+        if (!snap.docs.length) { setExpediente(null); return; }
+        // Si por error hubiera más de un expediente con el mismo correo,
+        // elegimos de forma determinista el más completo (no uno al azar),
+        // para no cruzar datos entre registros.
+        const cand = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const score = e => (e.mediciones || []).length + (e.recomendaciones || []).length +
+          (e.planes || []).length + (e.bitacora || []).length + (e.isak || []).length;
+        cand.sort((a, b) => score(b) - score(a) || String(a.id).localeCompare(String(b.id)));
+        setExpediente(cand[0]);
+      },
       () => setExpediente(null));
   }, [user]);
 
