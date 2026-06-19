@@ -91,6 +91,11 @@ function nuevoTiempo(def, eqRow, nOp = 3) {
 
 export default function Menus({ patient, onBack, initialMenus = null }) {
   const plan = patient.plan || {};
+  const ultimaNota = (() => {
+    const b = Array.isArray(patient.bitacora) ? patient.bitacora : [];
+    if (!b.length) return null;
+    return b.slice().sort((a, c) => (c.fecha || 0) - (a.fecha || 0))[0];
+  })();
   const planEq = Array.isArray(plan.eq) ? plan.eq.map(num) : null;
   const usados = planEq ? planEq.map((v, i) => (v > 0 ? i : -1)).filter(i => i >= 0) : [];
 
@@ -114,6 +119,9 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
   const [showLista, setShowLista] = useState(false);
   const [showScope, setShowScope] = useState(false);
   const [listaErr, setListaErr] = useState('');
+  const [showSeg, setShowSeg] = useState(false);   // modal "Aplicar cambios de seguimiento"
+  const [segNota, setSegNota] = useState('');
+  const [segBusy, setSegBusy] = useState(false);
 
   // Ventana de configuración: aparece al abrir menús cuando aún no hay configuración guardada.
   const [showCfg, setShowCfg] = useState(!savedMenus);
@@ -226,6 +234,48 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
       setRep('No se pudo generar con IA: ' + e.message);
     }
     setIaBusy(false);
+  };
+
+  const aplicarCambiosSeg = async () => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setRep('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    const nota = (segNota || '').trim();
+    if (!nota) { setRep('Escribe o pega el cambio a aplicar.'); return; }
+    const idxIA = tiempos.map((t, i) => esPorciones(t) ? -1 : i).filter(i => i >= 0);
+    if (!idxIA.length) { setRep('No hay tiempos con platillos para ajustar (los tiempos en modo porciones se editan a mano).'); return; }
+    setSegBusy(true); setRep('Aplicando cambios de seguimiento con IA…');
+    try {
+      const payloadTiempos = idxIA.map(i => {
+        const t = tiempos[i];
+        return { nombre: t.nombre, hora: t.hora, opciones: (t.opciones || []).map(o => ({ nombre: o.nombre || '', prep: o.prep || '' })) };
+      });
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'ajustarMenuIA', objetivo: patient.objetivo || '', nota, tiempos: payloadTiempos }),
+        redirect: 'follow',
+      });
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      if (!data.ok || !Array.isArray(data.tiempos)) throw new Error(data.error || 'No se recibió el menú ajustado.');
+      setTiempos(ts => {
+        const next = ts.slice();
+        idxIA.forEach((origIdx, k) => {
+          const r = data.tiempos[k];
+          if (!r || !Array.isArray(r.opciones)) return;
+          const orig = next[origIdx];
+          const nOps = (orig.opciones || []).length || 1;
+          const ops = r.opciones.slice(0, nOps).map(o => ({ nombre: (o && o.nombre) || '', prep: (o && o.prep) || '' }));
+          while (ops.length < nOps) ops.push(nuevaOpcion());
+          next[origIdx] = { ...orig, opciones: ops };
+        });
+        return next;
+      });
+      setStatus('nuevo');
+      setShowSeg(false);
+      setRep('Cambios de seguimiento aplicados. Revisa y edita los platillos antes de guardar como versión nueva.');
+    } catch (e) {
+      setRep('No se pudieron aplicar los cambios: ' + e.message);
+    }
+    setSegBusy(false);
   };
 
   const generarOpcionIA = async (idx, oi) => {
@@ -482,6 +532,32 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
         </div>
       )}
 
+      {showSeg && (
+        <div style={S.modalWrap}>
+          <div style={{ ...S.modalCard, maxWidth: 480 }}>
+            <div style={S.eyebrow}>Seguimiento</div>
+            <h2 style={S.balTitle}>Aplicar cambios de seguimiento</h2>
+            <div style={{ fontSize: 12.5, color: T.inkSoft, lineHeight: 1.55, marginBottom: 6 }}>Se toma la última nota de seguimiento y la IA aplica solo los cambios de alimento que pidas. <b>No se modifican equivalencias ni gramajes.</b> Puedes editar el texto antes de aplicar.</div>
+            <div style={{ fontSize: 11, color: T.inkSoft, margin: '10px 0 4px' }}>
+              {ultimaNota
+                ? `Última nota${ultimaNota.fecha ? ' · ' + new Date(ultimaNota.fecha).toLocaleDateString('es-MX') : ''}`
+                : 'No hay notas de seguimiento; escribe el cambio a aplicar.'}
+            </div>
+            <textarea
+              style={{ width: '100%', minHeight: 120, padding: '10px 12px', border: `1px solid ${T.line}`, borderRadius: 9, fontSize: 13, lineHeight: 1.6, color: T.ink, resize: 'vertical', boxSizing: 'border-box', fontFamily: mono }}
+              placeholder="Ej.: cambiar el pollo por pescado en la comida y quitar la avena del desayuno. Todo lo demás igual."
+              value={segNota}
+              onChange={e => setSegNota(e.target.value)}
+            />
+            {segBusy && <div style={S.listaMsg}>Aplicando cambios con IA…</div>}
+            <div style={S.cfgActions}>
+              <button style={S.volverBtn} onClick={() => setShowSeg(false)} disabled={segBusy}>Cancelar</button>
+              <button style={{ ...S.toolBtn, ...S.iaBtn }} onClick={aplicarCambiosSeg} disabled={segBusy}>{segBusy ? 'Aplicando…' : 'Aplicar cambios'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showLista && (
         <div style={S.modalWrap}>
           <div style={S.modalCard}>
@@ -528,6 +604,7 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
         <button style={S.toolBtn} onClick={redistribuir}>Redistribuir equivalentes</button>
         <button style={{ ...S.toolBtn, ...S.iaBtn }} onClick={generarIA} disabled={iaBusy}>{iaBusy ? 'Generando…' : 'Generar todos con IA ✦'}</button>
         <button style={S.toolBtn} onClick={generarListaSuper} disabled={listaBusy}>{listaBusy ? 'Generando…' : 'Lista del súper'}</button>
+        <button style={S.toolBtn} onClick={() => { setSegNota(ultimaNota ? (ultimaNota.texto || '') : ''); setShowSeg(true); }} disabled={iaBusy || segBusy}>Aplicar cambios de seguimiento ✦</button>
       </div>
       <div style={S.iaNote}>Puedes generar todos los menús de golpe, o regenerar <b>una sola opción</b> con el botón <b>IA ✦</b> de cada tarjeta — así arreglas las que no sirven sin tocar las que ya quedaron bien. La IA solo sugiere: <b>revisa y edita</b> antes de guardar.</div>
 
