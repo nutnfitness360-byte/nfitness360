@@ -76,9 +76,9 @@ export default function Pacientes() {
   const [isakFile, setIsakFile] = useState(null);
   const [isakBusy, setIsakBusy] = useState(false);
   const [panel, setPanel] = useState(null);
-  const [ib, setIb] = useState({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '', agua: '' });
   const [ibFile, setIbFile] = useState(null);
   const [ibBusy, setIbBusy] = useState(false);
+  const [ibMsg, setIbMsg] = useState('');
   const [err, setErr] = useState('');
 
   useEffect(() => {
@@ -300,45 +300,50 @@ export default function Pacientes() {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { isak: arr }); } catch (e) { setErr(e.message); }
   };
 
-  const guardarInBody = async () => {
-    const peso = parseFloat(ib.peso);
-    if (!isFinite(peso)) { setErr('El peso es necesario para registrar el InBody.'); return; }
-    setIbBusy(true);
-    const nm = {
-      fecha: ib.fecha || hoyISO(),
-      peso,
-      grasa: parseFloat(ib.grasa) || 0,
-      musculo: parseFloat(ib.mme) || 0,
-      grasaKg: parseFloat(ib.grasaKg) || 0,
-      visceral: parseFloat(ib.visceral) || 0,
-      agua: parseFloat(ib.agua) || 0,
-    };
-    const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const leerYGuardarInBody = async () => {
+    if (!ibFile) { setErr('Selecciona el PDF del InBody.'); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setErr('Falta la configuración del servidor (REACT_APP_APPSCRIPT_URL).'); return; }
+    setIbBusy(true); setErr(''); setIbMsg('Leyendo el InBody con IA… (puede tardar unos segundos)');
     try {
-      await updateDoc(doc(db, 'pacientes', sel.id), { mediciones: arr });
-      // Respaldo del PDF en Drive (carpeta "InBody" del paciente) + registro del enlace para listarlo.
-      if (ibFile) {
-        try {
-          const b64 = await fileToBase64(ibFile);
-          const url = process.env.REACT_APP_APPSCRIPT_URL;
-          if (url) {
-            const filename = 'InBody_' + (sel.codigo || '') + '_' + nm.fecha + '.pdf';
-            const res = await fetch(url, {
-              method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ action: 'saveInBody', patient: sel.nombre, correo: (sel.correo || ''), filename, pdfBase64: b64 }),
-              redirect: 'follow',
-            });
-            let data; try { data = JSON.parse(await res.text()); } catch (_) { data = null; }
-            if (data && data.ok && data.link) {
-              const reg = { nombre: data.filename || filename, fecha: nm.fecha, link: data.link };
-              await updateDoc(doc(db, 'pacientes', sel.id), { inbodyArchivos: [...(sel.inbodyArchivos || []), reg] });
-            }
-          }
-        } catch (e) { /* el respaldo en Drive es secundario; la medición ya quedó guardada */ }
+      const b64 = await fileToBase64(ibFile);
+      const filename = 'InBody_' + (sel.codigo || '') + '_' + hoyISO() + '.pdf';
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'leerInBody', patient: sel.nombre, correo: (sel.correo || ''), filename, pdfBase64: b64 }),
+        redirect: 'follow',
+      });
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = null; }
+      if (data && data.ok && data.datos) {
+        const d = data.datos;
+        const nm = {
+          fecha: (d.fecha && /^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) ? d.fecha : hoyISO(),
+          peso: parseFloat(d.peso) || 0,
+          grasa: parseFloat(d.grasa) || 0,
+          musculo: parseFloat(d.mme) || 0,
+          grasaKg: parseFloat(d.grasaKg) || 0,
+          visceral: parseFloat(d.visceral) || 0,
+          agua: parseFloat(d.agua) || 0,
+          tmb: parseFloat(d.tmb) || 0,
+        };
+        const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
+        const updates = { mediciones: arr };
+        if (data.link) updates.inbodyArchivos = [...(sel.inbodyArchivos || []), { nombre: data.filename || filename, fecha: nm.fecha, link: data.link }];
+        await updateDoc(doc(db, 'pacientes', sel.id), updates);
+        setIbFile(null);
+        setIbMsg('InBody leído y guardado ✓ — revisa los valores en las gráficas y, si algo quedó mal, usa “Editar última” en Seguimiento.');
+      } else {
+        // La lectura falló; si el PDF alcanzó a guardarse, al menos registramos el archivo.
+        if (data && data.link) {
+          await updateDoc(doc(db, 'pacientes', sel.id), { inbodyArchivos: [...(sel.inbodyArchivos || []), { nombre: data.filename || 'InBody', fecha: hoyISO(), link: data.link }] });
+        }
+        setIbMsg('');
+        setErr('No se pudo leer el InBody automáticamente: ' + ((data && data.error) || 'intenta con un PDF más nítido.'));
       }
-      setIb({ fecha: hoyISO(), peso: '', grasa: '', mme: '', grasaKg: '', visceral: '', agua: '' });
-      setIbFile(null); setErr('');
-    } catch (e) { setErr('No se pudo guardar el InBody: ' + e.message); }
+    } catch (e) {
+      setIbMsg('');
+      setErr('No se pudo procesar el InBody: ' + e.message);
+    }
     setIbBusy(false);
   };
 
@@ -482,21 +487,13 @@ export default function Pacientes() {
             </button>
             {panel === 'inbody' && (
               <div style={S.panelBody}>
-                <div style={S.note}>Sube el PDF del InBody (se respalda en Drive) y captura los valores del estudio. Estos datos alimentan las gráficas de seguimiento.</div>
+                <div style={S.note}>Sube el PDF del InBody y el sistema lo lee automáticamente (IA): extrae peso, % de grasa, masa muscular, masa grasa, grasa visceral, agua y TMB, y alimenta las gráficas. Si algún valor sale mal, corrígelo con “Editar última” en Seguimiento.</div>
                 <label style={S.upload}>
-                  <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => setIbFile(e.target.files && e.target.files[0])} />
+                  <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => { setIbFile(e.target.files && e.target.files[0]); setIbMsg(''); }} />
                   {ibFile ? ('PDF seleccionado: ' + ibFile.name) : 'Seleccionar PDF del InBody'}
                 </label>
-                <div style={S.formRow}>
-                  <Field l="Fecha del test"><input type="date" style={S.inp} value={ib.fecha} onChange={e => setIb({ ...ib, fecha: e.target.value })} /></Field>
-                  <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={ib.peso} onChange={e => setIb({ ...ib, peso: e.target.value })} placeholder="74.0" /></Field>
-                  <Field l="% de grasa"><input style={S.inp} inputMode="decimal" value={ib.grasa} onChange={e => setIb({ ...ib, grasa: e.target.value })} placeholder="18.2" /></Field>
-                  <Field l="Masa muscular (kg)"><input style={S.inp} inputMode="decimal" value={ib.mme} onChange={e => setIb({ ...ib, mme: e.target.value })} placeholder="34.5" /></Field>
-                  <Field l="Masa grasa corporal (kg)"><input style={S.inp} inputMode="decimal" value={ib.grasaKg} onChange={e => setIb({ ...ib, grasaKg: e.target.value })} placeholder="13.4" /></Field>
-                  <Field l="Grasa visceral (nivel)"><input style={S.inp} inputMode="decimal" value={ib.visceral} onChange={e => setIb({ ...ib, visceral: e.target.value })} placeholder="7" /></Field>
-                  <Field l="Agua corporal total (L)"><input style={S.inp} inputMode="decimal" value={ib.agua} onChange={e => setIb({ ...ib, agua: e.target.value })} placeholder="38.5" /></Field>
-                </div>
-                <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={guardarInBody} disabled={ibBusy}>{ibBusy ? 'Guardando…' : 'Guardar InBody'}</button>
+                <button style={{ ...S.saveBtn, marginTop: 4 }} onClick={leerYGuardarInBody} disabled={ibBusy}>{ibBusy ? 'Leyendo…' : 'Leer y guardar InBody'}</button>
+                {ibMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{ibMsg}</div>}
                 <div style={{ marginTop: 16 }}>
                   <div style={S.note}>Archivos InBody cargados (respaldo en Drive).</div>
                   {(!sel.inbodyArchivos || sel.inbodyArchivos.length === 0)
@@ -561,7 +558,7 @@ export default function Pacientes() {
               <div style={S.panelBody}>
                 <div style={S.titleRow}>
                   <div style={S.note}>Calcula los equivalentes (SMAE) y los macros del plan a partir de los datos del paciente.</div>
-                  <button style={S.smallBtn} onClick={() => setInbodyOpen(true)}>Abrir cálculo</button>
+                  <button style={S.smallBtn} onClick={() => { setInbody(null); irSub('plan'); }}>Abrir cálculo</button>
                 </div>
                 {sel.plan && sel.plan.totales
                   ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Plan guardado: <b>{sel.plan.totales.kcal} kcal</b> · {fmtFecha(sel.plan.fecha)}</div>
