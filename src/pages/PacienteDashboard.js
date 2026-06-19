@@ -139,20 +139,19 @@ export default function PacienteDashboard() {
   const proxima = citas.find(c => c.fecha >= hoyKey && c.estado !== 'cancelada');
   const nombre = user?.displayName?.split(' ')[0] || 'bienvenida';
 
-  const generarPDFReco = async () => {
+  const generarPDFReco = async (reco) => {
     const url = process.env.REACT_APP_APPSCRIPT_URL;
     if (!url) { setRecoPdfMsg('No se pudo generar el PDF (configuración del servidor).'); return; }
-    if (!expediente || !Array.isArray(expediente.recomendaciones) || !expediente.recomendaciones.length) {
-      setRecoPdfMsg('Aún no tienes recomendaciones para generar el PDF.'); return;
-    }
+    if (!reco || !reco.texto) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
     setRecoPdfMsg('Generando tu PDF…');
     try {
-      const nombrePac = expediente.nombre || user?.displayName || 'Paciente';
-      const html = buildRecomendacionesHTML({ nombre: nombrePac, recomendaciones: expediente.recomendaciones, fecha: Date.now() });
-      const filename = `Recomendaciones_${String(nombrePac).replace(/[^\w\-]+/g, '_')}.pdf`;
+      const nombrePac = expediente?.nombre || user?.displayName || 'Paciente';
+      const html = buildRecomendacionesHTML({ nombre: nombrePac, recomendaciones: [reco], fecha: Date.now() });
+      const stamp = (reco.fecha && !isNaN(new Date(reco.fecha).getTime())) ? new Date(reco.fecha).getTime() : Date.now();
+      const filename = `Recomendacion_${String(nombrePac).replace(/[^\w\-]+/g, '_')}_${stamp}.pdf`;
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'saveRecomendaciones', patient: nombrePac, correo: (expediente.correo || user?.email || '').toLowerCase(), filename, html }),
+        body: JSON.stringify({ action: 'saveRecomendaciones', patient: nombrePac, correo: (expediente?.correo || user?.email || '').toLowerCase(), filename, html }),
         redirect: 'follow',
       });
       let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: 'Respuesta no válida del servidor.' }; }
@@ -447,10 +446,7 @@ export default function PacienteDashboard() {
             </button>
             <div className="card-title">Recomendaciones</div>
             <div style={{ margin: '4px 0 14px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <button onClick={generarPDFReco}
-                style={{ background: '#221C16', color: '#EEE4DA', border: 'none', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '8px 16px', borderRadius: 8 }}>
-                Generar PDF
-              </button>
+              <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>Genera el PDF de cada recomendación con su botón.</span>
               {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
             </div>
             {(!expediente || !Array.isArray(expediente.recomendaciones) || expediente.recomendaciones.length === 0) ? (
@@ -461,8 +457,16 @@ export default function PacienteDashboard() {
             ) : (
               [...expediente.recomendaciones].reverse().map((r, i) => (
                 <div key={i} style={{ border: '0.5px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 10, background: 'var(--cream)' }}>
-                  <div style={{ fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 5 }}>{fmtSello(r.fecha)}</div>
-                  <div style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{r.texto}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 5 }}>{fmtSello(r.fecha)}</div>
+                      <div style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{r.texto}</div>
+                    </div>
+                    <button onClick={() => generarPDFReco(r)} title="Generar PDF de esta recomendación"
+                      style={{ background: '#221C16', color: '#EEE4DA', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 12px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      PDF
+                    </button>
+                  </div>
                 </div>
               ))
             )}
