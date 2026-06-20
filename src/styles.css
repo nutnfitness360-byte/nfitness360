@@ -39,30 +39,28 @@ body {
     grid-template-rows: auto 1fr;
     grid-template-areas: "topbar topbar" "nav content";
     min-height: 100vh;
-    height: 100vh;
-    height: 100dvh;
   }
-  .topbar { grid-area: topbar; position: static; }
-  .content {
+  .app .topbar { grid-area: topbar; position: static; }
+  .app .content {
     grid-area: content;
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
     padding: 2rem 2.5rem !important;
-    min-height: 0;
   }
-  .bottomnav {
+  .app .bottomnav {
     grid-area: nav;
     flex-direction: column;
     justify-content: flex-start;
     align-items: stretch;
     gap: 4px;
     padding: 1.5rem 0.75rem;
-    align-self: stretch;
-    min-height: 0;
-    overflow-y: auto;
-    position: static;
+    align-self: start;
+    position: sticky;
+    top: 0;
     bottom: auto;
+    max-height: 100vh;
+    overflow-y: auto;
   }
   .bottomnav .nav-item {
     flex-direction: row;
