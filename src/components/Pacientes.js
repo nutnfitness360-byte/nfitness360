@@ -561,13 +561,13 @@ export default function Pacientes() {
           {/* Historial clínico */}
           <div className="card" style={panel === 'historia' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'historia' ? null : 'historia')}>
-              <span style={S.panelTitle}>Historial clínico</span>
+              <span style={S.panelTitle}>Historial clínico nutricio</span>
               <span style={panel === 'historia' ? S.chevOpen : S.chev}>⌄</span>
             </button>
             {panel === 'historia' && (
               <div style={S.panelBody}>
                 <div style={S.titleRow}>
-                  <div style={S.note}>Datos generales, bioquímica, suplementación, síntomas, antecedentes, historia dietética y ejercicio.</div>
+                  <div style={S.note}>Datos generales, padecimientos, bioquímica, suplementación, síntomas, antecedentes, historia dietética, ejercicio y notas generales.</div>
                   <button style={S.smallBtn} onClick={() => irSub('historia')}>Ver / editar</button>
                 </div>
                 {sel.historia
