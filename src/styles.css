@@ -39,6 +39,8 @@ body {
     grid-template-rows: auto 1fr;
     grid-template-areas: "topbar topbar" "nav content";
     min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;
   }
   .topbar { grid-area: topbar; }
   .content {
@@ -47,6 +49,7 @@ body {
     margin: 0 auto;
     width: 100%;
     padding: 2rem 2.5rem !important;
+    min-height: 0;
   }
   .bottomnav {
     grid-area: nav;
@@ -56,9 +59,9 @@ body {
     gap: 4px;
     padding: 1.5rem 0.75rem;
     align-self: stretch;
-    min-height: calc(100vh - 120px);
-    position: sticky;
-    top: 120px;
+    min-height: 0;
+    overflow-y: auto;
+    position: static;
     bottom: auto;
   }
   .bottomnav .nav-item {
