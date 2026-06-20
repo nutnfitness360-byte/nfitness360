@@ -36,15 +36,21 @@ const T = {
 
 const SECTIONS = [
   { id: "datos", n: "1", label: "Datos generales" },
-  { id: "bioquimica", n: "2", label: "Bioquímica" },
-  { id: "suplementacion", n: "3", label: "Suplementación" },
-  { id: "sintomas", n: "4", label: "Signos y síntomas" },
-  { id: "antecedentes", n: "5", label: "Antecedentes" },
-  { id: "dietetica", n: "6", label: "Dietético" },
-  { id: "ejercicio", n: "7", label: "Ejercicio" },
+  { id: "padecimientos", n: "2", label: "Padecimientos" },
+  { id: "bioquimica", n: "3", label: "Bioquímica" },
+  { id: "suplementacion", n: "4", label: "Suplementación" },
+  { id: "sintomas", n: "5", label: "Signos y síntomas" },
+  { id: "antecedentes", n: "6", label: "Antecedentes" },
+  { id: "dietetica", n: "7", label: "Dietético" },
+  { id: "ejercicio", n: "8", label: "Ejercicio" },
+  { id: "notas", n: "9", label: "Notas generales" },
 ];
 
 const TIEMPOS = ["Desayuno", "Colación", "Comida", "Colación", "Cena"];
+const PADECIMIENTOS = [
+  "Diabetes", "Hipertensión", "Hipotiroidismo", "Hipertiroidismo",
+  "SOMP", "Hipoglucemia", "Anemia", "Resistencia a la insulina",
+];
 
 const OBJETIVOS = ["Aumento de masa muscular", "Baja de grasa", "Recomposición corporal", "Salud", "Rendimiento deportivo", "Otro"];
 
@@ -55,6 +61,7 @@ function baseSeed() {
       nombre: "", pacienteNo: "", fecha: "", edad: "", sexo: "Femenino",
       peso: "", talla: "", correo: "", ocupacion: "", objetivo: "",
     },
+    padecimientos: { lista: [] },
     bioquimica: {
       fecha: "",
       filas: [
@@ -70,8 +77,8 @@ function baseSeed() {
     },
     suplementacion: {
       items: [
-        { nombre: "", dosis: "", frecuencia: "" },
-        { nombre: "", dosis: "", frecuencia: "" },
+        { nombre: "", marca: "", dosis: "", frecuencia: "", horario: "" },
+        { nombre: "", marca: "", dosis: "", frecuencia: "", horario: "" },
       ],
       notas: "",
     },
@@ -87,6 +94,7 @@ function baseSeed() {
       comeAntes: "No", queComeAntes: "", comeDurante: "No", queComeDurante: "", comeDespues: "No", queComeDespues: "",
       hidratacion: "", notas: "",
     },
+    notasGenerales: { texto: "" },
   };
 }
 
@@ -98,7 +106,8 @@ function histParts(data) {
   const v = (s) => (s && String(s).trim() ? esc(s) : "—");
 
   const d = data.datos, b = data.bioquimica, s = data.suplementacion,
-    si = data.sintomas, a = data.antecedentes, di = data.dietetica, ej = data.ejercicio;
+    si = data.sintomas, a = data.antecedentes, di = data.dietetica, ej = data.ejercicio,
+    pad = data.padecimientos || { lista: [] }, ng = data.notasGenerales || { texto: "" };
 
   const rows = (arr) =>
     `<table class="rows">${arr.map((p) => `<tr><td class="lbl">${esc(p[0])}</td><td class="val">${v(p[1])}</td></tr>`).join("")}</table>`;
@@ -115,10 +124,10 @@ function histParts(data) {
   const anaTable = anaFilas
     ? `<div class="subh">Análisis cargados</div><table class="data"><thead><tr><th>Archivo</th><th>Fecha</th></tr></thead><tbody>${anaFilas}</tbody></table>` : "";
   const supFilas = (s.items || [])
-    .filter((it) => it.nombre || it.dosis || it.frecuencia)
-    .map((it) => `<tr><td>${v(it.nombre)}</td><td>${v(it.dosis)}</td><td>${v(it.frecuencia)}</td></tr>`).join("");
+    .filter((it) => it.nombre || it.marca || it.dosis || it.frecuencia || it.horario)
+    .map((it) => `<tr><td>${v(it.nombre)}</td><td>${v(it.marca)}</td><td>${v(it.dosis)}</td><td>${v(it.frecuencia)}</td><td>${v(it.horario)}</td></tr>`).join("");
   const supTable = supFilas
-    ? `<table class="data"><thead><tr><th>Suplemento</th><th>Dosis</th><th>Frecuencia</th></tr></thead><tbody>${supFilas}</tbody></table>`
+    ? `<table class="data"><thead><tr><th>Suplemento</th><th>Marca</th><th>Dosis</th><th>Frecuencia</th><th>Horario</th></tr></thead><tbody>${supFilas}</tbody></table>`
     : `<p class="empty">Sin suplementación registrada.</p>`;
   const dietaTable =
     `<table class="data"><tbody>${(di.dieta || [])
@@ -131,33 +140,38 @@ function histParts(data) {
   const header =
     `<div class="brand">${logo}</div>` +
     `<div class="eyebrow">Panel de la nutrióloga</div>` +
-    `<h1>Historial clínico</h1>` +
+    `<h1>Historial Clínico Nutricio</h1>` +
     `<div class="idrow"><span class="pill">${v(d.pacienteNo)}</span><span class="pname"><b>${v(d.nombre)}</b>${d.edad ? " · " + esc(d.edad) + " años" : ""}${d.sexo ? " · " + esc(d.sexo) : ""}${d.fecha ? " · " + esc(d.fecha) : ""}</span></div>` +
     `<hr class="hdrsep"/>`;
+
+  const padInner = (pad.lista && pad.lista.length)
+    ? `<table class="data"><tbody>${pad.lista.map((p) => `<tr><td>${esc(p)}</td></tr>`).join("")}</tbody></table>`
+    : `<p class="empty">Sin padecimientos registrados.</p>`;
 
   const content =
     card("1", "Datos generales", rows([
       ["Correo electrónico", d.correo],
       ["Ocupación", d.ocupacion], ["Objetivo", d.objetivo],
     ])) +
-    card("2", "Evaluación bioquímica", rows([["¿De cuándo son los estudios?", b.fecha]]) + bioTable + anaTable +
+    card("2", "Padecimientos", padInner) +
+    card("3", "Evaluación bioquímica", rows([["¿De cuándo son los estudios?", b.fecha]]) + bioTable + anaTable +
       (b.observaciones ? `<div class="subh">Observaciones</div><div class="note">${v(b.observaciones)}</div>` : "")) +
-    card("3", "Suplementación", supTable + (s.notas ? `<div class="subh">Notas</div><div class="note">${v(s.notas)}</div>` : "")) +
-    card("4", "Signos y síntomas recientes", rows([
+    card("4", "Suplementación", supTable + (s.notas ? `<div class="subh">Notas</div><div class="note">${v(s.notas)}</div>` : "")) +
+    card("5", "Signos y síntomas recientes", rows([
       ["Digestivos", si.digestivos], ["Dermatológicos", si.dermatologicos],
       ["Energía y sueño", si.energiaSueno], ["Otros", si.otros],
     ])) +
-    card("5", "Antecedentes y estilo de vida", rows([
+    card("6", "Antecedentes y estilo de vida", rows([
       ["Heredofamiliares", a.heredofamiliares], ["Alcohol", a.alcohol],
       ["Tabaco", a.tabaco], ["Otros", a.otros],
     ])) +
-    card("6", "Historia dietética", rows([
+    card("7", "Historia dietética", rows([
       ["Comidas al día", di.comidasDia], ["Consumo de agua natural", di.agua],
       ["Alergias o intolerancias", di.alergias], ["Otros líquidos", di.liquidos],
       ["Qué SÍ le gusta", di.leGusta], ["Qué NO le gusta", di.noLeGusta],
     ]) + `<div class="subh">Dieta habitual</div>` + dietaTable +
       rows([["Hora en que despierta", di.despierta], ["Hora en que se duerme", di.duerme]])) +
-    card("7", "Ejercicio", rows([
+    card("8", "Ejercicio", rows([
       ["Tipo de ejercicio", ej.tipo], ["Horario de ejercicio", ej.horario], ["Días por semana", ej.dias],
       ["Tiempo de actividad al día", ej.tiempoDia], ["Intensidad", ej.intensidad],
       ["Hidratación", ej.hidratacion],
@@ -166,6 +180,9 @@ function histParts(data) {
       ["¿Come después de entrenar?", ej.comeDespues === "Sí" ? "Sí — " + (ej.queComeDespues || "—") : "No"],
       ["Notas", ej.notas],
     ])) +
+    card("9", "Notas generales", (ng.texto && ng.texto.trim())
+      ? `<div class="note">${v(ng.texto)}</div>`
+      : `<p class="empty">Sin notas.</p>`) +
     `<div class="foot">Documento generado desde el panel de la nutrióloga · ${esc(d.pacienteNo || "")}</div>`;
 
   const css = `
@@ -402,7 +419,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
     if (nombre && url) {
       try {
         const pdfBase64 = await generarHistorialPDFBase64(data);
-        const filename = "Historial clínico " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
+        const filename = "Historial Clínico Nutricio " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
         await fetch(url, {
           method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify({ action: "saveHistorial", patient: nombre, correo: (data.datos.correo || ""), filename, pdfBase64 }), redirect: "follow",
@@ -420,7 +437,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
     try {
       const pdfBase64 = await generarHistorialPDFBase64(data);
       setPdfStatus("Guardando en Drive…");
-      const filename = "Historial clínico " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
+      const filename = "Historial Clínico Nutricio " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
       const res = await fetch(url, {
         method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({ action: "saveHistorial", patient: nombre, correo: (data.datos.correo || ""), filename, pdfBase64 }), redirect: "follow",
@@ -456,7 +473,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
         <div style={styles.titleRow}>
           <div>
             <div style={styles.eyebrow}>Panel de la nutrióloga</div>
-            <h1 style={styles.h1}>Historial clínico</h1>
+            <h1 style={styles.h1}>Historial Clínico Nutricio</h1>
             <div style={styles.idBlock}>
               <span style={styles.noPill}>{data.datos.pacienteNo || "NF-…"}</span>
               <p style={styles.patientLine}>
@@ -565,8 +582,37 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           </p>
         </Section>
 
-        {/* 2. EVALUACIÓN BIOQUÍMICA */}
-        <Section reg={reg("bioquimica")} sid="bioquimica" title="Evaluación bioquímica" n="2"
+        {/* 2. PADECIMIENTOS */}
+        <Section reg={reg("padecimientos")} sid="padecimientos" title="Padecimientos" n="2"
+          hint="Selecciona los padecimientos que presenta el paciente. Puedes elegir varios.">
+          <Field label="Agregar padecimiento" full>
+            <select style={styles.input} value=""
+              onChange={(e) => {
+                const val = e.target.value; if (!val) return;
+                const cur = data.padecimientos.lista || [];
+                if (!cur.includes(val)) setField("padecimientos", "lista", [...cur, val]);
+              }}>
+              <option value="">Selecciona un padecimiento…</option>
+              {PADECIMIENTOS.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </Field>
+          {(data.padecimientos.lista || []).length > 0 ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+              {data.padecimientos.lista.map((p) => (
+                <span key={p} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: T.mint, color: T.pine, borderRadius: 999, padding: "5px 6px 5px 13px", fontSize: 13, fontWeight: 600 }}>
+                  {p}
+                  <button title="Quitar" onClick={() => setField("padecimientos", "lista", data.padecimientos.lista.filter((x) => x !== p))}
+                    style={{ border: "none", background: "transparent", color: T.pine, cursor: "pointer", fontSize: 17, lineHeight: 1, padding: "0 4px" }}>×</button>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 10 }}>Sin padecimientos seleccionados.</div>
+          )}
+        </Section>
+
+        {/* 3. EVALUACIÓN BIOQUÍMICA */}
+        <Section reg={reg("bioquimica")} sid="bioquimica" title="Evaluación bioquímica" n="3"
           hint="Estudios de laboratorio referidos por la paciente.">
           <Grid>
             <Field label="¿De cuándo son los estudios?" full>
@@ -623,28 +669,32 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           </Field>
         </Section>
 
-        {/* 3. SUPLEMENTACIÓN */}
-        <Section reg={reg("suplementacion")} sid="suplementacion" title="Suplementación" n="3"
+        {/* 4. SUPLEMENTACIÓN */}
+        <Section reg={reg("suplementacion")} sid="suplementacion" title="Suplementación" n="4"
           hint="Suplementos que consume actualmente con dosis y frecuencia.">
           <div style={styles.tableWrap}>
             <div style={{ ...styles.supRow, ...styles.bioHead }}>
-              <div>Suplemento</div><div>Dosis</div><div>Frecuencia</div><div></div>
+              <div>Suplemento</div><div>Marca</div><div>Dosis</div><div>Frecuencia</div><div>Horario</div><div></div>
             </div>
             {data.suplementacion.items.map((it, i) => (
               <div key={i} style={styles.supRow}>
                 <input style={styles.cellInput} value={it.nombre} placeholder="Proteína, vitamina D…"
                   onChange={(e) => setRow("suplementacion", "items", i, "nombre", e.target.value)} />
+                <input style={styles.cellInput} value={it.marca || ""} placeholder="Marca"
+                  onChange={(e) => setRow("suplementacion", "items", i, "marca", e.target.value)} />
                 <input style={styles.cellInput} value={it.dosis} placeholder="Cantidad"
                   onChange={(e) => setRow("suplementacion", "items", i, "dosis", e.target.value)} />
                 <input style={styles.cellInput} value={it.frecuencia} placeholder="Diario, semanal…"
                   onChange={(e) => setRow("suplementacion", "items", i, "frecuencia", e.target.value)} />
+                <input style={styles.cellInput} value={it.horario || ""} placeholder="Ej. con la comida"
+                  onChange={(e) => setRow("suplementacion", "items", i, "horario", e.target.value)} />
                 <button style={styles.rowDel} title="Quitar"
                   onClick={() => removeRow("suplementacion", "items", i)}>×</button>
               </div>
             ))}
           </div>
           <button style={styles.addBtn}
-            onClick={() => addRow("suplementacion", "items", { nombre: "", dosis: "", frecuencia: "" })}>
+            onClick={() => addRow("suplementacion", "items", { nombre: "", marca: "", dosis: "", frecuencia: "", horario: "" })}>
             + Agregar suplemento
           </button>
           <Field label="Notas de suplementación" full style={{ marginTop: 16 }}>
@@ -654,8 +704,8 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           </Field>
         </Section>
 
-        {/* 4. SIGNOS Y SÍNTOMAS RECIENTES */}
-        <Section reg={reg("sintomas")} sid="sintomas" title="Signos y síntomas recientes" n="4"
+        {/* 5. SIGNOS Y SÍNTOMAS RECIENTES */}
+        <Section reg={reg("sintomas")} sid="sintomas" title="Signos y síntomas recientes" n="5"
           hint="Sintomatología actual organizada por aparato o sistema.">
           <Grid>
             <Field label="Digestivos" full>
@@ -681,8 +731,8 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           </Grid>
         </Section>
 
-        {/* 5. ANTECEDENTES Y ESTILO DE VIDA */}
-        <Section reg={reg("antecedentes")} sid="antecedentes" title="Antecedentes y estilo de vida" n="5"
+        {/* 6. ANTECEDENTES Y ESTILO DE VIDA */}
+        <Section reg={reg("antecedentes")} sid="antecedentes" title="Antecedentes y estilo de vida" n="6"
           hint="Antecedentes heredofamiliares y consumo de sustancias.">
           <Grid>
             <Field label="Antecedentes heredofamiliares" full>
@@ -708,8 +758,8 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           </Grid>
         </Section>
 
-        {/* 6. HISTORIA DIETÉTICA */}
-        <Section reg={reg("dietetica")} sid="dietetica" title="Historia dietética" n="6"
+        {/* 7. HISTORIA DIETÉTICA */}
+        <Section reg={reg("dietetica")} sid="dietetica" title="Historia dietética" n="7"
           hint="Hábitos de alimentación, líquidos, preferencias, dieta habitual y rutina.">
           <Grid>
             <Field label="Comidas al día">
@@ -821,8 +871,8 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           </Grid>
         </Section>
 
-        {/* 7. EJERCICIO */}
-        <Section reg={reg("ejercicio")} sid="ejercicio" title="Ejercicio" n="7"
+        {/* 8. EJERCICIO */}
+        <Section reg={reg("ejercicio")} sid="ejercicio" title="Ejercicio" n="8"
           hint="Actividad física y alimentación alrededor del entrenamiento.">
           <Grid>
             <Field label="Tipo de ejercicio">
@@ -894,6 +944,16 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
                 onChange={(e) => setField("ejercicio", "notas", e.target.value)} />
             </Field>
           </Grid>
+        </Section>
+
+        {/* 9. NOTAS GENERALES */}
+        <Section reg={reg("notas")} sid="notas" title="Notas generales" n="9"
+          hint="Espacio libre para cualquier observación adicional del paciente.">
+          <Field label="Notas generales" full>
+            <textarea style={styles.textarea} rows={5} value={data.notasGenerales.texto || ""}
+              placeholder="Escribe aquí cualquier nota u observación general…"
+              onChange={(e) => setField("notasGenerales", "texto", e.target.value)} />
+          </Field>
         </Section>
       </main>
 
@@ -1028,7 +1088,7 @@ const styles = {
   note: { marginTop: 16, fontSize: 12.5, color: T.pineSoft, background: T.mint, borderRadius: 10, padding: "10px 13px", lineHeight: 1.5 },
   tableWrap: { border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" },
   bioRow: { display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 40px", borderBottom: `1px solid ${T.lineSoft}` },
-  supRow: { display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 40px", borderBottom: `1px solid ${T.lineSoft}` },
+  supRow: { display: "grid", gridTemplateColumns: "1.4fr 1fr 0.9fr 1fr 1.1fr 40px", borderBottom: `1px solid ${T.lineSoft}` },
   bioHead: { background: T.mint, fontSize: 11, fontWeight: 700, color: T.pine, textTransform: "uppercase", letterSpacing: 0.4 },
   cellInput: { border: "none", borderRight: `1px solid ${T.lineSoft}`, padding: "10px 12px", fontSize: 13.5, background: "transparent", fontFamily: "inherit", color: T.ink, width: "100%", boxSizing: "border-box" },
   rowDel: { border: "none", background: "transparent", color: T.inkSoft, fontSize: 18, cursor: "pointer", lineHeight: 1 },
