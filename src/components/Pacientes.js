@@ -53,6 +53,7 @@ const RECO_CHIPS = [
   { titulo: 'Estudios', items: ['Estudio QS35', 'Estudio EGO', 'Estudio BH', 'Estudio perfil tiroideo', 'Estudio insulina en suero', 'Índice HOMA', 'Hemoglobina glucosilada'] },
   { titulo: 'Ejercicio', items: [{ l: 'Fuerza' }, { l: 'Cardio o funcional' }, { l: 'Tiempo', ins: 'Tiempo: ' }, { l: 'Frecuencia', ins: 'Frecuencia: ' }] },
   { titulo: 'Hidratación', items: ['Agua', 'Electrolitos', 'Bebida deportiva'] },
+  { titulo: 'Suplementos', items: ['Proteína', 'Creatina', 'Vitamina D', 'Omega 3', 'Magnesio', 'Beta-Alanina', 'Cafeína', 'Resveratrol', 'Berberina', 'Colágeno', 'Calcio', 'Hierro'] },
 ];
 
 export default function Pacientes() {
