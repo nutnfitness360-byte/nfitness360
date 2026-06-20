@@ -289,7 +289,8 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
         lip: a.lip + num(t.eq[g]) * GRUPOS[g][3], hc: a.hc + num(t.eq[g]) * GRUPOS[g][4],
       }), { kcal: 0, prot: 0, lip: 0, hc: 0 });
       const equivalentes = t.eq.map((n, g) => ({ grupo: GRUPOS[g][0], n: round2(num(n)) })).filter(x => x.n > 0);
-      const payloadTiempos = [{ nombre: t.nombre, hora: t.hora, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) } }];
+      const evitar = (t.opciones || []).map(o => (o.nombre || '').trim()).filter(Boolean);
+      const payloadTiempos = [{ nombre: t.nombre, hora: t.hora, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) }, evitar }];
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'generarMenusIA', objetivo: patient.objetivo || '', totales: plan.totales || {}, tiempos: payloadTiempos, nOpciones: 1, gustos: ((patient.historia && patient.historia.dietetica && patient.historia.dietetica.leGusta) || '').trim(), disgustos: ((patient.historia && patient.historia.dietetica && patient.historia.dietetica.noLeGusta) || '').trim() }),
