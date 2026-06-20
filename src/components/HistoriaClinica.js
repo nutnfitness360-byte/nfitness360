@@ -52,7 +52,7 @@ const PADECIMIENTOS = [
   "SOMP", "Hipoglucemia", "Anemia", "Resistencia a la insulina",
 ];
 
-const OBJETIVOS = ["Aumento de masa muscular", "Baja de grasa", "Recomposición corporal", "Salud", "Rendimiento deportivo", "Otro"];
+const OBJETIVOS = ["Aumento de masa muscular", "Baja de grasa", "Recomposición corporal", "Salud", "Rendimiento deportivo", "Embarazo", "Lactancia", "Otro"];
 
 
 function baseSeed() {
@@ -61,7 +61,7 @@ function baseSeed() {
       nombre: "", pacienteNo: "", fecha: "", edad: "", sexo: "Femenino",
       peso: "", talla: "", correo: "", ocupacion: "", objetivo: "",
     },
-    padecimientos: { lista: [] },
+    padecimientos: { lista: [], medicamentos: "" },
     bioquimica: {
       fecha: "",
       filas: [
@@ -144,9 +144,13 @@ function histParts(data) {
     `<div class="idrow"><span class="pill">${v(d.pacienteNo)}</span><span class="pname"><b>${v(d.nombre)}</b>${d.edad ? " · " + esc(d.edad) + " años" : ""}${d.sexo ? " · " + esc(d.sexo) : ""}${d.fecha ? " · " + esc(d.fecha) : ""}</span></div>` +
     `<hr class="hdrsep"/>`;
 
-  const padInner = (pad.lista && pad.lista.length)
-    ? `<table class="data"><tbody>${pad.lista.map((p) => `<tr><td>${esc(p)}</td></tr>`).join("")}</tbody></table>`
-    : `<p class="empty">Sin padecimientos registrados.</p>`;
+  const padInner =
+    ((pad.lista && pad.lista.length)
+      ? `<table class="data"><tbody>${pad.lista.map((p) => `<tr><td>${esc(p)}</td></tr>`).join("")}</tbody></table>`
+      : `<p class="empty">Sin padecimientos registrados.</p>`)
+    + (pad.medicamentos && pad.medicamentos.trim()
+      ? `<div class="subh">Medicamentos</div><div class="note">${v(pad.medicamentos)}</div>`
+      : "");
 
   const content =
     card("1", "Datos generales", rows([
@@ -609,6 +613,11 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           ) : (
             <div style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 10 }}>Sin padecimientos seleccionados.</div>
           )}
+          <Field label="Medicamentos" full style={{ marginTop: 16 }}>
+            <textarea style={styles.textarea} rows={3} value={data.padecimientos.medicamentos || ""}
+              placeholder="Medicamentos que toma actualmente (nombre, dosis, indicación)…"
+              onChange={(e) => setField("padecimientos", "medicamentos", e.target.value)} />
+          </Field>
         </Section>
 
         {/* 3. EVALUACIÓN BIOQUÍMICA */}
