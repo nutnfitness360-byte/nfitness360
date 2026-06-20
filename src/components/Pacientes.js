@@ -676,7 +676,7 @@ export default function Pacientes() {
               <div style={S.panelBody}>
                 <div style={S.titleRow}>
                   <div style={S.note}>Reparte los equivalentes del plan en los tiempos de comida y arma las opciones de menú.</div>
-                  <button style={S.smallBtn} onClick={() => { setMenuReabrir(null); irSub('menus'); }}>Abrir menús</button>
+                  <button style={S.smallBtn} onClick={() => { setMenuReabrir(null); irSub('menus'); }}>Nuevo menú</button>
                 </div>
                 {!(sel.plan && sel.plan.eq)
                   ? <div className="empty-state">Primero calcula y guarda el plan.</div>
