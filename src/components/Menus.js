@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
 import { buildReportHTML, generarPorcionesTexto, esPorciones } from '../report/reporteHTML';
@@ -89,7 +89,7 @@ function nuevoTiempo(def, eqRow, nOp = 3) {
   return { id: uid(), nombre: def?.nombre || 'Nuevo tiempo', hora: def?.hora || '12:00', eq: eqRow || Array(18).fill(0), opciones: opcionesArr(nOp), foto: '' };
 }
 
-export default function Menus({ patient, onBack, initialMenus = null }) {
+export default function Menus({ patient, onBack, initialMenus = null, onGuardChange }) {
   const plan = patient.plan || {};
   const ultimaNota = (() => {
     const b = Array.isArray(patient.bitacora) ? patient.bitacora : [];
@@ -131,6 +131,23 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
   const [cfgOverIdx, setCfgOverIdx] = useState(null);
 
   const touch = () => setStatus('nuevo');
+
+  // --- Aviso de cambios sin guardar al salir ---
+  const [exitModal, setExitModal] = useState(null); // { proceed } | null
+  const hayContenido = tiempos.some(t => (t.opciones || []).some(o => (o.nombre || '').trim() || (o.prep || '').trim()));
+  const dirty = hayContenido && status !== 'guardado';
+  const dirtyRef = useRef(false);
+  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
+  const requestExit = useCallback((proceed) => {
+    if (dirtyRef.current) setExitModal({ proceed: (typeof proceed === 'function' ? proceed : () => {}) });
+    else if (typeof proceed === 'function') proceed();
+  }, []);
+  useEffect(() => {
+    if (onGuardChange) onGuardChange(requestExit);
+    return () => { if (onGuardChange) onGuardChange(null); };
+  }, [onGuardChange, requestExit]);
+  const salirAhora = () => { const p = exitModal && exitModal.proceed; setExitModal(null); if (p) p(); };
+  const guardarYSalir = async () => { const p = exitModal && exitModal.proceed; const ok = await guardarBorrador(); if (ok) { setExitModal(null); if (p) p(); } };
   const setT = (idx, patch) => { setTiempos(ts => ts.map((t, i) => i === idx ? { ...t, ...patch } : t)); touch(); };
   const setEqCell = (idx, g, v) => setT(idx, { eq: tiempos[idx].eq.map((x, k) => k === g ? String(v).replace(',', '.') : x) });
   const setOpcion = (idx, oi, patch) => setT(idx, { opciones: tiempos[idx].opciones.map((o, k) => k === oi ? { ...o, ...patch } : o) });
@@ -362,8 +379,10 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
     try {
       await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos, nOpciones } });
       setStatus('guardado'); setRep('Borrador guardado ✓ (sin generar el reporte). Puedes salir y retomarlo después.');
+      return true;
     } catch (e) {
       setStatus('error'); setRep('No se pudo guardar el borrador: ' + e.message);
+      return false;
     }
   };
 
@@ -436,7 +455,7 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
     return (
       <div style={S.root}>
         <style>{css}</style>
-        <button style={S.back} onClick={onBack}>← {patient.nombre}</button>
+        <button style={S.back} onClick={() => requestExit(onBack)}>← {patient.nombre}</button>
         <div style={S.empty}>
           Primero <b>calcula y guarda el plan</b> (sección "Plan nutricional"). Los menús se arman a partir de los equivalentes del plan.
         </div>
@@ -591,7 +610,7 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
         </div>
       )}
 
-      <button style={S.back} onClick={onBack}>← {patient.nombre}</button>
+      <button style={S.back} onClick={() => requestExit(onBack)}>← {patient.nombre}</button>
       <div style={S.titleRow}>
         <div style={{ flex: 1 }}>
           <div style={S.eyebrow}>Plan nutricional</div>
@@ -727,11 +746,26 @@ export default function Menus({ patient, onBack, initialMenus = null }) {
           {rep || (status === 'guardado' && 'Menús guardados.') || (status === 'guardando' && 'Guardando…') || (status === 'error' && 'No se pudo guardar.') || (status === 'nuevo' && 'Cambios sin guardar.')}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button style={S.volverBtn} onClick={onBack}>← Atrás</button>
+          <button style={S.volverBtn} onClick={() => requestExit(onBack)}>← Atrás</button>
           <button style={S.draftBtn} onClick={guardarBorrador} disabled={status === 'guardando'}>Guardar borrador</button>
           <button style={S.primaryBtn} className="nf-primary" onClick={() => setShowScope(true)} disabled={status === 'guardando'}>{status === 'guardando' ? 'Guardando…' : 'Guardar menús'}</button>
         </div>
       </div>
+
+      {exitModal && (
+        <div style={S.modalWrap}>
+          <div style={{ ...S.modalCard, maxWidth: 420 }}>
+            <div style={S.exitTitle}>¿Quieres salir?</div>
+            <div style={S.exitText}>No has guardado tu trabajo.</div>
+            <div style={S.exitBtns}>
+              <button style={S.volverBtn} onClick={salirAhora}>Salir</button>
+              <button style={S.primaryBtn} className="nf-primary" onClick={guardarYSalir} disabled={status === 'guardando'}>
+                {status === 'guardando' ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -754,6 +788,9 @@ const styles = {
   balHint: { marginTop: 10, fontSize: 11.5, color: T.inkSoft, lineHeight: 1.5 },
   modalWrap: { position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 50 },
   modalCard: { background: T.surface, borderRadius: 16, padding: '22px 22px 20px', width: '100%', maxWidth: 460, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' },
+  exitTitle: { fontSize: 18, fontWeight: 800, color: T.pine, marginBottom: 8 },
+  exitText: { fontSize: 14, color: T.ink, lineHeight: 1.5, marginBottom: 20 },
+  exitBtns: { display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' },
   cfgRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: `1px solid ${T.lineSoft}` },
   cfgLbl: { fontSize: 13.5, fontWeight: 600, color: T.pine },
   stepper: { display: 'flex', alignItems: 'center', gap: 10 },
