@@ -58,7 +58,7 @@ const RECO_SECCIONES = [
 ];
 const RECO_KEYS = RECO_SECCIONES.map(s => s.key);
 
-export default function Pacientes() {
+export default function Pacientes({ onRegisterExitGuard }) {
   const [pacientes, setPacientes] = useState([]);
   const [selId, setSelId] = useState(null);
   const [sub, setSub] = useState('dash');
@@ -469,7 +469,7 @@ export default function Pacientes() {
       return <Plan patient={sel} pdata={pdata} onBack={volver} />;
     }
     if (sub === 'menus') {
-      return <Menus key={menuReabrir ? ('h-' + (menuReabrir.fecha || '') + (menuReabrir.nombre || '')) : 'actual'} patient={sel} onBack={volver} initialMenus={menuReabrir} />;
+      return <Menus key={menuReabrir ? ('h-' + (menuReabrir.fecha || '') + (menuReabrir.nombre || '')) : 'actual'} patient={sel} onBack={volver} initialMenus={menuReabrir} onGuardChange={onRegisterExitGuard} />;
     }
     return (
       <div>
