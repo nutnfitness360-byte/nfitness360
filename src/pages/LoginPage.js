@@ -6,6 +6,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { NUTRI_EMAIL } from '../context/AuthContext';
+import { useBranding } from '../context/BrandingContext';
 
 async function esNutriAutorizada(email) {
   const e = (email || '').toLowerCase();
@@ -33,6 +34,8 @@ const POSIBLE_SIN_CUENTA = ['auth/user-not-found', 'auth/invalid-credential', 'a
 
 export default function LoginPage() {
   const [vista, setVista] = useState('inicio');     // inicio | acceso | email | crear | denegado
+  const { logo } = useBranding();
+  const logoSrc = (logo === undefined) ? '/logo.png' : logo;
   const [puerta, setPuerta] = useState('paciente'); // nutri | paciente
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -145,7 +148,7 @@ export default function LoginPage() {
     return (
       <div style={S.wrap}>
         <div style={S.box}>
-          <img src="/logo.png" alt="Nfitness 360" style={S.logo} />
+          {logoSrc ? <img src={logoSrc} alt="" style={S.logo} /> : null}
           <div style={S.hola}>¿Cómo deseas ingresar?</div>
           <div style={S.cards}>
             <div style={S.card} onClick={() => abrir('nutri')}>
