@@ -8,7 +8,7 @@ export const useAuth = () => useContext(AuthContext);
 
 // Correo principal (bootstrap): siempre se considera nutrióloga, aunque la
 // lista "autorizados" estuviera vacía. Evita que te quedes fuera del sistema.
-const NUTRI_EMAIL = 'nutnfitness360@gmail.com';
+export const NUTRI_EMAIL = (process.env.REACT_APP_NUTRI_EMAIL || 'nutnfitness360@gmail.com').toLowerCase();
 
 // Decide el rol del usuario:
 //  - "nutriologa" si es el correo principal o está en /autorizados con rol nutriologa
