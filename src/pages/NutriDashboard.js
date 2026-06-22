@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { collection, query, onSnapshot, orderBy, doc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +28,9 @@ function diasDesde(fechaStr, hoy) {
 export default function NutriDashboard() {
   const { user } = useAuth();
   const [tab, setTab] = useState('inicio');
+  const exitGuardRef = useRef(null);
+  const registerExitGuard = useCallback((fn) => { exitGuardRef.current = fn || null; }, []);
+  const goTab = (id) => { const g = exitGuardRef.current; if (g) g(() => setTab(id)); else setTab(id); };
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [cfg, setCfg] = useState({ pendientes: [], precios: {} });
@@ -136,13 +139,13 @@ export default function NutriDashboard() {
   const navEl = (
     <nav className="bottomnav">
       {tabs.map(t => (
-        <button key={t.id} className={`nav-item${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
+        <button key={t.id} className={`nav-item${tab === t.id ? ' active' : ''}`} onClick={() => goTab(t.id)}>
           {t.icon}
           <span>{t.label}</span>
         </button>
       ))}
       <div className="nav-spacer" />
-      <button className={`nav-item${tab === 'perfil' ? ' active' : ''}`} onClick={() => setTab('perfil')}>
+      <button className={`nav-item${tab === 'perfil' ? ' active' : ''}`} onClick={() => goTab('perfil')}>
         <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
         <span>Mi perfil</span>
       </button>
@@ -151,7 +154,7 @@ export default function NutriDashboard() {
 
   return (
     <div className="app">
-      <Topbar role="nutriologa" user={user} onPerfil={() => setTab('perfil')} />
+      <Topbar role="nutriologa" user={user} onPerfil={() => goTab('perfil')} />
 
       <div className="content">
         {tab === 'inicio' && (
@@ -286,7 +289,7 @@ export default function NutriDashboard() {
           </>
         )}
         {tab === 'agenda' && <Agenda isNutri={true} />}
-        {tab === 'pacientes' && <Pacientes />}
+        {tab === 'pacientes' && <Pacientes onRegisterExitGuard={registerExitGuard} />}
         {tab === 'perfil' && (
           <div className="card">
             <div className="card-title">Mi perfil</div>
