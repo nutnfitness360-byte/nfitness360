@@ -142,7 +142,7 @@ export default function PacienteDashboard() {
   const generarPDFReco = async (reco) => {
     const url = process.env.REACT_APP_APPSCRIPT_URL;
     if (!url) { setRecoPdfMsg('No se pudo generar el PDF (configuración del servidor).'); return; }
-    if (!reco || !reco.texto) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
+    if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales)) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
     setRecoPdfMsg('Generando tu PDF…');
     try {
       const nombrePac = expediente?.nombre || user?.displayName || 'Paciente';
@@ -455,12 +455,21 @@ export default function PacienteDashboard() {
                 Aún no tienes recomendaciones. Tu nutrióloga las publicará aquí cuando las tenga listas.
               </div>
             ) : (
-              [...expediente.recomendaciones].reverse().map((r, i) => (
+              [...expediente.recomendaciones].reverse().map((r, i) => {
+                const secs = [['estudios', 'Estudios'], ['suplementos', 'Suplementos'], ['ejercicio', 'Ejercicio'], ['hidratacion', 'Hidratación'], ['generales', 'Generales']]
+                  .filter(([k]) => (r[k] || '').toString().trim());
+                return (
                 <div key={i} style={{ border: '0.5px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 10, background: 'var(--cream)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 5 }}>{fmtSello(r.fecha)}</div>
-                      <div style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{r.texto}</div>
+                      {secs.length > 0
+                        ? secs.map(([k, t]) => (
+                          <div key={k} style={{ marginTop: 7 }}>
+                            <div style={{ fontSize: 10.5, color: 'var(--gold)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 2 }}>{t}</div>
+                            <div style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{r[k]}</div>
+                          </div>))
+                        : <div style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{r.texto}</div>}
                     </div>
                     <button onClick={() => generarPDFReco(r)} title="Generar PDF de esta recomendación"
                       style={{ background: '#221C16', color: '#EEE4DA', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 12px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -468,7 +477,8 @@ export default function PacienteDashboard() {
                     </button>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
