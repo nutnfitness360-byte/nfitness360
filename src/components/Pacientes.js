@@ -49,12 +49,14 @@ function Linea({ data, field, color, unit }) {
 }
 
 /* ===== componente principal ===== */
-const RECO_CHIPS = [
-  { titulo: 'Estudios', items: ['Estudio QS35', 'Estudio EGO', 'Estudio BH', 'Estudio perfil tiroideo', 'Estudio insulina en suero', 'Índice HOMA', 'Hemoglobina glucosilada'] },
-  { titulo: 'Ejercicio', items: [{ l: 'Fuerza' }, { l: 'Cardio o funcional' }, { l: 'Tiempo', ins: 'Tiempo: ' }, { l: 'Frecuencia', ins: 'Frecuencia: ' }] },
-  { titulo: 'Hidratación', items: ['Agua', 'Electrolitos', 'Bebida deportiva'] },
-  { titulo: 'Suplementos', items: ['Proteína', 'Creatina', 'Vitamina D', 'Omega 3', 'Magnesio', 'Beta-Alanina', 'Cafeína', 'Resveratrol', 'Berberina', 'Colágeno', 'Calcio', 'Hierro'] },
+const RECO_SECCIONES = [
+  { key: 'estudios', titulo: 'Estudios', items: ['Estudio QS35', 'Estudio EGO', 'Estudio BH', 'Estudio perfil tiroideo', 'Estudio insulina en suero', 'Índice HOMA', 'Hemoglobina glucosilada'] },
+  { key: 'suplementos', titulo: 'Suplementos', items: ['Proteína', 'Creatina', 'Vitamina D', 'Omega 3', 'Magnesio', 'Beta-Alanina', 'Cafeína', 'Resveratrol', 'Berberina', 'Colágeno', 'Calcio', 'Hierro'] },
+  { key: 'ejercicio', titulo: 'Ejercicio', items: [{ l: 'Fuerza' }, { l: 'Cardio o funcional' }, { l: 'Tiempo', ins: 'Tiempo: ' }, { l: 'Frecuencia', ins: 'Frecuencia: ' }] },
+  { key: 'hidratacion', titulo: 'Hidratación', items: ['Agua', 'Electrolitos', 'Bebida deportiva'] },
+  { key: 'generales', titulo: 'Generales', items: [] },
 ];
+const RECO_KEYS = RECO_SECCIONES.map(s => s.key);
 
 export default function Pacientes() {
   const [pacientes, setPacientes] = useState([]);
@@ -76,7 +78,7 @@ export default function Pacientes() {
   const [openPlan, setOpenPlan] = useState(false);
   const [inbodyOpen, setInbodyOpen] = useState(false);
   const [inbody, setInbody] = useState(null);
-  const [recoTexto, setRecoTexto] = useState('');
+  const [recoForm, setRecoForm] = useState({ estudios: '', suplementos: '', ejercicio: '', hidratacion: '', generales: '' });
   const [bitacoraTexto, setBitacoraTexto] = useState('');
   const [bitacoraApego, setBitacoraApego] = useState('');
   const [isakFile, setIsakFile] = useState(null);
@@ -280,23 +282,30 @@ export default function Pacientes() {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { planes: arr }); } catch (e) { setErr(e.message); }
   };
 
-  const addChip = (texto) => {
+  const addChipTo = (key, texto) => {
     const linea = '• ' + texto;
-    setRecoTexto(prev => {
-      const lineas = prev ? prev.split('\n') : [];
+    setRecoForm(prev => {
+      const cur = prev[key] || '';
+      const lineas = cur ? cur.split('\n') : [];
       if (lineas.some(x => x.trim() === linea.trim())) return prev; // ya está
-      const base = prev && !prev.endsWith('\n') ? prev + '\n' : prev;
-      return base + linea + '\n';
+      const base = cur && !cur.endsWith('\n') ? cur + '\n' : cur;
+      return { ...prev, [key]: base + linea + '\n' };
     });
   };
 
+  const recoSeccionesConContenido = (r) => RECO_SECCIONES
+    .filter(s => (r[s.key] || '').toString().trim())
+    .map(s => ({ titulo: s.titulo, texto: r[s.key] }));
+
   const addReco = async () => {
-    const t = recoTexto.trim();
-    if (!t) { setErr('Escribe la recomendación.'); return; }
-    const arr = [...(sel.recomendaciones || []), { texto: t, fecha: Date.now() }];
+    const r = {};
+    RECO_KEYS.forEach(k => { r[k] = (recoForm[k] || '').trim(); });
+    if (!RECO_KEYS.some(k => r[k])) { setErr('Escribe al menos una recomendación en alguna sección.'); return; }
+    const arr = [...(sel.recomendaciones || []), { ...r, fecha: Date.now() }];
     try {
       await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr });
-      setRecoTexto(''); setErr('');
+      setRecoForm({ estudios: '', suplementos: '', ejercicio: '', hidratacion: '', generales: '' });
+      setErr('');
     } catch (e) { setErr('No se pudo guardar la recomendación: ' + e.message); }
   };
 
@@ -309,7 +318,7 @@ export default function Pacientes() {
   const generarPDFReco = async (reco) => {
     const url = process.env.REACT_APP_APPSCRIPT_URL;
     if (!url) { setRecoPdfMsg('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
-    if (!reco || !reco.texto) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
+    if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales)) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
     setRecoPdfMsg('Generando PDF…');
     try {
       const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now() });
@@ -783,41 +792,49 @@ export default function Pacientes() {
             </button>
             {panel === 'reco' && (
               <div style={S.panelBody}>
-                <div style={S.note}>Notas de bitácora para el paciente. Se guardan con la fecha y hora en que las publicas, y el paciente las verá en su sección "Recomendaciones".</div>
-                <div style={S.chipGroups}>
-                  {RECO_CHIPS.map(grupo => (
-                    <div key={grupo.titulo} style={S.chipGroup}>
-                      <div style={S.chipLabel}>{grupo.titulo}</div>
+                <div style={S.note}>Cada recomendación se publica con fecha y hora; el paciente la verá en su sección "Recomendaciones". Usa los botones para agregar atajos a cada apartado.</div>
+                {RECO_SECCIONES.map(sec => (
+                  <div key={sec.key} style={S.recoSeccion}>
+                    <div style={S.recoSeccionTitulo}>{sec.titulo}</div>
+                    {sec.items.length > 0 && (
                       <div style={S.chipRow}>
-                        {grupo.items.map(it => {
+                        {sec.items.map(it => {
                           const label = typeof it === 'string' ? it : it.l;
                           const ins = typeof it === 'string' ? it : (it.ins || it.l);
-                          return <button key={label} type="button" style={S.chip} onClick={() => addChip(ins)}>+ {label}</button>;
+                          return <button key={label} type="button" style={S.chip} onClick={() => addChipTo(sec.key, ins)}>+ {label}</button>;
                         })}
                       </div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ marginBottom: 12 }}>
-                  <textarea style={S.recoArea} rows={4} value={recoTexto} onChange={e => setRecoTexto(e.target.value)}
-                    placeholder="Escribe una recomendación para el paciente, o agrégala con los botones de arriba…" />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-                    <button style={S.saveBtn} onClick={addReco}>+ Agregar recomendación</button>
-                    {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
+                    )}
+                    <textarea style={S.recoArea} rows={3} value={recoForm[sec.key]}
+                      onChange={e => setRecoForm(prev => ({ ...prev, [sec.key]: e.target.value }))}
+                      placeholder={`Recomendaciones de ${sec.titulo.toLowerCase()}…`} />
                   </div>
+                ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, marginBottom: 14, flexWrap: 'wrap' }}>
+                  <button style={S.saveBtn} onClick={addReco}>+ Agregar recomendación</button>
+                  {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
                 </div>
                 {(!sel.recomendaciones || sel.recomendaciones.length === 0)
                   ? <div className="empty-state">Aún no hay recomendaciones.</div>
-                  : [...sel.recomendaciones].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
-                    <div key={idx} style={S.recoItem}>
-                      <div style={{ flex: 1 }}>
-                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
-                        <div style={S.recoText}>{r.texto}</div>
+                  : [...sel.recomendaciones].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => {
+                    const secs = recoSeccionesConContenido(r);
+                    return (
+                      <div key={idx} style={S.recoItem}>
+                        <div style={{ flex: 1 }}>
+                          <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
+                          {secs.length > 0
+                            ? secs.map(s => (
+                              <div key={s.titulo} style={{ marginTop: 7 }}>
+                                <div style={S.recoItemSecTitulo}>{s.titulo}</div>
+                                <div style={S.recoText}>{s.texto}</div>
+                              </div>))
+                            : <div style={S.recoText}>{r.texto || ''}</div>}
+                        </div>
+                        <button style={S.smallBtn} onClick={() => generarPDFReco(r)} title="Generar PDF de esta recomendación">PDF</button>
+                        <button style={S.rm} onClick={() => removeReco(idx)} title="Eliminar">×</button>
                       </div>
-                      <button style={S.smallBtn} onClick={() => generarPDFReco(r)} title="Generar PDF de esta recomendación">PDF</button>
-                      <button style={S.rm} onClick={() => removeReco(idx)} title="Eliminar">×</button>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -967,8 +984,11 @@ const styles = {
   chipGroups: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 },
   chipGroup: { display: 'flex', flexDirection: 'column', gap: 6 },
   chipLabel: { fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)' },
-  chipRow: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+  chipRow: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   chip: { background: 'var(--cream)', border: '1px solid var(--gold)', borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 600, color: 'var(--dark)', cursor: 'pointer', fontFamily: 'var(--font)' },
+  recoSeccion: { marginBottom: 14 },
+  recoSeccionTitulo: { fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--stone)', marginBottom: 7 },
+  recoItemSecTitulo: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 2 },
   recoItem: { display: 'flex', alignItems: 'flex-start', gap: 10, border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, background: 'var(--cream)' },
   recoDate: { fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 },
   recoText: { fontSize: 13, color: 'var(--dark)', lineHeight: 1.5, whiteSpace: 'pre-wrap' },
