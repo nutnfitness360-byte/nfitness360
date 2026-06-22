@@ -1,12 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { auth } from '../firebase/config';
 import { signOut } from 'firebase/auth';
+import { useBranding } from '../context/BrandingContext';
 
 const LOGO = '/logo.png';
 
 export default function Topbar({ role, user, onPerfil }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const { logo } = useBranding();
+  const logoSrc = (logo === undefined) ? LOGO : logo; // undefined = por defecto · '' = sin logo
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -24,7 +27,7 @@ export default function Topbar({ role, user, onPerfil }) {
   return (
     <div className="topbar">
       <div>
-        <img src={LOGO} alt="N Fitness 360" className="topbar-logo-img" />
+        {logoSrc ? <img src={logoSrc} alt="" className="topbar-logo-img" /> : null}
         <div className="topbar-role">{role === 'nutriologa' ? 'Panel nutriologa' : 'Mi cuenta'}</div>
       </div>
 
