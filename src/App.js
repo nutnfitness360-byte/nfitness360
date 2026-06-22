@@ -1,5 +1,6 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { BrandingProvider } from './context/BrandingContext';
 import LoginPage from './pages/LoginPage';
 import NutriDashboard from './pages/NutriDashboard';
 import PacienteDashboard from './pages/PacienteDashboard';
@@ -24,7 +25,9 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <BrandingProvider>
+        <AppContent />
+      </BrandingProvider>
     </AuthProvider>
   );
 }
