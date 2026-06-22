@@ -5,8 +5,7 @@ import {
   updateProfile, signOut,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-
-const NUTRI_EMAIL = 'nutnfitness360@gmail.com';
+import { NUTRI_EMAIL } from '../context/AuthContext';
 
 async function esNutriAutorizada(email) {
   const e = (email || '').toLowerCase();
