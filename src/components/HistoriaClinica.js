@@ -49,7 +49,7 @@ const SECTIONS = [
 const TIEMPOS = ["Desayuno", "Colación", "Comida", "Colación", "Cena"];
 const PADECIMIENTOS = [
   "Diabetes", "Hipertensión", "Hipotiroidismo", "Hipertiroidismo",
-  "SOMP", "Hipoglucemia", "Anemia", "Resistencia a la insulina",
+  "SOMP", "Hipoglucemia", "Anemia", "Resistencia a la insulina", "Ninguna",
 ];
 
 const OBJETIVOS = ["Aumento de masa muscular", "Baja de grasa", "Recomposición corporal", "Salud", "Rendimiento deportivo", "Embarazo", "Lactancia", "Otro"];
@@ -1055,7 +1055,7 @@ const styles = {
     background: T.bg, color: T.ink, minHeight: "100%", maxWidth: 980, margin: "0 auto",
     padding: "0 0 96px", WebkitFontSmoothing: "antialiased",
   },
-  header: { position: "sticky", top: 0, zIndex: 5, background: T.bg, paddingTop: 0, borderBottom: `1px solid ${T.line}` },
+  header: { position: "static", background: T.bg, paddingTop: 0, borderBottom: `1px solid ${T.line}` },
   brandRow: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 22px", background: T.black },
   logo: { display: "flex", alignItems: "center", gap: 12 },
   logoMark: { width: 38, height: 38, borderRadius: 11, background: T.amber, color: "#000", display: "grid", placeItems: "center", fontWeight: 800, fontSize: 20, letterSpacing: -0.5 },
