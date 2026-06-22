@@ -22,11 +22,21 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha } = {}
   const fechaDoc = new Date(fecha || Date.now())
     .toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
-  const items = recos.map((r) => `
+  const SECS = [
+    ["estudios", "Estudios"], ["suplementos", "Suplementos"],
+    ["ejercicio", "Ejercicio"], ["hidratacion", "Hidratación"], ["generales", "Generales"],
+  ];
+  const items = recos.map((r) => {
+    const conContenido = SECS.filter(([k]) => (r[k] || "").toString().trim());
+    const cuerpo = conContenido.length
+      ? conContenido.map(([k, t]) => `<div class="rsec"><div class="rst">${esc(t)}</div><div class="rtext">${esc(r[k])}</div></div>`).join("")
+      : `<div class="rtext">${esc(r.texto)}</div>`;
+    return `
       <div class="reco">
         <div class="rdate">${esc(fmtFechaHora(r.fecha))}</div>
-        <div class="rtext">${esc(r.texto)}</div>
-      </div>`).join("");
+        ${cuerpo}
+      </div>`;
+  }).join("");
   const vacio = `<div class="empty">Aún no hay recomendaciones registradas.</div>`;
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
@@ -42,6 +52,9 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha } = {}
     .meta b { color:#3A332C; }
     .reco { border-left:3px solid #CDA788; background:#FAF6F1; padding:13px 16px; margin-bottom:11px; }
     .rdate { font-size:10px; letter-spacing:1px; color:#A1968C; font-weight:bold; text-transform:uppercase; margin-bottom:5px; }
+    .rsec { margin-bottom:9px; }
+    .rsec:last-child { margin-bottom:0; }
+    .rst { font-size:10px; letter-spacing:1px; color:#CDA788; font-weight:bold; text-transform:uppercase; margin-bottom:3px; }
     .rtext { font-size:13px; line-height:1.55; white-space:pre-wrap; color:#3A332C; }
     .empty { font-size:13px; color:#A1968C; padding:20px 0; }
     .ftr { display:flex; justify-content:space-between; align-items:flex-end; border-top:1px solid #E0D6CB; margin-top:18px; padding-top:14px; }
