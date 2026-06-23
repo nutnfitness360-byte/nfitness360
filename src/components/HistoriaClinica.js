@@ -52,6 +52,33 @@ const PADECIMIENTOS = [
   "SOMP", "Hipoglucemia", "Anemia", "Resistencia a la insulina", "Ninguna",
 ];
 
+// Convierte una hora escrita libremente ("6:45 am", "11:30 pm", "23:00", "7") a minutos desde medianoche.
+function parseHora_(s) {
+  if (!s) return null;
+  var t = String(s).toLowerCase().trim();
+  var pm = /p\.?\s*m/.test(t);
+  var am = /a\.?\s*m/.test(t);
+  t = t.replace(/[ap]\.?\s*m\.?/g, " ");
+  var m = t.match(/(\d{1,2})\s*[:.h]?\s*(\d{2})?/);
+  if (!m) return null;
+  var h = parseInt(m[1], 10);
+  var min = m[2] ? parseInt(m[2], 10) : 0;
+  if (isNaN(h) || h > 23 || min > 59) return null;
+  if (pm && h < 12) h += 12;
+  if (am && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+// Diferencia entre la hora de dormir y la de despertar (cruzando medianoche). Devuelve {min, texto} o null.
+function horasSueno_(despierta, duerme) {
+  var w = parseHora_(despierta), d = parseHora_(duerme);
+  if (w == null || d == null) return null;
+  var diff = (((w - d) % 1440) + 1440) % 1440;
+  if (diff === 0) return null;
+  var hh = Math.floor(diff / 60), mm = diff % 60;
+  return { min: diff, texto: mm === 0 ? (hh + " h") : (hh + " h " + mm + " min") };
+}
+
 const OBJETIVOS = ["Aumento de masa muscular", "Baja de grasa", "Recomposición corporal", "Salud", "Rendimiento deportivo", "Embarazo", "Lactancia", "Otro"];
 
 
@@ -174,7 +201,7 @@ function histParts(data) {
       ["Alergias o intolerancias", di.alergias], ["Otros líquidos", di.liquidos],
       ["Qué SÍ le gusta", di.leGusta], ["Qué NO le gusta", di.noLeGusta],
     ]) + `<div class="subh">Dieta habitual</div>` + dietaTable +
-      rows([["Hora en que despierta", di.despierta], ["Hora en que se duerme", di.duerme]])) +
+      rows([["Hora en que despierta", di.despierta], ["Hora en que se duerme", di.duerme], ["Horas de sueño (aprox.)", (horasSueno_(di.despierta, di.duerme) || {}).texto || "—"]])) +
     card("8", "Ejercicio", rows([
       ["Tipo de ejercicio", ej.tipo], ["Horario de ejercicio", ej.horario], ["Días por semana", ej.dias],
       ["Tiempo de actividad al día", ej.tiempoDia], ["Intensidad", ej.intensidad],
@@ -876,6 +903,10 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
             <Field label="Hora en que se duerme">
               <input style={styles.input} value={data.dietetica.duerme} placeholder="11:30 pm"
                 onChange={(e) => setField("dietetica", "duerme", e.target.value)} />
+            </Field>
+            <Field label="Total de horas de sueño (promedio)">
+              <input style={{ ...styles.input, background: T.bg, fontWeight: 700, color: T.pine }} readOnly
+                value={(horasSueno_(data.dietetica.despierta, data.dietetica.duerme) || {}).texto || "—"} />
             </Field>
           </Grid>
         </Section>
