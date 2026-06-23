@@ -63,6 +63,8 @@ export default function PacienteDashboard() {
   const [reagendando, setReagendando] = useState(null);
   const [pagoMsg, setPagoMsg] = useState('');
   const [recoPdfMsg, setRecoPdfMsg] = useState('');
+  const [secAbierta, setSecAbierta] = useState({ plan: true, isak: false, inbody: false, estudios: false });
+  const toggleSec = (id) => setSecAbierta(s => ({ ...s, [id]: !s[id] }));
 
   // Al volver de Stripe: confirma el pago y agenda (o cancela si se abandonó el pago).
   useEffect(() => {
@@ -253,6 +255,30 @@ export default function PacienteDashboard() {
     );
   }
 
+  const secHeader = (id, titulo) => (
+    <button onClick={() => toggleSec(id)}
+      style={{ width: '100%', background: 'var(--dark)', color: '#fff', fontWeight: 700, fontSize: 14, padding: '10px 14px', borderRadius: 10, letterSpacing: 0.3, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'var(--font)' }}>
+      <span>{titulo}</span>
+      <span style={{ display: 'inline-block', transition: 'transform .15s', transform: secAbierta[id] ? 'rotate(90deg)' : 'none', fontSize: 12 }}>▸</span>
+    </button>
+  );
+  const listaArchivos = (items, vacio, etiqueta) => {
+    const arr = Array.isArray(items) ? [...items].reverse() : [];
+    if (arr.length === 0) return <div className="empty-state">{vacio}</div>;
+    return arr.map((r, i) => (
+      <div className="cita-item" key={i}>
+        <div style={{ width: 40, height: 40, borderRadius: 8, background: 'var(--dark)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>PDF</div>
+        <div style={{ flex: 1, marginLeft: 12 }}>
+          <div className="cita-nombre">{r.nombre || etiqueta}</div>
+          <div className="cita-motivo">{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+        </div>
+        {r.link
+          ? <a href={r.link} target="_blank" rel="noreferrer" style={{ background: 'var(--gold)', color: '#fff', textDecoration: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>Abrir</a>
+          : <span style={{ fontSize: 11, color: 'var(--stone)' }}>Sin archivo</span>}
+      </div>
+    ));
+  };
+
   return (
     <div className="app">
       {pagoMsg && (
@@ -374,67 +400,69 @@ export default function PacienteDashboard() {
 
         {tab === 'planes' && (
           <div className="card">
-            <div style={{ background: 'var(--dark)', color: '#fff', fontWeight: 700, fontSize: 14, padding: '10px 14px', borderRadius: 10, marginBottom: 14, letterSpacing: 0.3 }}>Mi plan alimenticio</div>
+            <button onClick={() => setTab('inicio')}
+              style={{ background: '#fff', border: '0.5px solid var(--border)', color: 'var(--dark)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 14px', borderRadius: 8, marginBottom: 14 }}>
+              ← Atrás
+            </button>
 
-            {expediente && expediente.plan && expediente.plan.totales && (
-              <div style={{ background: 'var(--cream)', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
-                <div style={{ fontSize: '11px', color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>Tu plan</div>
-                <div style={{ fontSize: '15px', color: 'var(--dark)', fontWeight: 700, marginTop: '2px' }}>
-                  {expediente.plan.totales.kcal} kcal al día
+            <div style={{ marginBottom: 12 }}>
+              {secHeader('plan', 'Mi plan alimenticio')}
+              {secAbierta.plan && (
+                <div style={{ marginTop: 14 }}>
+                  {expediente && expediente.plan && expediente.plan.totales && (
+                    <div style={{ background: 'var(--cream)', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>Tu plan</div>
+                      <div style={{ fontSize: '15px', color: 'var(--dark)', fontWeight: 700, marginTop: '2px' }}>
+                        {expediente.plan.totales.kcal} kcal al día
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--stone)', marginTop: '2px' }}>
+                        HC {expediente.plan.totales.hc} g · Proteína {expediente.plan.totales.prot} g · Grasa {expediente.plan.totales.lip} g
+                      </div>
+                    </div>
+                  )}
+                  {!expediente ? (
+                    <div className="empty-state">
+                      <div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>🥗</div>
+                      Aún no hay un plan vinculado a esta cuenta.<br />
+                      Pídele a tu nutrióloga que registre tu correo: <strong>{user.email}</strong>
+                    </div>
+                  ) : planes.length === 0 ? (
+                    <div className="empty-state">
+                      <div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>🥗</div>
+                      Tu plan estará disponible aquí en cuanto tu nutrióloga lo genere.
+                    </div>
+                  ) : (
+                    planes.map((p, i) => (
+                      <div className="cita-item" key={i}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--dark)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>PDF</div>
+                        <div style={{ flex: 1, marginLeft: '12px' }}>
+                          <div className="cita-nombre">{p.nombre || 'Plan nutricional'}</div>
+                          <div className="cita-motivo">{p.fecha ? fmtFecha(p.fecha) : ''}</div>
+                        </div>
+                        {p.link
+                          ? <a href={p.link} target="_blank" rel="noreferrer" style={{ background: 'var(--gold)', color: '#fff', textDecoration: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap' }}>Abrir</a>
+                          : <span style={{ fontSize: '11px', color: 'var(--stone)' }}>Sin archivo</span>}
+                      </div>
+                    ))
+                  )}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--stone)', marginTop: '2px' }}>
-                  HC {expediente.plan.totales.hc} g · Proteína {expediente.plan.totales.prot} g · Grasa {expediente.plan.totales.lip} g
-                </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            {!expediente ? (
-              <div className="empty-state">
-                <div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>🥗</div>
-                Aún no hay un plan vinculado a esta cuenta.<br />
-                Pídele a tu nutrióloga que registre tu correo: <strong>{user.email}</strong>
-              </div>
-            ) : planes.length === 0 ? (
-              <div className="empty-state">
-                <div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>🥗</div>
-                Tu plan estará disponible aquí en cuanto tu nutrióloga lo genere.
-              </div>
-            ) : (
-              planes.map((p, i) => (
-                <div className="cita-item" key={i}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--dark)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>PDF</div>
-                  <div style={{ flex: 1, marginLeft: '12px' }}>
-                    <div className="cita-nombre">{p.nombre || 'Plan nutricional'}</div>
-                    <div className="cita-motivo">{p.fecha ? fmtFecha(p.fecha) : ''}</div>
-                  </div>
-                  {p.link
-                    ? <a href={p.link} target="_blank" rel="noreferrer" style={{ background: 'var(--gold)', color: '#fff', textDecoration: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap' }}>Abrir</a>
-                    : <span style={{ fontSize: '11px', color: 'var(--stone)' }}>Sin archivo</span>}
-                </div>
-              ))
-            )}
-          </div>
-        )}
+            <div style={{ marginBottom: 12 }}>
+              {secHeader('isak', 'Reportes ISAK')}
+              {secAbierta.isak && <div style={{ marginTop: 14 }}>{listaArchivos(expediente && expediente.isak, 'Aún no tienes reportes ISAK.', 'Reporte ISAK')}</div>}
+            </div>
 
-        {tab === 'planes' && expediente && (
-          <div className="card">
-            <div style={{ background: 'var(--dark)', color: '#fff', fontWeight: 700, fontSize: 14, padding: '10px 14px', borderRadius: 10, marginBottom: 14, letterSpacing: 0.3 }}>Reportes ISAK</div>
-            {(!Array.isArray(expediente.isak) || expediente.isak.length === 0) ? (
-              <div className="empty-state">Aún no tienes reportes ISAK.</div>
-            ) : (
-              [...expediente.isak].reverse().map((r, i) => (
-                <div className="cita-item" key={i}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--dark)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>PDF</div>
-                  <div style={{ flex: 1, marginLeft: '12px' }}>
-                    <div className="cita-nombre">{r.nombre || 'Reporte ISAK'}</div>
-                    <div className="cita-motivo">{r.fecha ? fmtFecha(r.fecha) : ''}</div>
-                  </div>
-                  {r.link
-                    ? <a href={r.link} target="_blank" rel="noreferrer" style={{ background: 'var(--gold)', color: '#fff', textDecoration: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap' }}>Abrir</a>
-                    : <span style={{ fontSize: '11px', color: 'var(--stone)' }}>Sin archivo</span>}
-                </div>
-              ))
-            )}
+            <div style={{ marginBottom: 12 }}>
+              {secHeader('inbody', 'InBody')}
+              {secAbierta.inbody && <div style={{ marginTop: 14 }}>{listaArchivos(expediente && expediente.inbody, 'Aún no tienes reportes InBody.', 'Reporte InBody')}</div>}
+            </div>
+
+            <div>
+              {secHeader('estudios', 'Estudios clínicos')}
+              {secAbierta.estudios && <div style={{ marginTop: 14 }}>{listaArchivos(expediente && expediente.estudios, 'Aún no tienes estudios clínicos.', 'Estudio clínico')}</div>}
+            </div>
           </div>
         )}
 
