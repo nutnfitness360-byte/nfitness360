@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
@@ -65,6 +65,9 @@ export default function PacienteDashboard() {
   const [recoPdfMsg, setRecoPdfMsg] = useState('');
   const [secAbierta, setSecAbierta] = useState({ plan: true, isak: false, inbody: false, estudios: false });
   const toggleSec = (id) => setSecAbierta(s => ({ ...s, [id]: !s[id] }));
+  const [estudioBusy, setEstudioBusy] = useState(false);
+  const [estudioMsg, setEstudioMsg] = useState('');
+  const estudioInputRef = useRef(null);
 
   // Al volver de Stripe: confirma el pago y agenda (o cancela si se abandonó el pago).
   useEffect(() => {
@@ -254,6 +257,39 @@ export default function PacienteDashboard() {
       </div>
     );
   }
+
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+
+  const subirEstudio = async (file) => {
+    if (!file) return;
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setEstudioMsg('No está configurada la conexión para subir archivos.'); return; }
+    if (!expediente) { setEstudioMsg('Tu cuenta aún no está vinculada a un expediente.'); return; }
+    setEstudioBusy(true); setEstudioMsg('Subiendo…');
+    try {
+      const b64 = await fileToBase64(file);
+      const fecha = new Date().toISOString().slice(0, 10);
+      const ext = (file.name.split('.').pop() || 'pdf').toLowerCase();
+      const filename = 'Estudio_' + (expediente.codigo || '') + '_' + fecha + '.' + ext;
+      const resp = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveEstudio', patient: expediente.nombre || '', correo: (expediente.correo || user.email || ''), filename, mime: file.type || 'application/pdf', fileBase64: b64 }),
+        redirect: 'follow',
+      });
+      const data = await resp.json().catch(() => null);
+      if (!data || !data.ok || !data.link) throw new Error((data && data.error) || 'No se recibió el enlace del archivo.');
+      const arr = [...(expediente.estudios || []), { nombre: file.name || filename, fecha, link: data.link }];
+      await updateDoc(doc(db, 'pacientes', expediente.id), { estudios: arr });
+      setEstudioMsg('Estudio cargado ✓');
+    } catch (e) { setEstudioMsg('No se pudo cargar: ' + e.message); }
+    setEstudioBusy(false);
+    if (estudioInputRef.current) estudioInputRef.current.value = '';
+  };
 
   const secHeader = (id, titulo) => (
     <button onClick={() => toggleSec(id)}
@@ -461,7 +497,20 @@ export default function PacienteDashboard() {
 
             <div>
               {secHeader('estudios', 'Estudios clínicos')}
-              {secAbierta.estudios && <div style={{ marginTop: 14 }}>{listaArchivos(expediente && expediente.estudios, 'Aún no tienes estudios clínicos.', 'Estudio clínico')}</div>}
+              {secAbierta.estudios && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <input ref={estudioInputRef} type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+                      onChange={e => subirEstudio(e.target.files && e.target.files[0])} />
+                    <button onClick={() => estudioInputRef.current && estudioInputRef.current.click()} disabled={estudioBusy || !expediente}
+                      style={{ background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: (estudioBusy || !expediente) ? 'default' : 'pointer', opacity: (estudioBusy || !expediente) ? 0.6 : 1, fontFamily: 'var(--font)' }}>
+                      {estudioBusy ? 'Subiendo…' : '+ Subir estudio (PDF o imagen)'}
+                    </button>
+                    {estudioMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>{estudioMsg}</span> : null}
+                  </div>
+                  {listaArchivos(expediente && expediente.estudios, 'Aún no tienes estudios clínicos.', 'Estudio clínico')}
+                </div>
+              )}
             </div>
           </div>
         )}
