@@ -85,6 +85,7 @@ export default function Pacientes({ onRegisterExitGuard }) {
   const [isakBusy, setIsakBusy] = useState(false);
   const [estudioFile, setEstudioFile] = useState(null);
   const [estudioBusy, setEstudioBusy] = useState(false);
+  const [archSec, setArchSec] = useState({ plan: false, isak: false, inbody: false, estudios: false });
   const [panel, setPanel] = useState(null);
   const [ibFile, setIbFile] = useState(null);
   const [ibBusy, setIbBusy] = useState(false);
@@ -418,6 +419,13 @@ export default function Pacientes({ onRegisterExitGuard }) {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { estudios: arr }); } catch (e) { setErr(e.message); }
   };
 
+  const archHeader = (id, titulo) => (
+    <button type="button" onClick={() => setArchSec(s => ({ ...s, [id]: !s[id] }))} style={S.archHead}>
+      <span>{titulo}</span>
+      <span style={{ display: 'inline-block', transition: 'transform .15s', transform: archSec[id] ? 'rotate(90deg)' : 'none', fontSize: 12 }}>▸</span>
+    </button>
+  );
+
   const leerYGuardarInBody = async () => {
     if (!ibFile) { setErr('Selecciona el PDF del InBody.'); return; }
     const url = process.env.REACT_APP_APPSCRIPT_URL;
@@ -619,6 +627,131 @@ export default function Pacientes({ onRegisterExitGuard }) {
             )}
           </div>
 
+          {/* Archivos del paciente (mismas secciones que ve el paciente) */}
+          <div className="card" style={panel === 'archivos' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'archivos' ? null : 'archivos')}>
+              <span style={S.panelTitle}>Archivos del paciente</span>
+              <span style={panel === 'archivos' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'archivos' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Todos los archivos del paciente, organizados como en su panel. El paciente ve estos mismos archivos.</div>
+
+                {archHeader('plan', 'Mi plan alimenticio')}
+                {archSec.plan && (
+                  <div style={S.archBody}>
+                    {sel.plan && sel.plan.totales && (
+                      <div style={{ background: 'var(--cream)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: 600 }}>Plan vigente</div>
+                        <div style={{ fontSize: 14, color: 'var(--dark)', fontWeight: 700, marginTop: 2 }}>{sel.plan.totales.kcal} kcal · {fmtFecha(sel.plan.fecha)}</div>
+                      </div>
+                    )}
+                    <div style={S.titleRow}>
+                      <div style={S.note}>El PDF del plan se guarda en Drive y aquí se registra su enlace.</div>
+                      <button style={S.smallBtn} onClick={() => setOpenPlan(v => !v)}>{openPlan ? 'Cancelar' : '+ Plan'}</button>
+                    </div>
+                    {openPlan && (
+                      <div style={S.formRow}>
+                        <Field l="Nombre del plan"><input style={S.inp} value={plan.nombre} onChange={e => setPlan({ ...plan, nombre: e.target.value })} placeholder="Plan · 2200 kcal" /></Field>
+                        <Field l="Fecha"><input type="date" style={S.inp} value={plan.fecha} onChange={e => setPlan({ ...plan, fecha: e.target.value })} /></Field>
+                        <Field l="Enlace de Drive"><input style={S.inp} value={plan.link} onChange={e => setPlan({ ...plan, link: e.target.value })} placeholder="https://drive.google.com/…" /></Field>
+                        <button style={S.saveBtn} onClick={addPlan}>Guardar</button>
+                      </div>
+                    )}
+                    {(!sel.planes || sel.planes.length === 0)
+                      ? <div className="empty-state">Aún no hay planes para este paciente.</div>
+                      : sel.planes.map((pl, i) => (
+                        <div key={i} style={S.planRow}>
+                          <div style={S.planIcon}>PDF</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{pl.nombre}</div>
+                            <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{pl.fecha ? fmtFecha(pl.fecha) : ''}</div>
+                          </div>
+                          {pl.link
+                            ? <a href={pl.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>
+                            : <span style={{ fontSize: 11, color: 'var(--stone)', fontStyle: 'italic' }}>Sin enlace</span>}
+                          <button style={S.rm} onClick={() => removePlan(i)} title="Quitar">×</button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                {archHeader('isak', 'Reportes ISAK')}
+                {archSec.isak && (
+                  <div style={S.archBody}>
+                    <label style={S.upload}>
+                      <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => setIsakFile(e.target.files && e.target.files[0])} />
+                      {isakFile ? ('PDF seleccionado: ' + isakFile.name) : 'Seleccionar PDF del reporte ISAK'}
+                    </label>
+                    <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={subirIsak} disabled={isakBusy}>{isakBusy ? 'Cargando…' : 'Cargar reporte ISAK'}</button>
+                    <div style={{ marginTop: 14 }}>
+                      {(!sel.isak || sel.isak.length === 0)
+                        ? <div className="empty-state">Aún no hay reportes ISAK.</div>
+                        : [...sel.isak].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                          <div key={idx} style={S.planRow}>
+                            <div style={S.planIcon}>PDF</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Reporte ISAK'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+                            </div>
+                            {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                            <button style={S.rm} onClick={() => removeIsak(idx)} title="Quitar">×</button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {archHeader('inbody', 'InBody')}
+                {archSec.inbody && (
+                  <div style={S.archBody}>
+                    <div style={S.note}>Los InBody se cargan y leen con IA desde el panel <b>InBody</b>. Aquí ves los archivos guardados.</div>
+                    {(!sel.inbodyArchivos || sel.inbodyArchivos.length === 0)
+                      ? <div className="empty-state">Aún no hay archivos de InBody.</div>
+                      : [...sel.inbodyArchivos].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                        <div key={idx} style={S.planRow}>
+                          <div style={S.planIcon}>PDF</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'InBody'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+                          </div>
+                          {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                {archHeader('estudios', 'Estudios clínicos')}
+                {archSec.estudios && (
+                  <div style={S.archBody}>
+                    <div style={S.note}>El paciente los sube desde su panel; también puedes subirlos tú.</div>
+                    <label style={S.upload}>
+                      <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }} onChange={e => setEstudioFile(e.target.files && e.target.files[0])} />
+                      {estudioFile ? ('Archivo seleccionado: ' + estudioFile.name) : 'Seleccionar estudio (PDF o imagen)'}
+                    </label>
+                    <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={subirEstudio} disabled={estudioBusy}>{estudioBusy ? 'Cargando…' : 'Cargar estudio'}</button>
+                    <div style={{ marginTop: 14 }}>
+                      {(!sel.estudios || sel.estudios.length === 0)
+                        ? <div className="empty-state">Aún no hay estudios clínicos.</div>
+                        : [...sel.estudios].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                          <div key={idx} style={S.planRow}>
+                            <div style={S.planIcon}>PDF</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Estudio clínico'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+                            </div>
+                            {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                            <button style={S.rm} onClick={() => removeEstudio(idx)} title="Quitar">×</button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
           {/* InBody */}
           <div className="card" style={panel === 'inbody' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'inbody' ? null : 'inbody')}>
@@ -634,96 +767,11 @@ export default function Pacientes({ onRegisterExitGuard }) {
                 </label>
                 <button style={{ ...S.saveBtn, marginTop: 4 }} onClick={leerYGuardarInBody} disabled={ibBusy}>{ibBusy ? 'Leyendo…' : 'Leer y guardar InBody'}</button>
                 {ibMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{ibMsg}</div>}
-                <div style={{ marginTop: 16 }}>
-                  <div style={S.note}>Archivos InBody cargados (respaldo en Drive).</div>
-                  {(!sel.inbodyArchivos || sel.inbodyArchivos.length === 0)
-                    ? <div className="empty-state">Aún no hay archivos de InBody cargados.</div>
-                    : [...sel.inbodyArchivos].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
-                      <div key={idx} style={S.planRow}>
-                        <div style={S.planIcon}>PDF</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'InBody'}</div>
-                          <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
-                        </div>
-                        {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
-                      </div>
-                    ))}
-                </div>
+                <div style={{ ...S.note, marginTop: 12, marginBottom: 0 }}>Los archivos InBody guardados aparecen en <b>Archivos del paciente → InBody</b>.</div>
               </div>
             )}
           </div>
 
-          {/* Isak (reportes PDF; visible también para el paciente) */}
-          <div className="card" style={panel === 'isak' ? S.panelOpen : S.panel}>
-            <button style={S.panelHead} onClick={() => setPanel(p => p === 'isak' ? null : 'isak')}>
-              <span style={S.panelTitle}>ISAK</span>
-              <span style={panel === 'isak' ? S.chevOpen : S.chev}>⌄</span>
-            </button>
-            {panel === 'isak' && (
-              <div style={S.panelBody}>
-                <div style={S.note}>Reportes ISAK en PDF. Se guardan en Drive y el paciente también puede verlos.</div>
-                <label style={S.upload}>
-                  <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => setIsakFile(e.target.files && e.target.files[0])} />
-                  {isakFile ? ('PDF seleccionado: ' + isakFile.name) : 'Seleccionar PDF del reporte ISAK'}
-                </label>
-                <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={subirIsak} disabled={isakBusy}>
-                  {isakBusy ? 'Cargando…' : 'Cargar reporte ISAK'}
-                </button>
-                <div style={{ marginTop: 14 }}>
-                  {(!sel.isak || sel.isak.length === 0)
-                    ? <div className="empty-state">Aún no hay reportes ISAK.</div>
-                    : [...sel.isak].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
-                      <div key={idx} style={S.planRow}>
-                        <div style={S.planIcon}>PDF</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Reporte ISAK'}</div>
-                          <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
-                        </div>
-                        {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
-          {/* Estudios clínicos (los sube el paciente; la nutri los ve y también puede subir) */}
-          <div className="card" style={panel === 'estudios' ? S.panelOpen : S.panel}>
-            <button style={S.panelHead} onClick={() => setPanel(p => p === 'estudios' ? null : 'estudios')}>
-              <span style={S.panelTitle}>Estudios clínicos</span>
-              <span style={panel === 'estudios' ? S.chevOpen : S.chev}>⌄</span>
-            </button>
-            {panel === 'estudios' && (
-              <div style={S.panelBody}>
-                <div style={S.note}>Estudios que el paciente sube desde su panel. Aparecen aquí automáticamente; también puedes subirlos tú. Se guardan en Drive.</div>
-                <label style={S.upload}>
-                  <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }} onChange={e => setEstudioFile(e.target.files && e.target.files[0])} />
-                  {estudioFile ? ('Archivo seleccionado: ' + estudioFile.name) : 'Seleccionar estudio (PDF o imagen)'}
-                </label>
-                <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={subirEstudio} disabled={estudioBusy}>
-                  {estudioBusy ? 'Cargando…' : 'Cargar estudio'}
-                </button>
-                <div style={{ marginTop: 14 }}>
-                  {(!sel.estudios || sel.estudios.length === 0)
-                    ? <div className="empty-state">Aún no hay estudios clínicos.</div>
-                    : [...sel.estudios].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
-                      <div key={idx} style={S.planRow}>
-                        <div style={S.planIcon}>PDF</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Estudio clínico'}</div>
-                          <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
-                        </div>
-                        {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
-                        <button style={S.rm} onClick={() => removeEstudio(idx)} title="Quitar">×</button>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
           {/* Plan nutricional */}
           <div className="card" style={panel === 'plan' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'plan' ? null : 'plan')}>
@@ -780,45 +828,6 @@ export default function Pacientes({ onRegisterExitGuard }) {
             )}
           </div>
 
-          {/* Planes */}
-          <div className="card" style={panel === 'planes' ? S.panelOpen : S.panel}>
-            <button style={S.panelHead} onClick={() => setPanel(p => p === 'planes' ? null : 'planes')}>
-              <span style={S.panelTitle}>Planes</span>
-              <span style={panel === 'planes' ? S.chevOpen : S.chev}>⌄</span>
-            </button>
-            {panel === 'planes' && (
-              <div style={S.panelBody}>
-                <div style={S.titleRow}>
-                  <div style={S.note}>El reporte (PDF) se guarda en Google Drive y aquí se registra su enlace.</div>
-                  <button style={S.smallBtn} onClick={() => setOpenPlan(v => !v)}>{openPlan ? 'Cancelar' : '+ Plan'}</button>
-                </div>
-                {openPlan && (
-                  <div style={S.formRow}>
-                    <Field l="Nombre del plan"><input style={S.inp} value={plan.nombre} onChange={e => setPlan({ ...plan, nombre: e.target.value })} placeholder="Plan · 2200 kcal" /></Field>
-                    <Field l="Fecha"><input type="date" style={S.inp} value={plan.fecha} onChange={e => setPlan({ ...plan, fecha: e.target.value })} /></Field>
-                    <Field l="Enlace de Drive"><input style={S.inp} value={plan.link} onChange={e => setPlan({ ...plan, link: e.target.value })} placeholder="https://drive.google.com/…" /></Field>
-                    <button style={S.saveBtn} onClick={addPlan}>Guardar</button>
-                  </div>
-                )}
-                {(!sel.planes || sel.planes.length === 0)
-                  ? <div className="empty-state">Aún no hay planes para este paciente.</div>
-                  : sel.planes.map((pl, i) => (
-                    <div key={i} style={S.planRow}>
-                      <div style={S.planIcon}>PDF</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{pl.nombre}</div>
-                        <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{pl.fecha ? fmtFecha(pl.fecha) : ''}</div>
-                      </div>
-                      {pl.link
-                        ? <a href={pl.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>
-                        : <span style={{ fontSize: 11, color: 'var(--stone)', fontStyle: 'italic' }}>Sin enlace</span>}
-                      <button style={S.rm} onClick={() => removePlan(i)} title="Quitar">×</button>
-                    </div>
-                  ))
-                }
-              </div>
-            )}
-          </div>
           {panel === null && <div style={S.rowSep} aria-hidden="true" />}
           {/* Seguimientos (notas internas de consulta, no visibles para el paciente) */}
           <div className="card" style={panel === 'bitacora' ? S.panelOpen : S.panel}>
@@ -1057,6 +1066,8 @@ const styles = {
   recoSeccion: { marginBottom: 14 },
   recoSeccionTitulo: { fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--stone)', marginBottom: 7 },
   recoItemSecTitulo: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 2 },
+  archHead: { width: '100%', background: 'var(--dark)', color: '#fff', fontWeight: 700, fontSize: 13.5, padding: '9px 13px', borderRadius: 9, letterSpacing: 0.3, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'var(--font)', marginTop: 10 },
+  archBody: { marginTop: 12, marginBottom: 6, paddingLeft: 2 },
   recoItem: { display: 'flex', alignItems: 'flex-start', gap: 10, border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, background: 'var(--cream)' },
   recoDate: { fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 },
   recoText: { fontSize: 13, color: 'var(--dark)', lineHeight: 1.5, whiteSpace: 'pre-wrap' },
