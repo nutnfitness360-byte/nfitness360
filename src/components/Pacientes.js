@@ -83,6 +83,8 @@ export default function Pacientes({ onRegisterExitGuard }) {
   const [bitacoraApego, setBitacoraApego] = useState('');
   const [isakFile, setIsakFile] = useState(null);
   const [isakBusy, setIsakBusy] = useState(false);
+  const [estudioFile, setEstudioFile] = useState(null);
+  const [estudioBusy, setEstudioBusy] = useState(false);
   const [panel, setPanel] = useState(null);
   const [ibFile, setIbFile] = useState(null);
   const [ibBusy, setIbBusy] = useState(false);
@@ -386,6 +388,36 @@ export default function Pacientes({ onRegisterExitGuard }) {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { isak: arr }); } catch (e) { setErr(e.message); }
   };
 
+  const subirEstudio = async () => {
+    if (!estudioFile) { setErr('Selecciona el archivo del estudio (PDF o imagen).'); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setErr('No está configurada la conexión para subir archivos.'); return; }
+    setEstudioBusy(true); setErr('');
+    try {
+      const b64 = await fileToBase64(estudioFile);
+      const fecha = hoyISO();
+      const ext = (estudioFile.name.split('.').pop() || 'pdf').toLowerCase();
+      const filename = 'Estudio_' + (sel.codigo || '') + '_' + fecha + '.' + ext;
+      const resp = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveEstudio', patient: sel.nombre, correo: (sel.correo || ''), filename, mime: estudioFile.type || 'application/pdf', fileBase64: b64 }),
+        redirect: 'follow',
+      });
+      const data = await resp.json().catch(() => null);
+      if (!data || !data.ok || !data.link) throw new Error((data && data.error) || 'No se recibió el enlace del archivo.');
+      const arr = [...(sel.estudios || []), { nombre: estudioFile.name || filename, fecha, link: data.link }];
+      await updateDoc(doc(db, 'pacientes', sel.id), { estudios: arr });
+      setEstudioFile(null); setErr('');
+    } catch (e) { setErr('No se pudo cargar el estudio: ' + e.message); }
+    setEstudioBusy(false);
+  };
+
+  const removeEstudio = async (i) => {
+    if (!window.confirm('¿Quitar este estudio de la lista? (El archivo seguirá en Drive.)')) return;
+    const arr = (sel.estudios || []).filter((_, k) => k !== i);
+    try { await updateDoc(doc(db, 'pacientes', sel.id), { estudios: arr }); } catch (e) { setErr(e.message); }
+  };
+
   const leerYGuardarInBody = async () => {
     if (!ibFile) { setErr('Selecciona el PDF del InBody.'); return; }
     const url = process.env.REACT_APP_APPSCRIPT_URL;
@@ -648,6 +680,42 @@ export default function Pacientes({ onRegisterExitGuard }) {
                           <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
                         </div>
                         {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
+          {/* Estudios clínicos (los sube el paciente; la nutri los ve y también puede subir) */}
+          <div className="card" style={panel === 'estudios' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'estudios' ? null : 'estudios')}>
+              <span style={S.panelTitle}>Estudios clínicos</span>
+              <span style={panel === 'estudios' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'estudios' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Estudios que el paciente sube desde su panel. Aparecen aquí automáticamente; también puedes subirlos tú. Se guardan en Drive.</div>
+                <label style={S.upload}>
+                  <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }} onChange={e => setEstudioFile(e.target.files && e.target.files[0])} />
+                  {estudioFile ? ('Archivo seleccionado: ' + estudioFile.name) : 'Seleccionar estudio (PDF o imagen)'}
+                </label>
+                <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={subirEstudio} disabled={estudioBusy}>
+                  {estudioBusy ? 'Cargando…' : 'Cargar estudio'}
+                </button>
+                <div style={{ marginTop: 14 }}>
+                  {(!sel.estudios || sel.estudios.length === 0)
+                    ? <div className="empty-state">Aún no hay estudios clínicos.</div>
+                    : [...sel.estudios].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                      <div key={idx} style={S.planRow}>
+                        <div style={S.planIcon}>PDF</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Estudio clínico'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+                        </div>
+                        {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                        <button style={S.rm} onClick={() => removeEstudio(idx)} title="Quitar">×</button>
                       </div>
                     ))}
                 </div>
