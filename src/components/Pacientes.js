@@ -702,10 +702,10 @@ export default function Pacientes({ onRegisterExitGuard }) {
                   </div>
                 )}
 
-                {archHeader('inbody', 'InBody')}
+                {archHeader('inbody', 'Mediciones')}
                 {archSec.inbody && (
                   <div style={S.archBody}>
-                    <div style={S.note}>Los InBody se cargan y leen con IA desde el panel <b>InBody</b>. Aquí ves los archivos guardados.</div>
+                    <div style={S.note}>Las mediciones se cargan y leen con IA (PDF del InBody) desde el panel <b>Mediciones</b>. Aquí ves los archivos guardados.</div>
                     {(!sel.inbodyArchivos || sel.inbodyArchivos.length === 0)
                       ? <div className="empty-state">Aún no hay archivos de InBody.</div>
                       : [...sel.inbodyArchivos].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
@@ -751,11 +751,10 @@ export default function Pacientes({ onRegisterExitGuard }) {
             )}
           </div>
 
-          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
           {/* InBody */}
           <div className="card" style={panel === 'inbody' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'inbody' ? null : 'inbody')}>
-              <span style={S.panelTitle}>InBody</span>
+              <span style={S.panelTitle}>Mediciones</span>
               <span style={panel === 'inbody' ? S.chevOpen : S.chev}>⌄</span>
             </button>
             {panel === 'inbody' && (
@@ -767,11 +766,12 @@ export default function Pacientes({ onRegisterExitGuard }) {
                 </label>
                 <button style={{ ...S.saveBtn, marginTop: 4 }} onClick={leerYGuardarInBody} disabled={ibBusy}>{ibBusy ? 'Leyendo…' : 'Leer y guardar InBody'}</button>
                 {ibMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{ibMsg}</div>}
-                <div style={{ ...S.note, marginTop: 12, marginBottom: 0 }}>Los archivos InBody guardados aparecen en <b>Archivos del paciente → InBody</b>.</div>
+                <div style={{ ...S.note, marginTop: 12, marginBottom: 0 }}>Los archivos guardados aparecen en <b>Archivos del paciente → Mediciones</b>.</div>
               </div>
             )}
           </div>
 
+          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
           {/* Plan nutricional */}
           <div className="card" style={panel === 'plan' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'plan' ? null : 'plan')}>
