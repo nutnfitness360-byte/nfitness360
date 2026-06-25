@@ -23,6 +23,25 @@ const initials = (n) => n ? n.split(' ').map(x => x[0]).join('').slice(0, 2).toU
 const last = (a) => (a && a.length ? a[a.length - 1] : null);
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 
+/* ===== mediciones manuales: pliegues (mm) y perímetros (cm) ===== */
+const PLIEGUES = [
+  { k: 'triceps', l: 'Tríceps' },
+  { k: 'subescapular', l: 'Subescapular' },
+  { k: 'supraespinal', l: 'Supraespinal / suprailiaco' },
+  { k: 'abdominal', l: 'Abdominal' },
+  { k: 'muslo', l: 'Muslo' },
+  { k: 'pantorrilla', l: 'Pantorrilla' },
+];
+const PERIMETROS = [
+  { k: 'brazoRelajado', l: 'Brazo relajado' },
+  { k: 'brazoFuerza', l: 'Brazo con fuerza' },
+  { k: 'cintura', l: 'Cintura' },
+  { k: 'abdomen', l: 'Abdomen' },
+  { k: 'cadera', l: 'Cadera' },
+];
+const MANUAL_CAMPOS = [...PLIEGUES, ...PERIMETROS].reduce((o, c) => { o[c.k] = ''; return o; }, {});
+const ANTRO_COLORS = ['var(--gold)', 'var(--stone)', 'var(--sage)', '#B0593F', '#5B7C99', '#3E6B5B', '#8E7CC3', '#C98A3F', '#6FA8A0', '#A0522D', '#4A7BA6'];
+
 /* ===== mini gráfica de línea (SVG, sin librerías) ===== */
 function Linea({ data, field, color, unit }) {
   const valid = (data || []).filter(d => typeof d[field] === 'number');
@@ -90,6 +109,10 @@ export default function Pacientes({ onRegisterExitGuard }) {
   const [ibFile, setIbFile] = useState(null);
   const [ibBusy, setIbBusy] = useState(false);
   const [ibMsg, setIbMsg] = useState('');
+  const [medMode, setMedMode] = useState('inbody');
+  const [manual, setManual] = useState({ fecha: hoyISO(), ...MANUAL_CAMPOS });
+  const [manualBusy, setManualBusy] = useState(false);
+  const [manualMsg, setManualMsg] = useState('');
   const [err, setErr] = useState('');
 
   useEffect(() => {
@@ -473,6 +496,26 @@ export default function Pacientes({ onRegisterExitGuard }) {
     setIbBusy(false);
   };
 
+  const guardarMedicionManual = async () => {
+    const numOrU = (s) => { const v = parseFloat(s); return isNaN(v) ? undefined : v; };
+    const entry = { fecha: manual.fecha || hoyISO() };
+    let algo = false;
+    [...PLIEGUES, ...PERIMETROS].forEach(({ k }) => { const v = numOrU(manual[k]); if (v !== undefined) { entry[k] = v; algo = true; } });
+    if (!algo) { setManualMsg('Escribe al menos un valor antes de guardar.'); return; }
+    if (PLIEGUES.some(({ k }) => typeof entry[k] === 'number')) {
+      const suma = PLIEGUES.reduce((a, { k }) => a + (typeof entry[k] === 'number' ? entry[k] : 0), 0);
+      entry.suma6 = Math.round(suma * 10) / 10;
+    }
+    setManualBusy(true); setManualMsg('');
+    try {
+      const arr = [...(sel.medicionesManual || []), entry].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+      await updateDoc(doc(db, 'pacientes', sel.id), { medicionesManual: arr });
+      setManual({ fecha: hoyISO(), ...MANUAL_CAMPOS });
+      setManualMsg('Medición guardada ✓ — revísala en las gráficas de pliegues y perímetros.');
+    } catch (e) { setManualMsg('No se pudo guardar: ' + e.message); }
+    setManualBusy(false);
+  };
+
   const onInBody = async (data) => {
     const peso = parseFloat(data.peso);
     if (isFinite(peso)) {
@@ -500,6 +543,11 @@ export default function Pacientes({ onRegisterExitGuard }) {
   /* ----- VISTA: dashboard de un paciente ----- */
   if (sel) {
     const m = last(sel.mediciones);
+    const mm = last(sel.medicionesManual);
+    const sumaManual = PLIEGUES.reduce((a, p) => { const v = parseFloat(manual[p.k]); return a + (isNaN(v) ? 0 : v); }, 0);
+    const hayPliegueManual = PLIEGUES.some(p => !isNaN(parseFloat(manual[p.k])));
+    const manualMasculino = /masc|hombre|var[oó]n|^m$/i.test((sel.sexo || '').trim());
+    const umbralPliegues = manualMasculino ? 50 : 30;
     const apegoData = bitacoraToApego(sel.bitacora);
     const ultApego = apegoData.length ? apegoData[apegoData.length - 1].apego : null;
     if (sub === 'plan') {
@@ -606,6 +654,31 @@ export default function Pacientes({ onRegisterExitGuard }) {
             <ChartCard title="Apego al plan" unit="%" valor={ultApego}><Linea data={apegoData} field="apego" color="#3E6B5B" unit="%" /></ChartCard>
           </div>
         </div>
+
+        {sel.medicionesManual && sel.medicionesManual.length > 0 && (
+          <div className="card">
+            <div style={S.titleRow}><div className="card-title" style={{ margin: 0 }}>Gráficas de pliegues y perímetros</div></div>
+            <div style={S.subLbl}>Pliegues (mm)</div>
+            <div style={S.chartGrid}>
+              {PLIEGUES.map((p, i) => (
+                <ChartCard key={p.k} title={p.l} unit=" mm" valor={mm && typeof mm[p.k] === 'number' ? mm[p.k] : null}>
+                  <Linea data={sel.medicionesManual} field={p.k} color={ANTRO_COLORS[i % ANTRO_COLORS.length]} unit="" />
+                </ChartCard>
+              ))}
+              <ChartCard title="Sumatoria 6 pliegues" unit=" mm" valor={mm && typeof mm.suma6 === 'number' ? mm.suma6 : null}>
+                <Linea data={sel.medicionesManual} field="suma6" color="#3E6B5B" unit="" />
+              </ChartCard>
+            </div>
+            <div style={{ ...S.subLbl, marginTop: 6 }}>Perímetros (cm)</div>
+            <div style={S.chartGrid}>
+              {PERIMETROS.map((p, i) => (
+                <ChartCard key={p.k} title={p.l} unit=" cm" valor={mm && typeof mm[p.k] === 'number' ? mm[p.k] : null}>
+                  <Linea data={sel.medicionesManual} field={p.k} color={ANTRO_COLORS[(i + 6) % ANTRO_COLORS.length]} unit="" />
+                </ChartCard>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={S.panelGrid}>
           {/* Historial clínico */}
@@ -759,14 +832,62 @@ export default function Pacientes({ onRegisterExitGuard }) {
             </button>
             {panel === 'inbody' && (
               <div style={S.panelBody}>
-                <div style={S.note}>Sube el PDF del InBody y el sistema lo lee automáticamente (IA): extrae peso, % de grasa, masa muscular, masa grasa, grasa visceral, agua y TMB, y alimenta las gráficas. Si algún valor sale mal, corrígelo con “Editar última” en Gráficas de avance.</div>
-                <label style={S.upload}>
-                  <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => { setIbFile(e.target.files && e.target.files[0]); setIbMsg(''); }} />
-                  {ibFile ? ('PDF seleccionado: ' + ibFile.name) : 'Seleccionar PDF del InBody'}
-                </label>
-                <button style={{ ...S.saveBtn, marginTop: 4 }} onClick={leerYGuardarInBody} disabled={ibBusy}>{ibBusy ? 'Leyendo…' : 'Leer y guardar InBody'}</button>
-                {ibMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{ibMsg}</div>}
-                <div style={{ ...S.note, marginTop: 12, marginBottom: 0 }}>Los archivos guardados aparecen en <b>Archivos del paciente → Mediciones</b>.</div>
+                <div style={S.segWrap}>
+                  <button style={medMode === 'inbody' ? S.segOn : S.segOff} onClick={() => setMedMode('inbody')}>InBody</button>
+                  <button style={medMode === 'manual' ? S.segOn : S.segOff} onClick={() => setMedMode('manual')}>Manual</button>
+                </div>
+
+                {medMode === 'inbody' && (
+                  <div>
+                    <div style={S.note}>Sube el PDF del InBody y el sistema lo lee automáticamente (IA): extrae peso, % de grasa, masa muscular, masa grasa, grasa visceral, agua y TMB, y alimenta las gráficas. Si algún valor sale mal, corrígelo con “Editar última” en Gráficas de avance.</div>
+                    <label style={S.upload}>
+                      <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => { setIbFile(e.target.files && e.target.files[0]); setIbMsg(''); }} />
+                      {ibFile ? ('PDF seleccionado: ' + ibFile.name) : 'Seleccionar PDF del InBody'}
+                    </label>
+                    <button style={{ ...S.saveBtn, marginTop: 4 }} onClick={leerYGuardarInBody} disabled={ibBusy}>{ibBusy ? 'Leyendo…' : 'Leer y guardar InBody'}</button>
+                    {ibMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{ibMsg}</div>}
+                    <div style={{ ...S.note, marginTop: 12, marginBottom: 0 }}>Los archivos guardados aparecen en <b>Archivos del paciente → Mediciones</b>.</div>
+                  </div>
+                )}
+
+                {medMode === 'manual' && (
+                  <div>
+                    <div style={S.note}>Captura pliegues (mm) y perímetros (cm). Se guardan con su fecha y alimentan las gráficas de seguimiento.</div>
+                    <div style={{ maxWidth: 200, marginBottom: 6 }}>
+                      <Field l="Fecha de la medición"><input type="date" style={S.inp} value={manual.fecha} onChange={e => setManual({ ...manual, fecha: e.target.value })} /></Field>
+                    </div>
+
+                    <div style={S.subLbl}>Pliegues (mm)</div>
+                    <div style={S.medGrid}>
+                      {PLIEGUES.map(p => (
+                        <Field key={p.k} l={p.l}><input style={S.inp} inputMode="decimal" value={manual[p.k]} onChange={e => setManual({ ...manual, [p.k]: e.target.value })} /></Field>
+                      ))}
+                    </div>
+
+                    <div style={S.sumaBox}>
+                      <div>
+                        <div style={{ fontSize: 12, color: 'var(--stone)' }}>Sumatoria de 6 pliegues</div>
+                        <div style={{ fontFamily: 'var(--font)', fontWeight: 800, fontSize: 22, color: 'var(--dark)' }}>{hayPliegueManual ? (Math.round(sumaManual * 10) / 10) : '—'} <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--stone)' }}>mm</span></div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 11, color: 'var(--stone)', marginBottom: 4 }}>Ideal {manualMasculino ? 'hombres' : 'mujeres'} &lt; {umbralPliegues} mm</div>
+                        {hayPliegueManual && (
+                          <span style={sumaManual < umbralPliegues ? S.badgeOk : S.badgeWarn}>{sumaManual < umbralPliegues ? 'Dentro del rango ideal' : 'Por encima del rango ideal'}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={S.subLbl}>Perímetros (cm)</div>
+                    <div style={S.medGrid}>
+                      {PERIMETROS.map(p => (
+                        <Field key={p.k} l={p.l}><input style={S.inp} inputMode="decimal" value={manual[p.k]} onChange={e => setManual({ ...manual, [p.k]: e.target.value })} /></Field>
+                      ))}
+                    </div>
+
+                    <button style={{ ...S.saveBtn, marginTop: 6 }} onClick={guardarMedicionManual} disabled={manualBusy}>{manualBusy ? 'Guardando…' : 'Guardar medición manual'}</button>
+                    {manualMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{manualMsg}</div>}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1068,6 +1189,14 @@ const styles = {
   recoItemSecTitulo: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 2 },
   archHead: { width: '100%', background: 'var(--dark)', color: '#fff', fontWeight: 700, fontSize: 13.5, padding: '9px 13px', borderRadius: 9, letterSpacing: 0.3, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'var(--font)', marginTop: 10 },
   archBody: { marginTop: 12, marginBottom: 6, paddingLeft: 2 },
+  segWrap: { display: 'inline-flex', background: 'var(--cream)', borderRadius: 9, padding: 3, gap: 3, marginBottom: 14 },
+  segOn: { border: 'none', background: '#fff', color: 'var(--dark)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, padding: '7px 16px', borderRadius: 7, cursor: 'pointer', boxShadow: '0 0 0 0.5px var(--border)' },
+  segOff: { border: 'none', background: 'transparent', color: 'var(--stone)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 7, cursor: 'pointer' },
+  subLbl: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)', margin: '4px 0 10px' },
+  medGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '4px 12px', marginBottom: 14 },
+  sumaBox: { background: 'var(--cream)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 18 },
+  badgeOk: { fontSize: 12, padding: '4px 10px', borderRadius: 8, background: '#e6f4ea', color: '#2e7d4f', fontWeight: 600 },
+  badgeWarn: { fontSize: 12, padding: '4px 10px', borderRadius: 8, background: '#fdf0e3', color: '#b5701f', fontWeight: 600 },
   recoItem: { display: 'flex', alignItems: 'flex-start', gap: 10, border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, background: 'var(--cream)' },
   recoDate: { fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 },
   recoText: { fontSize: 13, color: 'var(--dark)', lineHeight: 1.5, whiteSpace: 'pre-wrap' },
