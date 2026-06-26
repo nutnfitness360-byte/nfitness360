@@ -114,7 +114,7 @@ function compressImage(file, maxW = 620, quality = 0.5) {
 const nuevaOpcion = () => ({ nombre: '', prep: '' });
 const opcionesArr = (n) => Array.from({ length: Math.max(1, n || 1) }, nuevaOpcion);
 function nuevoTiempo(def, eqRow, nOp = 3) {
-  return { id: uid(), nombre: def?.nombre || 'Nuevo tiempo', hora: def?.hora || '12:00', eq: eqRow || Array(18).fill(0), opciones: opcionesArr(nOp), foto: '' };
+  return { id: uid(), nombre: def?.nombre || 'Nuevo tiempo', hora: def?.hora || '12:00', eq: eqRow || Array(18).fill(0), opciones: opcionesArr(nOp), foto: '', indicacion: '' };
 }
 
 export default function Menus({ patient, onBack, initialMenus = null, onGuardChange }) {
@@ -253,7 +253,9 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           lip: a.lip + num(t.eq[g]) * GRUPOS[g][3], hc: a.hc + num(t.eq[g]) * GRUPOS[g][4],
         }), { kcal: 0, prot: 0, lip: 0, hc: 0 });
         const equivalentes = t.eq.map((n, g) => ({ grupo: GRUPOS[g][0], n: round2(num(n)) })).filter(x => x.n > 0);
-        return { nombre: t.nombre, hora: t.hora, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) } };
+        const ind = (t.indicacion || '').trim();
+        const nombreIA = ind ? (t.nombre + ' — indicación del nutriólogo: ' + ind) : t.nombre;
+        return { nombre: nombreIA, hora: t.hora, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) } };
       });
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -268,7 +270,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         const usados = new Array(aiList.length).fill(false);
         const norm = (s) => (s || '').toString().trim().toLowerCase();
         idxIA.forEach((origIdx, k) => {
-          const objetivo = norm(next[origIdx].nombre);
+          const objetivo = norm(payloadTiempos[k] && payloadTiempos[k].nombre);
           // 1) empareja por NOMBRE (el que devuelve la IA), 2) si no, por posición k, 3) primer libre
           let ridx = objetivo ? aiList.findIndex((r, j) => !usados[j] && r && norm(r.nombre) === objetivo) : -1;
           if (ridx < 0) ridx = (aiList[k] && !usados[k]) ? k : aiList.findIndex((r, j) => !usados[j]);
@@ -344,7 +346,9 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       }), { kcal: 0, prot: 0, lip: 0, hc: 0 });
       const equivalentes = t.eq.map((n, g) => ({ grupo: GRUPOS[g][0], n: round2(num(n)) })).filter(x => x.n > 0);
       const evitar = (t.opciones || []).map(o => (o.nombre || '').trim()).filter(Boolean);
-      const payloadTiempos = [{ nombre: t.nombre, hora: t.hora, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) }, evitar }];
+      const indOp = (t.indicacion || '').trim();
+      const nombreIAop = indOp ? (t.nombre + ' — indicación del nutriólogo: ' + indOp) : t.nombre;
+      const payloadTiempos = [{ nombre: nombreIAop, hora: t.hora, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) }, evitar }];
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'generarMenusIA', objetivo: patient.objetivo || '', totales: plan.totales || {}, tiempos: payloadTiempos, nOpciones: 1, gustos: ((patient.historia && patient.historia.dietetica && patient.historia.dietetica.leGusta) || '').trim(), disgustos: ((patient.historia && patient.historia.dietetica && patient.historia.dietetica.noLeGusta) || '').trim() }),
@@ -727,6 +731,19 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
               <input type="checkbox" checked={esPorciones(t)} onChange={e => setPorciones(idx, e.target.checked)} />
               Porciones (equivalencias) — una sola opción, sin IA
             </label>
+
+            {!esPorciones(t) && (
+              <div style={{ border: `1px solid #C2A24E`, borderRadius: 10, padding: '11px 13px', background: 'rgba(194,162,78,0.06)', margin: '0 0 14px' }}>
+                <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: '#9A7B2E', marginBottom: 7 }}>✦ Indicaciones para la IA (opcional)</div>
+                <textarea
+                  style={{ width: '100%', minHeight: 54, padding: '9px 11px', border: `1px solid ${T.line}`, borderRadius: 8, fontSize: 13, lineHeight: 1.5, fontFamily: mono, color: T.ink, resize: 'vertical', boxSizing: 'border-box' }}
+                  placeholder="Ej.: Cena ligera, proteína magra + verdura, sin cereales ni frituras."
+                  value={t.indicacion || ''}
+                  onChange={e => setT(idx, { indicacion: e.target.value })}
+                />
+                <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 6, lineHeight: 1.5 }}>Guía a la IA para este tiempo. Si la dejas vacía, decide por el nombre y la hora.</div>
+              </div>
+            )}
 
             <div style={S.optsRow}>
               <div style={{ flex: 1 }}>
