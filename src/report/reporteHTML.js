@@ -87,7 +87,7 @@ function porcionLineHTML(line) {
   return `<b>${esc(line)}</b>`;
 }
 
-function mealRow(t) {
+function mealRow(t, nCols) {
   const circle = t.foto
     ? `<div class="circle"><img src="${t.foto}" alt=""/></div>`
     : `<div class="circle ph">${PLATE}</div>`;
@@ -102,8 +102,9 @@ function mealRow(t) {
       </div></div>
     </div>`;
   }
-  const ops = (t.opciones || []).slice(0, 3);
-  while (ops.length < 3) ops.push({ nombre: '', prep: '' });
+  const n = (nCols && nCols > 0) ? nCols : Math.max(1, (t.opciones || []).length);
+  const ops = [];
+  for (let k = 0; k < n; k++) ops.push((t.opciones || [])[k] || { nombre: '', prep: '' });
   const cols = ops.map((o, k) => `
     <div class="ocol"><div class="ohead">Opción ${k + 1}</div>
       <div class="obox"><div class="dn">${esc(o.nombre) || '—'}</div><div class="od">${esc(o.prep)}</div></div>
@@ -123,8 +124,19 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
   const distrib = plan.totales ? `(${r0(plan.totales.distC)}, ${r0(plan.totales.distP)}, ${r0(plan.totales.distL)})` : '';
   const nom = (nombre || 'Paciente').toUpperCase();
 
+  // Columnas de opción: se ajustan al número real de opciones del menú (igual en toda la hoja).
+  // Toma el máximo de opciones con contenido entre los tiempos; mínimo 1, tope 6 (lo que permite la configuración).
+  let nCols = 1;
+  tiempos.forEach(t => {
+    if (esPorciones(t)) return;
+    const ops = (t.opciones || []).slice(0, 6);
+    let last = ops.length;
+    while (last > 0 && !(((ops[last - 1] || {}).nombre || '').trim() || ((ops[last - 1] || {}).prep || '').trim())) last--;
+    if (last > nCols) nCols = last;
+  });
+
   // páginas de menú: 3 tiempos por página
-  const filas = tiempos.map(mealRow);
+  const filas = tiempos.map(t => mealRow(t, nCols));
   const menuPages = [];
   for (let i = 0; i < filas.length; i += 3) {
     const chunk = filas.slice(i, i + 3).join('');
