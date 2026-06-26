@@ -46,13 +46,41 @@ const round2 = (n) => Math.round((num(n) + Number.EPSILON) * 100) / 100;
 const fmt = (n) => String(round2(n)); // muestra decimales tal cual (2.5, 2, 0.6) sin redondear a entero
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-function distribuir(eqArr, nMeals) {
+// Clasifica un tiempo a una columna de GW [Desayuno, Col AM, Comida, Col PM, Cena]
+// según su NOMBRE (y la hora como respaldo), NO según su posición.
+function tiempoCol(nombre, hora) {
+  const n = (nombre || '').toString().toLowerCase();
+  if (/desayun/.test(n)) return 0;
+  if (/comida|almuerz/.test(n)) return 2;
+  if (/cena/.test(n)) return 4;
+  const h = parseInt((hora || '').toString().slice(0, 2), 10);
+  if (/colaci|refrig|snack|tentempi|merienda|entren|media/.test(n)) {
+    if (/\bpm\b|tarde|noche|vesp/.test(n)) return 3;
+    if (/\bam\b|mañ|matut/.test(n)) return 1;
+    return (isFinite(h) && h >= 14) ? 3 : 1;
+  }
+  // nombre personalizado: clasifica por hora
+  if (!isFinite(h)) return 2;
+  if (h < 10) return 0;
+  if (h < 12) return 1;
+  if (h < 16) return 2;
+  if (h < 19) return 3;
+  return 4;
+}
+
+function distribuir(eqArr, nMeals, tiempos) {
   const meals = Array.from({ length: nMeals }, () => Array(18).fill(0));
+  // Columna de pesos por cada tiempo: por NOMBRE/hora si se reciben los tiempos; si no, por posición.
+  const cols = [];
+  for (let m = 0; m < nMeals; m++) {
+    const t = (tiempos && tiempos[m]) || null;
+    cols.push(t ? tiempoCol(t.nombre, t.hora) : m);
+  }
   for (let g = 0; g < 18; g++) {
     const total = num(eqArr[g]); // sin redondear: respeta el decimal del plan
     if (!total) continue;
     let w = [];
-    for (let m = 0; m < nMeals; m++) w.push(GW[g] && GW[g][m] != null ? GW[g][m] : 0);
+    for (let m = 0; m < nMeals; m++) { const c = cols[m]; w.push(GW[g] && GW[g][c] != null ? GW[g][c] : 0); }
     let sw = w.reduce((a, b) => a + b, 0);
     if (sw <= 0) { meals[Math.min(2, nMeals - 1)][g] = round2(total); continue; }
     w = w.map(x => x / sw);
@@ -162,7 +190,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
 
   const redistribuir = () => {
     if (!planEq) return;
-    const dist = distribuir(planEq, tiempos.length);
+    const dist = distribuir(planEq, tiempos.length, tiempos);
     setTiempos(ts => ts.map((t, m) => ({ ...t, eq: dist[m] }))); touch();
   };
   const addTiempo = () => { setTiempos(ts => [...ts, nuevoTiempo({ nombre: 'Nuevo tiempo', hora: '12:00' }, Array(18).fill(0), nOpciones)]); touch(); };
@@ -191,7 +219,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const aplicarConfig = () => {
     const nOp = Math.max(1, Math.min(6, cfgNOp));
     const defs = cfgTiempos;
-    const dist = planEq ? distribuir(planEq, defs.length) : defs.map(() => Array(18).fill(0));
+    const dist = planEq ? distribuir(planEq, defs.length, defs) : defs.map(() => Array(18).fill(0));
     setTiempos(defs.map((d, m) => nuevoTiempo(d, dist[m], nOp)));
     setNOpciones(nOp);
     setShowCfg(false); setStatus('nuevo'); setRep('');
