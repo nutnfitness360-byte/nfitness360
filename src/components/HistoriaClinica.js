@@ -85,7 +85,7 @@ const OBJETIVOS = ["Aumento de masa muscular", "Baja de grasa", "Recomposición 
 function baseSeed() {
   return {
     datos: {
-      nombre: "", pacienteNo: "", fecha: "", edad: "", sexo: "Femenino",
+      nombre: "", pacienteNo: "", fecha: "", fechaNacimiento: "", edad: "", sexo: "Femenino",
       peso: "", talla: "", correo: "", ocupacion: "", objetivo: "",
     },
     padecimientos: { lista: [], medicamentos: "" },
@@ -168,7 +168,7 @@ function histParts(data) {
     `<div class="brand">${logo}</div>` +
     `<div class="eyebrow">Panel de la nutrióloga</div>` +
     `<h1>Historial Clínico Nutricio</h1>` +
-    `<div class="idrow"><span class="pill">${v(d.pacienteNo)}</span><span class="pname"><b>${v(d.nombre)}</b>${d.edad ? " · " + esc(d.edad) + " años" : ""}${d.sexo ? " · " + esc(d.sexo) : ""}${d.fecha ? " · " + esc(d.fecha) : ""}</span></div>` +
+    `<div class="idrow"><span class="pill">${v(d.pacienteNo)}</span><span class="pname"><b>${v(d.nombre)}</b>${d.edad ? " · " + esc(d.edad) + " años" : ""}${d.sexo ? " · " + esc(d.sexo) : ""}${d.fecha ? " · " + esc(fmtFechaMX(d.fecha)) : ""}</span></div>` +
     `<hr class="hdrsep"/>`;
 
   const padInner =
@@ -319,14 +319,48 @@ async function generarHistorialPDFBase64(data) {
   }
 }
 
+/* Edad calculada a partir de la fecha de nacimiento, referida a la fecha de consulta.
+   Acepta fechas en formato ISO (YYYY-MM-DD) o es-MX (DD/MM/YYYY). */
+function parseFechaFlex(s) {
+  if (!s) return null;
+  s = String(s).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+function calcEdad(nac, ref) {
+  const b = parseFechaFlex(nac), r = parseFechaFlex(ref);
+  if (!b || !r) return "";
+  let a = r.getFullYear() - b.getFullYear();
+  const mo = r.getMonth() - b.getMonth();
+  if (mo < 0 || (mo === 0 && r.getDate() < b.getDate())) a--;
+  return (a >= 0 && a < 130) ? String(a) : "";
+}
+function fmtFechaMX(s) {
+  const d = parseFechaFlex(s);
+  return d ? d.toLocaleDateString("es-MX") : (s || "");
+}
+function toISODate(s) {
+  const d = parseFechaFlex(s);
+  if (!d) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
 export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
   const [data, setData] = useState(() => {
     const s = baseSeed();
     if (initial && typeof initial === "object") {
-      return { ...s, ...initial, datos: { ...s.datos, ...(initial.datos || {}) } };
+      const merged = { ...s, ...initial, datos: { ...s.datos, ...(initial.datos || {}) } };
+      const iso = toISODate(merged.datos.fecha);
+      if (iso) merged.datos.fecha = iso;
+      return merged;
     }
     s.datos.pacienteNo = codigo || "";
-    s.datos.fecha = new Date().toLocaleDateString("es-MX");
+    s.datos.fecha = new Date().toISOString().slice(0, 10);
     return s;
   });
   const [active, setActive] = useState("datos");
@@ -355,6 +389,16 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
 
   const setField = useCallback((sec, field, value) => {
     setData((d) => ({ ...d, [sec]: { ...d[sec], [field]: value } }));
+  }, []);
+
+  // Actualiza fecha de consulta o de nacimiento y recalcula la edad automáticamente.
+  const setFechaDato = useCallback((field, value) => {
+    setData((d) => {
+      const datos = { ...d.datos, [field]: value };
+      const nueva = calcEdad(datos.fechaNacimiento, datos.fecha);
+      if (nueva) datos.edad = nueva;
+      return { ...d, datos };
+    });
   }, []);
 
   const setRow = useCallback((sec, listKey, idx, key, value) => {
@@ -556,15 +600,23 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
             </Field>
             <Field label="Fecha de consulta">
               <input type="date" style={styles.input} value={data.datos.fecha}
-                onChange={(e) => setField("datos", "fecha", e.target.value)} />
+                onChange={(e) => setFechaDato("fecha", e.target.value)} />
             </Field>
             <Field label="Nombre" full>
               <input style={styles.input} value={data.datos.nombre} placeholder="Nombre completo"
                 onChange={(e) => setField("datos", "nombre", e.target.value)} />
             </Field>
+            <Field label="Fecha de nacimiento">
+              <input type="date" style={styles.input} value={data.datos.fechaNacimiento || ""}
+                onChange={(e) => setFechaDato("fechaNacimiento", e.target.value)} />
+            </Field>
             <Field label="Edad (años)">
-              <input style={styles.input} inputMode="numeric" value={data.datos.edad} placeholder="29"
-                onChange={(e) => setField("datos", "edad", e.target.value)} />
+              <div style={styles.autoWrap}>
+                <input style={{ ...styles.input, ...styles.inputAuto }}
+                  value={data.datos.edad ? data.datos.edad + " años" : ""}
+                  placeholder="Se calcula con la fecha de nacimiento" readOnly />
+                <span style={styles.autoTag}>auto</span>
+              </div>
             </Field>
             <Field label="Sexo">
               <select style={styles.input} value={data.datos.sexo}
