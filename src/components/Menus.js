@@ -236,8 +236,17 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       if (!data.ok || !Array.isArray(data.tiempos)) throw new Error(data.error || 'No se recibieron menús.');
       setTiempos(ts => {
         const next = ts.slice();
+        const aiList = Array.isArray(data.tiempos) ? data.tiempos.slice() : [];
+        const usados = new Array(aiList.length).fill(false);
+        const norm = (s) => (s || '').toString().trim().toLowerCase();
         idxIA.forEach((origIdx, k) => {
-          const r = data.tiempos[k];
+          const objetivo = norm(next[origIdx].nombre);
+          // 1) empareja por NOMBRE (el que devuelve la IA), 2) si no, por posición k, 3) primer libre
+          let ridx = objetivo ? aiList.findIndex((r, j) => !usados[j] && r && norm(r.nombre) === objetivo) : -1;
+          if (ridx < 0) ridx = (aiList[k] && !usados[k]) ? k : aiList.findIndex((r, j) => !usados[j]);
+          if (ridx < 0) return;
+          usados[ridx] = true;
+          const r = aiList[ridx];
           if (!r || !Array.isArray(r.opciones)) return;
           const ops = r.opciones.slice(0, nOpciones).map(o => ({ nombre: (o && o.nombre) || '', prep: (o && o.prep) || '' }));
           while (ops.length < nOpciones) ops.push(nuevaOpcion());
