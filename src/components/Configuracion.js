@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
+import { useBranding, DEFAULT_COLORS, aplicarColores, BRANDING_LOCKED } from '../context/BrandingContext';
 
 const COLOR_LABELS = [
   ['gold', 'Acento (botones, detalles)'],
@@ -103,22 +103,26 @@ export default function Configuracion() {
         {(logo === '' ) ? <button style={B.ghost} onClick={() => guardar({ logo: null })} disabled={busy}>Usar logo por defecto</button> : null}
       </div>
 
-      {/* COLORES */}
-      <div style={B.label}>Colores</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px,1fr))', gap: 10, marginBottom: 18 }}>
-        {COLOR_LABELS.map(([k, label]) => (
-          <label key={k} style={B.colorRow}>
-            <input type="color" value={colorsLocal[k] || '#000000'}
-              onChange={e => setColor(k, e.target.value)} style={B.colorInput} />
-            <span>{label}</span>
-          </label>
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button style={B.primary} onClick={() => guardar({ colors: colorsLocal })} disabled={busy}>Guardar colores</button>
-        <button style={B.ghost} onClick={() => { setColorsLocal(DEFAULT_COLORS); aplicarColores(DEFAULT_COLORS); guardar({ colors: DEFAULT_COLORS }); }} disabled={busy}>Restablecer colores</button>
-        {msg ? <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>{msg}</span> : null}
-      </div>
+      {!BRANDING_LOCKED && (
+        <div>
+          {/* COLORES */}
+          <div style={B.label}>Colores</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px,1fr))', gap: 10, marginBottom: 18 }}>
+            {COLOR_LABELS.map(([k, label]) => (
+              <label key={k} style={B.colorRow}>
+                <input type="color" value={colorsLocal[k] || '#000000'}
+                  onChange={e => setColor(k, e.target.value)} style={B.colorInput} />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button style={B.primary} onClick={() => guardar({ colors: colorsLocal })} disabled={busy}>Guardar colores</button>
+            <button style={B.ghost} onClick={() => { setColorsLocal(DEFAULT_COLORS); aplicarColores(DEFAULT_COLORS); guardar({ colors: DEFAULT_COLORS }); }} disabled={busy}>Restablecer colores</button>
+          </div>
+        </div>
+      )}
+      {msg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{msg}</span> : null}
     </div>
   );
 }
