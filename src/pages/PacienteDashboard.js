@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import { useBranding, aplicarColores } from '../context/BrandingContext';
 import Topbar from '../components/Topbar';
 import PerfilPaciente from '../components/PerfilPaciente';
 import Agenda from '../components/Agenda';
@@ -53,8 +54,85 @@ const IconAgendar = <svg viewBox="0 0 24 24" width="30" height="30" strokeWidth=
 const IconPlan = <svg viewBox="0 0 24 24" width="30" height="30" strokeWidth="1.5" fill="none" stroke="var(--gold)"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>;
 const IconRecom = <svg viewBox="0 0 24 24" width="30" height="30" strokeWidth="1.5" fill="none" stroke="var(--gold)"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>;
 
+const APARIENCIA_TOKENS = [
+  { k: 'cream', l: 'Fondo' },
+  { k: 'card', l: 'Tarjetas' },
+  { k: 'gold', l: 'Acento (botones)' },
+  { k: 'dark', l: 'Texto' },
+];
+
+// Preferencia personal de colores del paciente: solo afecta SU vista (capa por encima de la marca).
+function AparienciaPaciente({ expediente, brandColors }) {
+  const [val, setVal] = useState({ ...brandColors, ...((expediente && expediente.coloresPersonales) || {}) });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    setVal({ ...brandColors, ...((expediente && expediente.coloresPersonales) || {}) });
+  }, [brandColors, expediente]);
+
+  const setColor = (k, v) => {
+    const next = { ...val, [k]: v };
+    setVal(next);
+    aplicarColores({ ...brandColors, ...next }); // vista previa en vivo
+  };
+
+  const guardar = async () => {
+    if (!expediente) { setMsg('Tu cuenta aún no está vinculada a un expediente.'); return; }
+    const personal = {};
+    APARIENCIA_TOKENS.forEach(({ k }) => { if (val[k]) personal[k] = val[k]; });
+    setBusy(true); setMsg('');
+    try {
+      await updateDoc(doc(db, 'pacientes', expediente.id), { coloresPersonales: personal });
+      setMsg('Colores guardados ✓');
+    } catch (e) { setMsg('No se pudo guardar: ' + e.message); }
+    setBusy(false);
+  };
+
+  const restablecer = async () => {
+    setVal({ ...brandColors });
+    aplicarColores(brandColors);
+    setMsg('');
+    if (!expediente) return;
+    setBusy(true);
+    try {
+      await updateDoc(doc(db, 'pacientes', expediente.id), { coloresPersonales: {} });
+      setMsg('Se restablecieron los colores de la marca.');
+    } catch (e) { setMsg('No se pudo restablecer: ' + e.message); }
+    setBusy(false);
+  };
+
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 22px', marginTop: 18 }}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)', marginBottom: 4 }}>Apariencia</div>
+      <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5, marginBottom: 16 }}>Personaliza los colores de tu vista. Solo afectan cómo tú ves la app; no cambian la marca de tu nutriólogo(a).</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 11, maxWidth: 360 }}>
+        {APARIENCIA_TOKENS.map(({ k, l }) => (
+          <label key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, fontSize: 13.5, color: 'var(--stone)' }}>
+            {l}
+            <input type="color" value={val[k] || '#000000'} onChange={e => setColor(k, e.target.value)}
+              style={{ width: 46, height: 30, border: 'none', background: 'none', cursor: 'pointer', padding: 0 }} />
+          </label>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 18 }}>
+        <button onClick={guardar} disabled={busy}
+          style={{ background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 9, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          {busy ? 'Guardando…' : 'Guardar mis colores'}
+        </button>
+        <button onClick={restablecer} disabled={busy}
+          style={{ background: 'transparent', color: 'var(--stone)', border: '1px solid var(--border)', borderRadius: 9, padding: '9px 16px', fontSize: 13, cursor: 'pointer' }}>
+          Volver a los colores de la marca
+        </button>
+        {msg ? <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>{msg}</span> : null}
+      </div>
+    </div>
+  );
+}
+
 export default function PacienteDashboard() {
   const { user } = useAuth();
+  const { colors } = useBranding();
   const [tab, setTab] = useState('inicio');
   const [citas, setCitas] = useState([]);
   const [expediente, setExpediente] = useState(null);
@@ -120,6 +198,12 @@ export default function PacienteDashboard() {
     const q = query(collection(db, 'citas'), where('pacienteEmail', '==', user.email));
     return onSnapshot(q, snap => setCitas(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.fecha.localeCompare(b.fecha))));
   }, [user]);
+
+  // Aplica la preferencia de colores del paciente (capa por encima de la marca) en toda su vista.
+  useEffect(() => {
+    const personal = (expediente && expediente.coloresPersonales) || null;
+    aplicarColores(personal ? { ...colors, ...personal } : colors);
+  }, [colors, expediente]);
 
   // Vincula el expediente del paciente con su cuenta por el correo de sesión.
   useEffect(() => {
@@ -252,6 +336,7 @@ export default function PacienteDashboard() {
         <Topbar role="paciente" user={user} onPerfil={() => setTab('perfil')} />
         <div className="content">
           <PerfilPaciente onBack={() => setTab('inicio')} />
+          <AparienciaPaciente expediente={expediente} brandColors={colors} />
         </div>
         {navEl}
       </div>
