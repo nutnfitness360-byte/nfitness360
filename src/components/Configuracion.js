@@ -1,7 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { useBranding, DEFAULT_COLORS, aplicarColores, BRANDING_LOCKED } from '../context/BrandingContext';
+import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
+
+// Bloqueo de marca por instancia (definido aquí para no depender de otro archivo):
+// si REACT_APP_BRANDING_LOCKED === 'true', no se muestra el editor de colores.
+const BRANDING_LOCKED = String(process.env.REACT_APP_BRANDING_LOCKED || '').toLowerCase() === 'true';
 
 const COLOR_LABELS = [
   ['gold', 'Acento (botones, detalles)'],
