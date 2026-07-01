@@ -37,6 +37,12 @@ function fmtDate(key) {
   return new Date(+y,+m-1,+d).toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'}).replace(/^\w/,c=>c.toUpperCase());
 }
 function toMin(h) { const [H,M] = h.split(':').map(Number); return H*60+M; }
+// Una cita ya pasó si su fecha+hora de inicio es anterior a este momento.
+function citaPasada(c) {
+  if (!c || !c.fecha) return false;
+  const dt = new Date(c.fecha + 'T' + (c.hora || '23:59') + ':00');
+  return !isNaN(dt.getTime()) && dt.getTime() < Date.now();
+}
 function fromMin(m) { return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
 function proxDisponible(date) {
   const d = new Date(date);
@@ -330,8 +336,10 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                     </div>
                   )}
                 </div>
-                <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>
-                {c.estado !== 'cancelada' && (
+                {!isNutri && c.estado !== 'cancelada' && citaPasada(c)
+                  ? <span className="badge" style={{ background: '#ECE7E1', color: '#7A6F66' }}>Concluida</span>
+                  : <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>}
+                {c.estado !== 'cancelada' && (isNutri || !citaPasada(c)) && (
                   <button onClick={() => (!isNutri && onSolicitarCancelar) ? onSolicitarCancelar(c) : setLocalModal(c)} title="Cancelar cita"
                     style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid #B0593F', borderRadius: 8, fontSize: 11, fontWeight: 600, color: '#B0593F', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', flexShrink: 0 }}>
                     Cancelar
