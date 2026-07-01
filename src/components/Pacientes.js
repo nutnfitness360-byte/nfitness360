@@ -85,7 +85,7 @@ export default function Pacientes({ onRegisterExitGuard }) {
   const [busca, setBusca] = useState('');
   const [menuId, setMenuId] = useState(null);
   const [menuReabrir, setMenuReabrir] = useState(null);
-  const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' });
+  const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', apego: '' });
   const [editMed, setEditMed] = useState({ fecha: '', peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', tmb: '' });
   const [editApego, setEditApego] = useState('');
   const [openEdit, setOpenEdit] = useState(false);
@@ -243,11 +243,22 @@ export default function Pacientes({ onRegisterExitGuard }) {
 
   const addMedicion = async () => {
     if (!med.fecha || !med.peso) { setErr('Fecha y peso son necesarios.'); return; }
+    const num = (x) => (x === '' || x === null || x === undefined || isNaN(+x)) ? undefined : +x;
     const nm = { fecha: med.fecha, peso: +med.peso, grasa: +med.grasa || 0, musculo: +med.musculo || 0 };
+    if (num(med.grasaKg) !== undefined) nm.grasaKg = +med.grasaKg;
+    if (num(med.visceral) !== undefined) nm.visceral = +med.visceral;
+    if (num(med.agua) !== undefined) nm.agua = +med.agua;
     const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const updates = { mediciones: arr };
+    // % de apego: agrega un punto nuevo (en bitácora) con la fecha de esta medición.
+    const ap = num(med.apego);
+    if (ap !== undefined) {
+      const ts = new Date(med.fecha + 'T00:00:00').getTime();
+      updates.bitacora = [...(sel.bitacora || []), { texto: '', apego: ap, fecha: isNaN(ts) ? Date.now() : ts }];
+    }
     try {
-      await updateDoc(doc(db, 'pacientes', sel.id), { mediciones: arr });
-      setMed({ fecha: hoyISO(), peso: '', grasa: '', musculo: '' }); setOpenMed(false); setErr('');
+      await updateDoc(doc(db, 'pacientes', sel.id), updates);
+      setMed({ fecha: hoyISO(), peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', apego: '' }); setOpenMed(false); setErr('');
     } catch (e) { setErr('No se pudo guardar: ' + e.message); }
   };
 
@@ -633,6 +644,10 @@ export default function Pacientes({ onRegisterExitGuard }) {
               <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={med.peso} onChange={e => setMed({ ...med, peso: e.target.value })} /></Field>
               <Field l="% grasa"><input style={S.inp} inputMode="decimal" value={med.grasa} onChange={e => setMed({ ...med, grasa: e.target.value })} /></Field>
               <Field l="Músculo (kg)"><input style={S.inp} inputMode="decimal" value={med.musculo} onChange={e => setMed({ ...med, musculo: e.target.value })} /></Field>
+              <Field l="Masa grasa (kg)"><input style={S.inp} inputMode="decimal" value={med.grasaKg} onChange={e => setMed({ ...med, grasaKg: e.target.value })} /></Field>
+              <Field l="Grasa visceral"><input style={S.inp} inputMode="decimal" value={med.visceral} onChange={e => setMed({ ...med, visceral: e.target.value })} /></Field>
+              <Field l="Agua (L)"><input style={S.inp} inputMode="decimal" value={med.agua} onChange={e => setMed({ ...med, agua: e.target.value })} /></Field>
+              <Field l="% apego al plan"><input style={S.inp} inputMode="decimal" value={med.apego} onChange={e => setMed({ ...med, apego: e.target.value })} placeholder="Ej. 100" /></Field>
               <button style={S.saveBtn} onClick={addMedicion}>Guardar</button>
             </div>
           )}
