@@ -479,6 +479,9 @@ export default function Pacientes({ onRegisterExitGuard }) {
         };
         const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
         const updates = { mediciones: arr };
+        // La estatura (Altura del InBody) alimenta el cálculo del plan. Se guarda solo si el paciente aún no tiene una.
+        const tallaIB = parseFloat(d.talla) || 0;
+        if (tallaIB > 0 && !(parseFloat(sel.estatura) > 0)) updates.estatura = tallaIB;
         if (data.link) updates.inbodyArchivos = [...(sel.inbodyArchivos || []), { nombre: data.filename || filename, fecha: nm.fecha, link: data.link }];
         await updateDoc(doc(db, 'pacientes', sel.id), updates);
         setIbFile(null);
