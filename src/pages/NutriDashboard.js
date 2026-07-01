@@ -32,6 +32,14 @@ export default function NutriDashboard() {
   const exitGuardRef = useRef(null);
   const registerExitGuard = useCallback((fn) => { exitGuardRef.current = fn || null; }, []);
   const goTab = (id) => { const g = exitGuardRef.current; if (g) g(() => setTab(id)); else setTab(id); };
+  const [pacReset, setPacReset] = useState(0);
+  // Clic en "Pacientes" estando ya en esa pestaña → regresa al listado (limpia el expediente abierto).
+  const navClick = (id) => {
+    if (id === 'pacientes' && tab === 'pacientes') {
+      const g = exitGuardRef.current; const reset = () => setPacReset(n => n + 1);
+      if (g) g(reset); else reset();
+    } else goTab(id);
+  };
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [cfg, setCfg] = useState({ pendientes: [], precios: {} });
@@ -140,7 +148,7 @@ export default function NutriDashboard() {
   const navEl = (
     <nav className="bottomnav">
       {tabs.map(t => (
-        <button key={t.id} className={`nav-item${tab === t.id ? ' active' : ''}`} onClick={() => goTab(t.id)}>
+        <button key={t.id} className={`nav-item${tab === t.id ? ' active' : ''}`} onClick={() => navClick(t.id)}>
           {t.icon}
           <span>{t.label}</span>
         </button>
@@ -294,7 +302,7 @@ export default function NutriDashboard() {
           </>
         )}
         {tab === 'agenda' && <Agenda isNutri={true} />}
-        {tab === 'pacientes' && <Pacientes onRegisterExitGuard={registerExitGuard} />}
+        {tab === 'pacientes' && <Pacientes onRegisterExitGuard={registerExitGuard} resetToList={pacReset} />}
         {tab === 'config' && <Configuracion />}
         {tab === 'perfil' && (
           <div className="card">
