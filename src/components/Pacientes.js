@@ -318,7 +318,27 @@ export default function Pacientes({ onRegisterExitGuard }) {
     const pl = (sel.planes || [])[i];
     if (!window.confirm('¿Eliminar el plan "' + ((pl && pl.nombre) || 'sin nombre') + '"?\n\nDesaparecerá también de la vista del paciente. (El archivo seguirá en Drive.)')) return;
     const arr = (sel.planes || []).filter((_, k) => k !== i);
-    try { await updateDoc(doc(db, 'pacientes', sel.id), { planes: arr }); } catch (e) { setErr(e.message); }
+    const updates = { planes: arr };
+    // Si tiene un menú gemelo en el historial (mismo enlace de Drive), quítalo también.
+    if (pl && pl.link) {
+      const hist = (sel.menusHistorial || []).filter(mh => mh.link !== pl.link);
+      if (hist.length !== (sel.menusHistorial || []).length) updates.menusHistorial = hist;
+    }
+    try { await updateDoc(doc(db, 'pacientes', sel.id), updates); } catch (e) { setErr(e.message); }
+  };
+
+  const removeMenuHistorial = async (idx) => {
+    const mh = (sel.menusHistorial || [])[idx];
+    if (!mh) return;
+    if (!window.confirm('¿Eliminar el menú "' + (mh.nombre || 'sin nombre') + '"?\n\nDesaparecerá de aquí y también del panel del paciente (en "Mis archivos"). El archivo seguirá en Drive.')) return;
+    const hist = (sel.menusHistorial || []).filter((_, k) => k !== idx);
+    const updates = { menusHistorial: hist };
+    // Quita también el plan gemelo que ve el paciente (mismo enlace de Drive).
+    if (mh.link) {
+      const planes = (sel.planes || []).filter(p => p.link !== mh.link);
+      if (planes.length !== (sel.planes || []).length) updates.planes = planes;
+    }
+    try { await updateDoc(doc(db, 'pacientes', sel.id), updates); } catch (e) { setErr(e.message); }
   };
 
   const addChipTo = (key, texto) => {
@@ -963,6 +983,7 @@ export default function Pacientes({ onRegisterExitGuard }) {
                         </div>
                         <button style={S.smallBtn} onClick={() => { setMenuReabrir(mh); irSub('menus'); }}>Reabrir</button>
                         {mh.link && <a href={mh.link} target="_blank" rel="noreferrer" style={S.openBtn}>PDF</a>}
+                        <button style={S.rm} onClick={() => removeMenuHistorial(idx)} title="Quitar">×</button>
                       </div>
                     ))}
                   </div>
