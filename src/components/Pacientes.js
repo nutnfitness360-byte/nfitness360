@@ -77,7 +77,7 @@ const RECO_SECCIONES = [
 ];
 const RECO_KEYS = RECO_SECCIONES.map(s => s.key);
 
-export default function Pacientes({ onRegisterExitGuard }) {
+export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [pacientes, setPacientes] = useState([]);
   const [selId, setSelId] = useState(null);
   const [sub, setSub] = useState('dash');
@@ -143,6 +143,12 @@ export default function Pacientes({ onRegisterExitGuard }) {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
+
+  // Señal desde el menú lateral: al dar clic en "Pacientes" ya estando aquí, regresa al listado.
+  useEffect(() => {
+    if (!resetToList) return; // no corre en el montaje inicial (empieza en 0)
+    setSelId(null); setSub('dash'); setNuevo(false); setMenuId(null); setInbody(null); setMenuReabrir(null); setErr('');
+  }, [resetToList]);
 
   const irNuevo = () => { setErr(''); pushNav(); setNuevo(true); };
   const irSub = (s) => { pushNav(); setPanel(null); setSub(s); };
