@@ -387,8 +387,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     setRecoPdfMsg('Generando PDF…');
     try {
       const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now() });
-      const stamp = (reco.fecha && !isNaN(new Date(reco.fecha).getTime())) ? new Date(reco.fecha).getTime() : Date.now();
-      const filename = `Recomendacion_${(sel.nombre || 'paciente').replace(/[^\w\-]+/g, '_')}_${stamp}.pdf`;
+      const fechaImp = hoyISO(); // fecha de impresión (AAAA-MM-DD)
+      const filename = `Recomendacion_${(sel.nombre || 'paciente').replace(/[^\w\-]+/g, '_')}_${fechaImp}.pdf`;
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'saveRecomendaciones', patient: sel.nombre || 'Paciente', correo: sel.correo || '', filename, html }),
