@@ -450,16 +450,18 @@ export default function Pacientes({ onRegisterExitGuard }) {
   );
 
   const leerYGuardarInBody = async () => {
-    if (!ibFile) { setErr('Selecciona el PDF del InBody.'); return; }
+    if (!ibFile) { setErr('Selecciona el archivo del InBody (PDF o imagen).'); return; }
     const url = process.env.REACT_APP_APPSCRIPT_URL;
     if (!url) { setErr('Falta la configuración del servidor (REACT_APP_APPSCRIPT_URL).'); return; }
     setIbBusy(true); setErr(''); setIbMsg('Leyendo el InBody con IA… (puede tardar unos segundos)');
     try {
       const b64 = await fileToBase64(ibFile);
-      const filename = 'InBody_' + (sel.codigo || '') + '_' + hoyISO() + '.pdf';
+      const IB_EXT = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+      const ibExt = IB_EXT[(ibFile.type || '').toLowerCase()] || ((ibFile.name || '').split('.').pop() || 'pdf').toLowerCase();
+      const filename = 'InBody_' + (sel.codigo || '') + '_' + hoyISO() + '.' + ibExt;
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'leerInBody', patient: sel.nombre, correo: (sel.correo || ''), filename, pdfBase64: b64 }),
+        body: JSON.stringify({ action: 'leerInBody', patient: sel.nombre, correo: (sel.correo || ''), filename, pdfBase64: b64, mime: ibFile.type || '' }),
         redirect: 'follow',
       });
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = null; }
@@ -487,7 +489,7 @@ export default function Pacientes({ onRegisterExitGuard }) {
           await updateDoc(doc(db, 'pacientes', sel.id), { inbodyArchivos: [...(sel.inbodyArchivos || []), { nombre: data.filename || 'InBody', fecha: hoyISO(), link: data.link }] });
         }
         setIbMsg('');
-        setErr('No se pudo leer el InBody automáticamente: ' + ((data && data.error) || 'intenta con un PDF más nítido.'));
+        setErr('No se pudo leer el InBody automáticamente: ' + ((data && data.error) || 'intenta con un archivo más nítido.'));
       }
     } catch (e) {
       setIbMsg('');
@@ -778,7 +780,7 @@ export default function Pacientes({ onRegisterExitGuard }) {
                 {archHeader('inbody', 'Mediciones')}
                 {archSec.inbody && (
                   <div style={S.archBody}>
-                    <div style={S.note}>Las mediciones se cargan y leen con IA (PDF del InBody) desde el panel <b>Mediciones</b>. Aquí ves los archivos guardados.</div>
+                    <div style={S.note}>Las mediciones se cargan y leen con IA (PDF o imagen del InBody) desde el panel <b>Mediciones</b>. Aquí ves los archivos guardados.</div>
                     {(!sel.inbodyArchivos || sel.inbodyArchivos.length === 0)
                       ? <div className="empty-state">Aún no hay archivos de InBody.</div>
                       : [...sel.inbodyArchivos].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
@@ -839,10 +841,10 @@ export default function Pacientes({ onRegisterExitGuard }) {
 
                 {medMode === 'inbody' && (
                   <div>
-                    <div style={S.note}>Sube el PDF del InBody y el sistema lo lee automáticamente (IA): extrae peso, % de grasa, masa muscular, masa grasa, grasa visceral, agua y TMB, y alimenta las gráficas. Si algún valor sale mal, corrígelo con “Editar última” en Gráficas de avance.</div>
+                    <div style={S.note}>Sube el PDF o la imagen (JPG/PNG) del InBody y el sistema lo lee automáticamente (IA): extrae peso, % de grasa, masa muscular, masa grasa, grasa visceral, agua y TMB, y alimenta las gráficas. Si algún valor sale mal, corrígelo con “Editar última” en Gráficas de avance.</div>
                     <label style={S.upload}>
-                      <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => { setIbFile(e.target.files && e.target.files[0]); setIbMsg(''); }} />
-                      {ibFile ? ('PDF seleccionado: ' + ibFile.name) : 'Seleccionar PDF del InBody'}
+                      <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }} onChange={e => { setIbFile(e.target.files && e.target.files[0]); setIbMsg(''); }} />
+                      {ibFile ? ('Archivo seleccionado: ' + ibFile.name) : 'Seleccionar PDF o imagen del InBody'}
                     </label>
                     <button style={{ ...S.saveBtn, marginTop: 4 }} onClick={leerYGuardarInBody} disabled={ibBusy}>{ibBusy ? 'Leyendo…' : 'Leer y guardar InBody'}</button>
                     {ibMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{ibMsg}</div>}
