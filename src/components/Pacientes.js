@@ -315,6 +315,8 @@ export default function Pacientes({ onRegisterExitGuard }) {
   };
 
   const removePlan = async (i) => {
+    const pl = (sel.planes || [])[i];
+    if (!window.confirm('¿Eliminar el plan "' + ((pl && pl.nombre) || 'sin nombre') + '"?\n\nDesaparecerá también de la vista del paciente. (El archivo seguirá en Drive.)')) return;
     const arr = (sel.planes || []).filter((_, k) => k !== i);
     try { await updateDoc(doc(db, 'pacientes', sel.id), { planes: arr }); } catch (e) { setErr(e.message); }
   };
