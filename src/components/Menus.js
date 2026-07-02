@@ -746,36 +746,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           </table>
         </div>
 
-        <div style={{ ...S.balSub, marginTop: 18 }}>Comparación · plan vs. lo distribuido</div>
-        <div style={S.balWrap}>
-          <table style={S.balTable}>
-            <thead>
-              <tr>
-                <th style={{ ...S.balTh, textAlign: 'left' }}>Grupo</th>
-                <th style={S.balTh}>Plan</th>
-                <th style={S.balTh}>En menús</th>
-                <th style={S.balTh}>Dif.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usados.map(g => {
-                const plan = round2(num(planEq[g]));
-                const menu = sumaPorGrupo(g);
-                const dif = round2(menu - plan);
-                const ok = Math.abs(dif) < 0.01;
-                return (
-                  <tr key={g} style={ok ? S.balRowOk : S.balRowBad}>
-                    <td style={{ ...S.balTd, textAlign: 'left' }}>{GRUPOS[g][0]}</td>
-                    <td style={S.balTd}>{fmt(plan)}</td>
-                    <td style={S.balTd}>{fmt(menu)}</td>
-                    <td style={{ ...S.balTd, color: ok ? T.sage : T.danger, fontWeight: 700 }}>{dif > 0 ? '+' : ''}{fmt(dif)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        <div style={S.balHint}>"En menús" suma lo repartido en todos los tiempos. Cuando la diferencia es 0 en todos los grupos, el reparto cuadra con el plan.</div>
+        <div style={S.balHint}>El Total suma lo repartido en todos los tiempos; debe coincidir con el plan del paciente.</div>
       </div>
 
       {tiempos.map((t, idx) => {
