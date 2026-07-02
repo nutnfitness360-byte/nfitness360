@@ -237,7 +237,7 @@ export default function PacienteDashboard() {
       const nombrePac = expediente?.nombre || user?.displayName || 'Paciente';
       const html = buildRecomendacionesHTML({ nombre: nombrePac, recomendaciones: [reco], fecha: Date.now() });
       const stamp = (reco.fecha && !isNaN(new Date(reco.fecha).getTime())) ? new Date(reco.fecha).getTime() : Date.now();
-      const filename = `Recomendacion_${String(nombrePac).replace(/[^\w\-]+/g, '_')}_${stamp}.pdf`;
+      const filename = `Recomendacion_${String(nombrePac).replace(/[^\w-]+/g, '_')}_${stamp}.pdf`;
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'saveRecomendaciones', patient: nombrePac, correo: (expediente?.correo || user?.email || '').toLowerCase(), filename, html }),
