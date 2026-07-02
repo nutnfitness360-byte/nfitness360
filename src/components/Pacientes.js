@@ -99,6 +99,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [inbody, setInbody] = useState(null);
   const [recoForm, setRecoForm] = useState({ estudios: '', suplementos: '', ejercicio: '', hidratacion: '', generales: '' });
   const [recoEditIdx, setRecoEditIdx] = useState(null);
+  const [recoChips, setRecoChips] = useState({});
   const recoFormRef = useRef(null);
   const [bitacoraTexto, setBitacoraTexto] = useState('');
   const [bitacoraApego, setBitacoraApego] = useState('');
@@ -121,6 +122,14 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     const q = query(collection(db, 'pacientes'), orderBy('codigo', 'asc'));
     return onSnapshot(q, snap => setPacientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       e => setErr('No se pudieron cargar los pacientes: ' + e.message));
+  }, []);
+
+  // Enlaces rápidos personalizados de recomendaciones (compartidos entre todos los pacientes).
+  useEffect(() => {
+    return onSnapshot(doc(db, 'config', 'recomendaciones'), snap => {
+      const d = snap.exists() ? snap.data() : {};
+      setRecoChips((d && d.chips) || {});
+    }, () => {});
   }, []);
 
   const sel = pacientes.find(p => p.id === selId);
@@ -358,6 +367,20 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       const base = cur && !cur.endsWith('\n') ? cur + '\n' : cur;
       return { ...prev, [key]: base + linea + '\n' };
     });
+  };
+
+  // "Agregar": guarda un enlace rápido nuevo (compartido) y lo deja listo para usarse.
+  const agregarChip = async (key) => {
+    const txt = (window.prompt('Escribe el enlace rápido que quieres guardar (quedará disponible para futuras recomendaciones):') || '').trim();
+    if (!txt) return;
+    const cur = recoChips[key] || [];
+    if (!cur.some(x => (x || '').toLowerCase() === txt.toLowerCase())) {
+      const next = { ...recoChips, [key]: [...cur, txt] };
+      try {
+        await setDoc(doc(db, 'config', 'recomendaciones'), { chips: next }, { merge: true });
+      } catch (e) { setErr('No se pudo guardar el enlace rápido: ' + e.message); return; }
+    }
+    addChipTo(key, txt); // queda listo y además lo inserta en la recomendación actual
   };
 
   const recoSeccionesConContenido = (r) => RECO_SECCIONES
@@ -1068,15 +1091,17 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                 {RECO_SECCIONES.map(sec => (
                   <div key={sec.key} style={S.recoSeccion}>
                     <div style={S.recoSeccionTitulo}>{sec.titulo}</div>
-                    {sec.items.length > 0 && (
-                      <div style={S.chipRow}>
-                        {sec.items.map(it => {
-                          const label = typeof it === 'string' ? it : it.l;
-                          const ins = typeof it === 'string' ? it : (it.ins || it.l);
-                          return <button key={label} type="button" style={S.chip} onClick={() => addChipTo(sec.key, ins)}>+ {label}</button>;
-                        })}
-                      </div>
-                    )}
+                    <div style={S.chipRow}>
+                      {sec.items.map(it => {
+                        const label = typeof it === 'string' ? it : it.l;
+                        const ins = typeof it === 'string' ? it : (it.ins || it.l);
+                        return <button key={'p-' + label} type="button" style={S.chip} onClick={() => addChipTo(sec.key, ins)}>+ {label}</button>;
+                      })}
+                      {(recoChips[sec.key] || []).map(c => (
+                        <button key={'c-' + c} type="button" style={S.chip} onClick={() => addChipTo(sec.key, c)}>+ {c}</button>
+                      ))}
+                      <button type="button" style={S.chipAdd} onClick={() => agregarChip(sec.key)} title="Guardar un enlace rápido nuevo para futuras recomendaciones">＋ Agregar</button>
+                    </div>
                     <textarea style={S.recoArea} rows={3} value={recoForm[sec.key]}
                       onChange={e => setRecoForm(prev => ({ ...prev, [sec.key]: e.target.value }))}
                       placeholder={`Recomendaciones de ${sec.titulo.toLowerCase()}…`} />
@@ -1261,6 +1286,7 @@ const styles = {
   chipLabel: { fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)' },
   chipRow: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   chip: { background: 'var(--cream)', border: '1px solid var(--gold)', borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 600, color: 'var(--dark)', cursor: 'pointer', fontFamily: 'var(--font)' },
+  chipAdd: { background: 'transparent', border: '1px dashed var(--gold)', borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 700, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font)' },
   recoSeccion: { marginBottom: 14 },
   recoSeccionTitulo: { fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--stone)', marginBottom: 7 },
   recoItemSecTitulo: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 2 },
