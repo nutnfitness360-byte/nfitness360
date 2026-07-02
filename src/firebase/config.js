@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 // La configuración se toma de variables de entorno para permitir una instancia
 // por nutrióloga (cada despliegue apunta a su propio proyecto de Firebase).
@@ -19,6 +20,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 // Forzar que Google pregunte SIEMPRE qué cuenta usar (evita reutilizar la sesión
 // anterior del navegador; importante para la confidencialidad entre nutrióloga y paciente).
