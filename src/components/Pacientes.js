@@ -19,6 +19,12 @@ const bitacoraToApego = (bit) => (bit || []).filter(b => typeof b.apego === 'num
 const fmtSello = (ts) => { const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
 const fileToBase64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
 const fmtFecha = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} de ${MESES_L[d.getMonth()]} de ${d.getFullYear()}`; };
+// Fecha de creación del expediente: usa 'creado' (timestamp) o, si no existe, 'inicio' (ISO).
+const pacCreadoTs = (p) => (typeof p.creado === 'number' ? p.creado : (p.inicio ? (new Date(p.inicio + 'T00:00:00').getTime() || 0) : 0));
+const pacCreadoISO = (p) => {
+  if (typeof p.creado === 'number') { const d = new Date(p.creado); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+  return p.inicio || '';
+};
 const initials = (n) => n ? n.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase() : 'NU';
 const last = (a) => (a && a.length ? a[a.length - 1] : null);
 const hoyISO = () => new Date().toISOString().slice(0, 10);
@@ -83,6 +89,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [sub, setSub] = useState('dash');
   const [nuevo, setNuevo] = useState(false);
   const [busca, setBusca] = useState('');
+  const [orden, setOrden] = useState('alfabetico'); // 'alfabetico' | 'creacion-desc' | 'creacion-asc'
+  const [vistaOpen, setVistaOpen] = useState(false);
   const [menuId, setMenuId] = useState(null);
   const [menuReabrir, setMenuReabrir] = useState(null);
   const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', apego: '' });
@@ -1209,6 +1217,20 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <input style={S.search} value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar paciente…" />
+          <div style={{ position: 'relative' }}>
+            <button style={S.smallBtn} onClick={() => setVistaOpen(v => !v)}>Vista ▾</button>
+            {vistaOpen && (
+              <>
+                <div style={S.menuOverlay} onClick={() => setVistaOpen(false)} />
+                <div style={{ ...S.menu, top: 42, right: 0, minWidth: 250 }}>
+                  {[['alfabetico', 'Orden alfabético'], ['creacion-desc', 'Fecha de creación · más reciente'], ['creacion-asc', 'Fecha de creación · más antigua']].map(([val, label]) => (
+                    <button key={val} style={{ ...S.menuItem, fontWeight: orden === val ? 800 : 500, background: orden === val ? 'var(--cream)' : 'transparent' }}
+                      onClick={() => { setOrden(val); setVistaOpen(false); }}>{label}</button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           <button style={S.smallBtn} onClick={irNuevo}>+ Nuevo paciente</button>
         </div>
       </div>
@@ -1220,6 +1242,11 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
           const filtrados = q
             ? pacientes.filter(p => (p.nombre || '').toLowerCase().includes(q) || (p.codigo || '').toLowerCase().includes(q))
             : pacientes;
+          const ordenados = [...filtrados].sort((a, b) => {
+            if (orden === 'alfabetico') return (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' });
+            if (orden === 'creacion-asc') return pacCreadoTs(a) - pacCreadoTs(b);
+            return pacCreadoTs(b) - pacCreadoTs(a); // creacion-desc (más reciente primero)
+          });
           return (
             <>
               <div className="card-title">Mis pacientes ({filtrados.length})</div>
@@ -1227,7 +1254,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                 ? <div className="empty-state">No hay pacientes registrados aún. Usa “+ Nuevo paciente”.</div>
                 : filtrados.length === 0
                   ? <div className="empty-state">No se encontraron pacientes con “{busca}”.</div>
-                  : filtrados.map(p => {
+                  : ordenados.map(p => {
                     const m = last(p.mediciones);
                     return (
                       <div className="pac-item" key={p.id} style={{ position: 'relative' }}
@@ -1237,6 +1264,12 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                           <div className="pac-nombre">{p.nombre}</div>
                           <div className="pac-detalle">{p.codigo} · {p.objetivo || 'sin objetivo'}</div>
                         </div>
+                        {orden.startsWith('creacion') && (
+                          <div style={{ flexShrink: 0, textAlign: 'right', marginLeft: 8, minWidth: 130 }}>
+                            <div style={{ fontSize: 9.5, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Fecha de creación</div>
+                            <div style={{ fontSize: 12.5, color: 'var(--dark)', fontWeight: 600 }}>{fmtFecha(pacCreadoISO(p)) || '—'}</div>
+                          </div>
+                        )}
                         <div className="pac-citas">{m ? m.peso + ' kg' : '—'}</div>
                         <button style={S.kebab} title="Opciones rápidas"
                           onClick={(e) => { e.stopPropagation(); setMenuId(menuId === p.id ? null : p.id); }}>⋮</button>
