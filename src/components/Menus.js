@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { db } from '../firebase/config';
+import { db, storage } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
 import { buildReportHTML, generarPorcionesTexto, esPorciones } from '../report/reporteHTML';
 
 /* ============================================================
@@ -142,6 +143,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const [iaBusy, setIaBusy] = useState(false);
   const [opBusy, setOpBusy] = useState(''); // "idx:oi" de la opción que se está generando
   const [dragOver, setDragOver] = useState(null); // idx del tiempo sobre el que se arrastra una imagen
+  const [subiendoFoto, setSubiendoFoto] = useState(null); // idx del tiempo cuya imagen se está subiendo
   const [listas, setListas] = useState(null);
   const [listaBusy, setListaBusy] = useState(false);
   const [showLista, setShowLista] = useState(false);
@@ -227,8 +229,22 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
 
   const procesarFoto = async (idx, file) => {
     if (!file || !(file.type || '').startsWith('image/')) return;
-    try { const data = await compressImage(file); setT(idx, { foto: data }); }
-    catch (_) { setStatus('error'); }
+    const t = tiempos[idx];
+    setSubiendoFoto(idx);
+    try {
+      const data = await compressImage(file); // comprime a JPEG (data URL)
+      // Sube a Firebase Storage y guarda solo el ENLACE (así el documento del paciente no se infla).
+      const path = `menu-fotos/${patient.id}/${(t && t.id) || idx}-${Date.now()}.jpg`;
+      const sref = storageRef(storage, path);
+      await uploadString(sref, data, 'data_url');
+      const url = await getDownloadURL(sref);
+      setT(idx, { foto: url });
+    } catch (e) {
+      setStatus('error');
+      setRep('No se pudo subir la imagen: ' + (e.code || e.message) + '. Revisa las reglas de Firebase Storage.');
+    } finally {
+      setSubiendoFoto(null);
+    }
   };
   const onFoto = (idx, e) => { procesarFoto(idx, e.target.files && e.target.files[0]); };
   const onDropFoto = (idx, e) => {
@@ -471,7 +487,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         await updateDoc(doc(db, 'pacientes', patient.id), { planes: [...(patient.planes || []), nuevo] });
         // Archiva este menú (contenido editable + PDF) en el historial para poder reabrirlo después.
         try {
-          const tiemposSnap = tiempos.map(t => ({ ...t, foto: '' })); // sin imágenes, para no inflar el documento
+          const tiemposSnap = tiempos.map(t => ({ ...t, foto: (typeof t.foto === 'string' && t.foto.startsWith('http')) ? t.foto : '' })); // conserva enlaces de imagen; descarta base64 heredado
           const snap = { fecha: new Date().toISOString().slice(0, 10), nombre: baseNombre, link: data.link, tiempos: tiemposSnap, nOpciones };
           const hist = [...(patient.menusHistorial || []), snap].slice(-24);
           await updateDoc(doc(db, 'pacientes', patient.id), { menusHistorial: hist });
@@ -779,9 +795,11 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                 onDrop={e => onDropFoto(idx, e)}
               >
                 <div style={S.photoLabel}>Foto ejemplo</div>
-                {t.foto
-                  ? <img src={t.foto} alt="" style={S.photo} />
-                  : <div style={S.photoEmpty}>{dragOver === idx ? 'Suelta la imagen' : 'Sin foto · arrastra una imagen aquí'}</div>}
+                {subiendoFoto === idx
+                  ? <div style={S.photoEmpty}>Subiendo imagen…</div>
+                  : t.foto
+                    ? <img src={t.foto} alt="" style={S.photo} />
+                    : <div style={S.photoEmpty}>{dragOver === idx ? 'Suelta la imagen' : 'Sin foto · arrastra una imagen aquí'}</div>}
                 <label style={S.photoBtn}>
                   <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => onFoto(idx, e)} />
                   {t.foto ? 'Cambiar' : 'Cargar imagen'}
