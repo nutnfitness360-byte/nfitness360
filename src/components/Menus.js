@@ -702,7 +702,6 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           <div style={S.eyebrow}>Plan nutricional</div>
           <h1 style={S.h1}>Menús por tiempo de comida</h1>
         </div>
-        <span style={{ ...S.balance, ...(cuadra ? S.balOk : S.balBad) }}>{cuadra ? 'Equivalentes cuadran ✓' : 'Revisar reparto'}</span>
       </div>
 
       <div style={S.toolbar}>
@@ -715,8 +714,13 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       <div style={S.iaNote}>Puedes generar todos los menús de golpe, o regenerar <b>una sola opción</b> con el botón <b>IA ✦</b> de cada tarjeta — así arreglas las que no sirven sin tocar las que ya quedaron bien. La IA solo sugiere: <b>revisa y edita</b> antes de guardar.</div>
 
       <div style={S.card}>
-        <div style={S.eyebrow}>Balance por grupo</div>
-        <h2 style={S.balTitle}>Distribución del plan vs. menús</h2>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <div style={S.eyebrow}>Balance por grupo</div>
+            <h2 style={S.balTitle}>Distribución del plan vs. menús</h2>
+          </div>
+          <span style={{ ...S.balance, ...(cuadra ? S.balOk : S.balBad) }}>{cuadra ? 'Equivalentes cuadran ✓' : 'Revisar reparto'}</span>
+        </div>
 
         <div style={S.balSub}>Equivalencias por tiempo · editable</div>
         <div style={S.balWrap}>
@@ -729,8 +733,10 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
               </tr>
             </thead>
             <tbody>
-              {GRUPOS.map((_, g) => g).filter(g => (planEq && num(planEq[g]) > 0) || sumaPorGrupo(g) > 0).map(g => (
-                <tr key={'eqm' + g}>
+              {GRUPOS.map((_, g) => g).filter(g => (planEq && num(planEq[g]) > 0) || sumaPorGrupo(g) > 0).map(g => {
+                const okG = planEq ? Math.abs(sumaPorGrupo(g) - num(planEq[g])) < 0.01 : null;
+                return (
+                <tr key={'eqm' + g} style={okG === null ? undefined : (okG ? S.balRowOk : S.balRowBad)}>
                   <td style={{ ...S.balTd, textAlign: 'left', fontWeight: 700 }}>{GSHORT[g]}</td>
                   {tiempos.map((t, idx) => (
                     <td key={idx} style={S.balTd}>
@@ -741,7 +747,8 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                   ))}
                   <td style={{ ...S.balTd, fontWeight: 700 }}>{fmt(sumaPorGrupo(g))}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
