@@ -102,7 +102,6 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [recoChips, setRecoChips] = useState({});
   const [verHistoria, setVerHistoria] = useState(false);
   const recoFormRef = useRef(null);
-  const recoDraftLoadedRef = useRef(null);
   const [bitacoraTexto, setBitacoraTexto] = useState('');
   const [bitacoraApego, setBitacoraApego] = useState('');
   const [isakFile, setIsakFile] = useState(null);
