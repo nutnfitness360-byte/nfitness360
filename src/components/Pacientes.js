@@ -102,6 +102,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [recoChips, setRecoChips] = useState({});
   const [verHistoria, setVerHistoria] = useState(false);
   const recoFormRef = useRef(null);
+  const recoLoadedForRef = useRef(null);
   const [bitacoraTexto, setBitacoraTexto] = useState('');
   const [bitacoraApego, setBitacoraApego] = useState('');
   const [isakFile, setIsakFile] = useState(null);
@@ -133,16 +134,18 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     }, () => {});
   }, []);
 
-  // Al abrir un paciente, carga su borrador de recomendaciones (si lo hay) en el formulario.
+  // Al abrir un paciente, carga su borrador de recomendaciones una sola vez (sin pisar lo que se esté escribiendo).
   useEffect(() => {
-    if (!selId) return;
+    if (!selId) { recoLoadedForRef.current = null; return; }
+    if (recoLoadedForRef.current === selId) return;
     const p = pacientes.find(x => x.id === selId);
-    const b = (p && p.recomendacionBorrador) || null;
+    if (!p) return;
+    recoLoadedForRef.current = selId;
+    const b = p.recomendacionBorrador || null;
     setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = (b && b[k]) || ''; return o; }, {}));
     setRecoEditIdx(null);
     setVerHistoria(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selId]);
+  }, [selId, pacientes]);
 
   const sel = pacientes.find(p => p.id === selId);
 
@@ -458,7 +461,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     try {
       const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now() });
       const fechaImp = hoyISO(); // fecha de impresión (AAAA-MM-DD)
-      const filename = `Recomendacion_${(sel.nombre || 'paciente').replace(/[^\w\-]+/g, '_')}_${fechaImp}.pdf`;
+      const filename = `Recomendacion_${(sel.nombre || 'paciente').replace(/[^\w-]+/g, '_')}_${fechaImp}.pdf`;
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'saveRecomendaciones', patient: sel.nombre || 'Paciente', correo: sel.correo || '', filename, html }),
