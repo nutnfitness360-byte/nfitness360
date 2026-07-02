@@ -100,6 +100,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [recoForm, setRecoForm] = useState({ estudios: '', suplementos: '', ejercicio: '', hidratacion: '', generales: '' });
   const [recoEditIdx, setRecoEditIdx] = useState(null);
   const [recoChips, setRecoChips] = useState({});
+  const [verHistoria, setVerHistoria] = useState(false);
   const recoFormRef = useRef(null);
   const recoDraftLoadedRef = useRef(null);
   const [bitacoraTexto, setBitacoraTexto] = useState('');
@@ -140,6 +141,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     const b = (p && p.recomendacionBorrador) || null;
     setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = (b && b[k]) || ''; return o; }, {}));
     setRecoEditIdx(null);
+    setVerHistoria(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selId]);
 
@@ -1109,6 +1111,25 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
             {panel === 'reco' && (
               <div style={S.panelBody} ref={recoFormRef}>
                 <div style={S.note}>Cada recomendación se publica con fecha y hora; el paciente la verá en su sección "Recomendaciones". Usa los botones para agregar atajos a cada apartado.</div>
+                {sel.historia && (
+                  <button style={{ ...S.smallBtn, marginBottom: 12 }} onClick={() => setVerHistoria(true)} title="Consultar la historia clínica sin salir">
+                    Ver historia clínica
+                  </button>
+                )}
+                {verHistoria && (
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+                    <div onClick={() => setVerHistoria(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
+                    <div style={{ position: 'relative', width: 'min(640px, 94vw)', height: '100%', background: 'var(--bg)', boxShadow: '-10px 0 30px rgba(0,0,0,0.22)', display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--card)' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--dark)', fontSize: 14 }}>Historia clínica · {sel.nombre || ''} <span style={{ fontWeight: 400, color: 'var(--stone)', fontSize: 12 }}>(solo lectura)</span></span>
+                        <button style={S.smallBtn} onClick={() => setVerHistoria(false)}>Cerrar ✕</button>
+                      </div>
+                      <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <HistoriaClinica initial={sel.historia} codigo={sel.codigo} readOnly onBack={() => setVerHistoria(false)} />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {RECO_SECCIONES.map(sec => (
                   <div key={sec.key} style={S.recoSeccion}>
                     <div style={S.recoSeccionTitulo}>{sec.titulo}</div>
