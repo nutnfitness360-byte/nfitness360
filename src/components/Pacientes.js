@@ -101,6 +101,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [recoEditIdx, setRecoEditIdx] = useState(null);
   const [recoChips, setRecoChips] = useState({});
   const recoFormRef = useRef(null);
+  const recoDraftLoadedRef = useRef(null);
   const [bitacoraTexto, setBitacoraTexto] = useState('');
   const [bitacoraApego, setBitacoraApego] = useState('');
   const [isakFile, setIsakFile] = useState(null);
@@ -131,6 +132,16 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       setRecoChips((d && d.chips) || {});
     }, () => {});
   }, []);
+
+  // Al abrir un paciente, carga su borrador de recomendaciones (si lo hay) en el formulario.
+  useEffect(() => {
+    if (!selId) return;
+    const p = pacientes.find(x => x.id === selId);
+    const b = (p && p.recomendacionBorrador) || null;
+    setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = (b && b[k]) || ''; return o; }, {}));
+    setRecoEditIdx(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selId]);
 
   const sel = pacientes.find(p => p.id === selId);
 
@@ -387,6 +398,15 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     .filter(s => (r[s.key] || '').toString().trim())
     .map(s => ({ titulo: s.titulo, texto: r[s.key] }));
 
+  const guardarBorradorReco = async () => {
+    if (!sel) return;
+    const b = RECO_KEYS.reduce((o, k) => { o[k] = (recoForm[k] || ''); return o; }, {});
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), { recomendacionBorrador: b });
+      setRecoPdfMsg('Borrador guardado ✓');
+    } catch (e) { setRecoPdfMsg('No se pudo guardar el borrador: ' + e.message); }
+  };
+
   const addReco = async () => {
     const r = {};
     RECO_KEYS.forEach(k => { r[k] = (recoForm[k] || '').trim(); });
@@ -400,7 +420,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       arr = [...(sel.recomendaciones || []), { ...r, fecha: Date.now() }];
     }
     try {
-      await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr });
+      // Al publicar, se limpia el borrador guardado.
+      await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr, recomendacionBorrador: {} });
       setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = ''; return o; }, {}));
       setRecoEditIdx(null);
       setErr('');
@@ -1109,6 +1130,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                 ))}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, marginBottom: 14, flexWrap: 'wrap' }}>
                   <button style={S.saveBtn} onClick={addReco}>{recoEditIdx != null ? 'Guardar cambios' : '+ Agregar recomendación'}</button>
+                  {recoEditIdx == null && <button style={S.smallBtn} onClick={guardarBorradorReco}>Guardar borrador</button>}
                   {recoEditIdx != null && <button style={S.smallBtn} onClick={cancelarEdicionReco}>Cancelar</button>}
                   {recoEditIdx != null && <span style={{ fontSize: 12, color: '#9A7B2E', fontWeight: 600 }}>Editando una recomendación existente</span>}
                   {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
