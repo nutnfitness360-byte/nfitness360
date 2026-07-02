@@ -351,7 +351,7 @@ function toISODate(s) {
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
 }
 
-export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
+export default function HistoriaClinica({ initial, codigo, onSave, onBack, readOnly }) {
   const [data, setData] = useState(() => {
     const s = baseSeed();
     if (initial && typeof initial === "object") {
@@ -588,6 +588,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
 
       {/* ---------- CONTENIDO (scroll completo) ---------- */}
       <main style={styles.main}>
+        <fieldset disabled={readOnly} style={{ border: "none", margin: 0, padding: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
 
         {/* 1. DATOS GENERALES */}
         <Section reg={reg("datos")} sid="datos" title="Datos generales" n="1"
@@ -1053,6 +1054,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
               onChange={(e) => setField("notasGenerales", "texto", e.target.value)} />
           </Field>
         </Section>
+        </fieldset>
       </main>
 
       {/* ---------- PIE ---------- */}
@@ -1072,12 +1074,16 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           <button style={styles.secondaryBtn} onClick={onBack} className="nf-secondary">
             ← Atrás
           </button>
-          <button style={styles.secondaryBtn} onClick={generarPDF} className="nf-secondary">
-            Generar PDF
-          </button>
-          <button style={styles.primaryBtn} onClick={guardar} className="nf-primary">
-            Guardar historia clínica
-          </button>
+          {!readOnly && (
+            <>
+              <button style={styles.secondaryBtn} onClick={generarPDF} className="nf-secondary">
+                Generar PDF
+              </button>
+              <button style={styles.primaryBtn} onClick={guardar} className="nf-primary">
+                Guardar historia clínica
+              </button>
+            </>
+          )}
         </div>
       </footer>
 
