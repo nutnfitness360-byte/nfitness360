@@ -36,11 +36,11 @@ const T = {
 
 const SECTIONS = [
   { id: "datos", n: "1", label: "Datos generales" },
-  { id: "padecimientos", n: "2", label: "Padecimientos" },
-  { id: "bioquimica", n: "3", label: "Bioquímica" },
-  { id: "suplementacion", n: "4", label: "Suplementación" },
-  { id: "sintomas", n: "5", label: "Signos y síntomas" },
-  { id: "antecedentes", n: "6", label: "Antecedentes" },
+  { id: "antecedentes", n: "2", label: "Antecedentes y estilo de vida" },
+  { id: "padecimientos", n: "3", label: "Padecimientos" },
+  { id: "sintomas", n: "4", label: "Signos y síntomas" },
+  { id: "bioquimica", n: "5", label: "Evaluación bioquímica" },
+  { id: "suplementacion", n: "6", label: "Suplementación" },
   { id: "dietetica", n: "7", label: "Dietético" },
   { id: "ejercicio", n: "8", label: "Ejercicio" },
   { id: "notas", n: "9", label: "Notas generales" },
@@ -49,7 +49,7 @@ const SECTIONS = [
 const TIEMPOS = ["Desayuno", "Colación", "Comida", "Colación", "Cena"];
 const PADECIMIENTOS = [
   "Diabetes", "Hipertensión", "Hipotiroidismo", "Hipertiroidismo",
-  "SOMP", "Hipoglucemia", "Anemia", "Resistencia a la insulina", "Ninguna",
+  "SOMP", "Hipoglucemia", "Anemia", "Resistencia a la insulina", "Ninguna", "Otro",
 ];
 
 // Convierte una hora escrita libremente ("6:45 am", "11:30 pm", "23:00", "7") a minutos desde medianoche.
@@ -112,8 +112,8 @@ function baseSeed() {
     sintomas: { digestivos: "", dermatologicos: "", energiaSueno: "", otros: "" },
     antecedentes: { heredofamiliares: "", alcohol: "", tabaco: "", otros: "" },
     dietetica: {
-      comidasDia: "", alergias: "", agua: "", liquidos: "",
-      leGusta: "", noLeGusta: "", despierta: "", duerme: "",
+      alergias: "", agua: "", liquidos: "",
+      leGusta: "", noLeGusta: "", despierta: "", duerme: "", notas: "",
       dieta: TIEMPOS.map((t) => ({ momento: t, alimentos: "" })),
     },
     ejercicio: {
@@ -184,24 +184,25 @@ function histParts(data) {
       ["Correo electrónico", d.correo],
       ["Ocupación", d.ocupacion], ["Objetivo", d.objetivo],
     ])) +
-    card("2", "Padecimientos", padInner) +
-    card("3", "Evaluación bioquímica", rows([["¿De cuándo son los estudios?", b.fecha]]) + bioTable + anaTable +
-      (b.observaciones ? `<div class="subh">Observaciones</div><div class="note">${v(b.observaciones)}</div>` : "")) +
-    card("4", "Suplementación", supTable + (s.notas ? `<div class="subh">Notas</div><div class="note">${v(s.notas)}</div>` : "")) +
-    card("5", "Signos y síntomas recientes", rows([
-      ["Digestivos", si.digestivos], ["Dermatológicos", si.dermatologicos],
-      ["Energía y sueño", si.energiaSueno], ["Otros", si.otros],
-    ])) +
-    card("6", "Antecedentes y estilo de vida", rows([
+    card("2", "Antecedentes y estilo de vida", rows([
       ["Heredofamiliares", a.heredofamiliares], ["Alcohol", a.alcohol],
       ["Tabaco", a.tabaco], ["Otros", a.otros],
     ])) +
+    card("3", "Padecimientos", padInner) +
+    card("4", "Signos y síntomas", rows([
+      ["Digestivos", si.digestivos], ["Dermatológicos", si.dermatologicos],
+      ["Energía y sueño", si.energiaSueno], ["Otros", si.otros],
+    ])) +
+    card("5", "Evaluación bioquímica", rows([["¿De cuándo son los estudios?", b.fecha]]) + bioTable + anaTable +
+      (b.observaciones ? `<div class="subh">Observaciones</div><div class="note">${v(b.observaciones)}</div>` : "")) +
+    card("6", "Suplementación", supTable + (s.notas ? `<div class="subh">Notas</div><div class="note">${v(s.notas)}</div>` : "")) +
     card("7", "Historia dietética", rows([
-      ["Comidas al día", di.comidasDia], ["Consumo de agua natural", di.agua],
-      ["Alergias o intolerancias", di.alergias], ["Otros líquidos", di.liquidos],
+      ["Alergias o intolerancias", di.alergias],
       ["Qué SÍ le gusta", di.leGusta], ["Qué NO le gusta", di.noLeGusta],
+      ["Consumo de agua natural", di.agua], ["Otros líquidos", di.liquidos],
     ]) + `<div class="subh">Dieta habitual</div>` + dietaTable +
-      rows([["Hora en que despierta", di.despierta], ["Hora en que se duerme", di.duerme], ["Horas de sueño (aprox.)", (horasSueno_(di.despierta, di.duerme) || {}).texto || "—"]])) +
+      rows([["Hora en que despierta", di.despierta], ["Hora en que se duerme", di.duerme], ["Horas de sueño (aprox.)", (horasSueno_(di.despierta, di.duerme) || {}).texto || "—"]]) +
+      (di.notas && di.notas.trim() ? `<div class="subh">Notas</div><div class="note">${v(di.notas)}</div>` : "")) +
     card("8", "Ejercicio", rows([
       ["Tipo de ejercicio", ej.tipo], ["Horario de ejercicio", ej.horario], ["Días por semana", ej.dias],
       ["Tiempo de actividad al día", ej.tiempoDia], ["Intensidad", ej.intensidad],
@@ -665,13 +666,41 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           </p>
         </Section>
 
-        {/* 2. PADECIMIENTOS */}
-        <Section reg={reg("padecimientos")} sid="padecimientos" title="Padecimientos" n="2"
+        {/* 2. ANTECEDENTES Y ESTILO DE VIDA */}
+        <Section reg={reg("antecedentes")} sid="antecedentes" title="Antecedentes y estilo de vida" n="2"
+          hint="Antecedentes heredofamiliares y consumo de sustancias.">
+          <Grid>
+            <Field label="Antecedentes heredofamiliares" full>
+              <textarea style={styles.textarea} rows={2} value={data.antecedentes.heredofamiliares}
+                placeholder="Diabetes, cáncer, hipertensión… (parentesco)"
+                onChange={(e) => setField("antecedentes", "heredofamiliares", e.target.value)} />
+            </Field>
+            <Field label="Consumo de alcohol">
+              <input style={styles.input} value={data.antecedentes.alcohol}
+                placeholder="Frecuencia y cantidad"
+                onChange={(e) => setField("antecedentes", "alcohol", e.target.value)} />
+            </Field>
+            <Field label="Tabaco">
+              <input style={styles.input} value={data.antecedentes.tabaco}
+                placeholder="Sí / No · frecuencia"
+                onChange={(e) => setField("antecedentes", "tabaco", e.target.value)} />
+            </Field>
+            <Field label="Otros" full>
+              <textarea style={styles.textarea} rows={2} value={data.antecedentes.otros}
+                placeholder="Notas adicionales…"
+                onChange={(e) => setField("antecedentes", "otros", e.target.value)} />
+            </Field>
+          </Grid>
+        </Section>
+
+        {/* 3. PADECIMIENTOS */}
+        <Section reg={reg("padecimientos")} sid="padecimientos" title="Padecimientos" n="3"
           hint="Selecciona los padecimientos que presenta el paciente. Puedes elegir varios.">
           <Field label="Agregar padecimiento" full>
             <select style={styles.input} value=""
               onChange={(e) => {
-                const val = e.target.value; if (!val) return;
+                let val = e.target.value; if (!val) return;
+                if (val === "Otro") { const c = window.prompt("Especifica el padecimiento:"); val = (c || "").trim(); if (!val) return; }
                 const cur = data.padecimientos.lista || [];
                 if (!cur.includes(val)) setField("padecimientos", "lista", [...cur, val]);
               }}>
@@ -699,8 +728,35 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           </Field>
         </Section>
 
-        {/* 3. EVALUACIÓN BIOQUÍMICA */}
-        <Section reg={reg("bioquimica")} sid="bioquimica" title="Evaluación bioquímica" n="3"
+        {/* 4. SIGNOS Y SÍNTOMAS */}
+        <Section reg={reg("sintomas")} sid="sintomas" title="Signos y síntomas" n="4"
+          hint="Sintomatología actual organizada por aparato o sistema.">
+          <Grid>
+            <Field label="Digestivos" full>
+              <textarea style={styles.textarea} rows={2} value={data.sintomas.digestivos}
+                placeholder="Reflujo, distensión, tránsito intestinal…"
+                onChange={(e) => setField("sintomas", "digestivos", e.target.value)} />
+            </Field>
+            <Field label="Dermatológicos" full>
+              <textarea style={styles.textarea} rows={2} value={data.sintomas.dermatologicos}
+                placeholder="Acné, brotes, resequedad, caída de cabello…"
+                onChange={(e) => setField("sintomas", "dermatologicos", e.target.value)} />
+            </Field>
+            <Field label="Energía y sueño" full>
+              <textarea style={styles.textarea} rows={2} value={data.sintomas.energiaSueno}
+                placeholder="Dolor de cabeza, fatiga, calidad del sueño…"
+                onChange={(e) => setField("sintomas", "energiaSueno", e.target.value)} />
+            </Field>
+            <Field label="Otros signos y síntomas" full>
+              <textarea style={styles.textarea} rows={2} value={data.sintomas.otros}
+                placeholder="Cualquier otra molestia referida…"
+                onChange={(e) => setField("sintomas", "otros", e.target.value)} />
+            </Field>
+          </Grid>
+        </Section>
+
+        {/* 5. EVALUACIÓN BIOQUÍMICA */}
+        <Section reg={reg("bioquimica")} sid="bioquimica" title="Evaluación bioquímica" n="5"
           hint="Estudios de laboratorio referidos por la paciente.">
           <Grid>
             <Field label="¿De cuándo son los estudios?" full>
@@ -757,8 +813,8 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           </Field>
         </Section>
 
-        {/* 4. SUPLEMENTACIÓN */}
-        <Section reg={reg("suplementacion")} sid="suplementacion" title="Suplementación" n="4"
+        {/* 6. SUPLEMENTACIÓN */}
+        <Section reg={reg("suplementacion")} sid="suplementacion" title="Suplementación" n="6"
           hint="Suplementos que consume actualmente con dosis y frecuencia.">
           <div style={styles.tableWrap}>
             <div style={{ ...styles.supRow, ...styles.bioHead }}>
@@ -792,81 +848,14 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
           </Field>
         </Section>
 
-        {/* 5. SIGNOS Y SÍNTOMAS RECIENTES */}
-        <Section reg={reg("sintomas")} sid="sintomas" title="Signos y síntomas recientes" n="5"
-          hint="Sintomatología actual organizada por aparato o sistema.">
-          <Grid>
-            <Field label="Digestivos" full>
-              <textarea style={styles.textarea} rows={2} value={data.sintomas.digestivos}
-                placeholder="Reflujo, distensión, tránsito intestinal…"
-                onChange={(e) => setField("sintomas", "digestivos", e.target.value)} />
-            </Field>
-            <Field label="Dermatológicos" full>
-              <textarea style={styles.textarea} rows={2} value={data.sintomas.dermatologicos}
-                placeholder="Acné, brotes, resequedad, caída de cabello…"
-                onChange={(e) => setField("sintomas", "dermatologicos", e.target.value)} />
-            </Field>
-            <Field label="Energía y sueño" full>
-              <textarea style={styles.textarea} rows={2} value={data.sintomas.energiaSueno}
-                placeholder="Dolor de cabeza, fatiga, calidad del sueño…"
-                onChange={(e) => setField("sintomas", "energiaSueno", e.target.value)} />
-            </Field>
-            <Field label="Otros signos y síntomas" full>
-              <textarea style={styles.textarea} rows={2} value={data.sintomas.otros}
-                placeholder="Cualquier otra molestia referida…"
-                onChange={(e) => setField("sintomas", "otros", e.target.value)} />
-            </Field>
-          </Grid>
-        </Section>
-
-        {/* 6. ANTECEDENTES Y ESTILO DE VIDA */}
-        <Section reg={reg("antecedentes")} sid="antecedentes" title="Antecedentes y estilo de vida" n="6"
-          hint="Antecedentes heredofamiliares y consumo de sustancias.">
-          <Grid>
-            <Field label="Antecedentes heredofamiliares" full>
-              <textarea style={styles.textarea} rows={2} value={data.antecedentes.heredofamiliares}
-                placeholder="Diabetes, cáncer, hipertensión… (parentesco)"
-                onChange={(e) => setField("antecedentes", "heredofamiliares", e.target.value)} />
-            </Field>
-            <Field label="Consumo de alcohol">
-              <input style={styles.input} value={data.antecedentes.alcohol}
-                placeholder="Frecuencia y cantidad"
-                onChange={(e) => setField("antecedentes", "alcohol", e.target.value)} />
-            </Field>
-            <Field label="Tabaco">
-              <input style={styles.input} value={data.antecedentes.tabaco}
-                placeholder="Sí / No · frecuencia"
-                onChange={(e) => setField("antecedentes", "tabaco", e.target.value)} />
-            </Field>
-            <Field label="Otros" full>
-              <textarea style={styles.textarea} rows={2} value={data.antecedentes.otros}
-                placeholder="Notas adicionales…"
-                onChange={(e) => setField("antecedentes", "otros", e.target.value)} />
-            </Field>
-          </Grid>
-        </Section>
-
         {/* 7. HISTORIA DIETÉTICA */}
         <Section reg={reg("dietetica")} sid="dietetica" title="Historia dietética" n="7"
           hint="Hábitos de alimentación, líquidos, preferencias, dieta habitual y rutina.">
           <Grid>
-            <Field label="Comidas al día">
-              <input style={styles.input} inputMode="numeric" value={data.dietetica.comidasDia} placeholder="4"
-                onChange={(e) => setField("dietetica", "comidasDia", e.target.value)} />
-            </Field>
-            <Field label="Consumo de agua natural">
-              <input style={styles.input} value={data.dietetica.agua} placeholder="1–2 L diario"
-                onChange={(e) => setField("dietetica", "agua", e.target.value)} />
-            </Field>
             <Field label="Alergias o intolerancias" full>
               <textarea style={styles.textarea} rows={2} value={data.dietetica.alergias}
                 placeholder="Alimentos a evitar…"
                 onChange={(e) => setField("dietetica", "alergias", e.target.value)} />
-            </Field>
-            <Field label="Consumo de otros líquidos" full>
-              <textarea style={styles.textarea} rows={2} value={data.dietetica.liquidos}
-                placeholder="Café, té, bebidas light…"
-                onChange={(e) => setField("dietetica", "liquidos", e.target.value)} />
             </Field>
             <Field label="Qué SÍ le gusta" full>
               <textarea style={{ ...styles.textarea, ...styles.likeYes }} rows={2} value={data.dietetica.leGusta}
@@ -877,6 +866,15 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
               <textarea style={{ ...styles.textarea, ...styles.likeNo }} rows={2} value={data.dietetica.noLeGusta}
                 placeholder="Alimentos que rechaza…"
                 onChange={(e) => setField("dietetica", "noLeGusta", e.target.value)} />
+            </Field>
+            <Field label="Consumo de agua natural">
+              <input style={styles.input} value={data.dietetica.agua} placeholder="1–2 L diario"
+                onChange={(e) => setField("dietetica", "agua", e.target.value)} />
+            </Field>
+            <Field label="Consumo de otros líquidos" full>
+              <textarea style={styles.textarea} rows={2} value={data.dietetica.liquidos}
+                placeholder="Café, té, bebidas light…"
+                onChange={(e) => setField("dietetica", "liquidos", e.target.value)} />
             </Field>
           </Grid>
 
@@ -959,6 +957,14 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack }) {
             <Field label="Total de horas de sueño (promedio)">
               <input style={{ ...styles.input, background: T.bg, fontWeight: 700, color: T.pine }} readOnly
                 value={(horasSueno_(data.dietetica.despierta, data.dietetica.duerme) || {}).texto || "—"} />
+            </Field>
+          </Grid>
+
+          <Grid style={{ marginTop: 18 }}>
+            <Field label="Notas" full>
+              <textarea style={styles.textarea} rows={3} value={data.dietetica.notas || ""}
+                placeholder="Notas sobre la alimentación, hábitos, contexto…"
+                onChange={(e) => setField("dietetica", "notas", e.target.value)} />
             </Field>
           </Grid>
         </Section>
