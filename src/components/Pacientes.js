@@ -98,6 +98,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [inbodyOpen, setInbodyOpen] = useState(false);
   const [inbody, setInbody] = useState(null);
   const [recoForm, setRecoForm] = useState({ estudios: '', suplementos: '', ejercicio: '', hidratacion: '', generales: '' });
+  const [recoEditIdx, setRecoEditIdx] = useState(null);
+  const recoFormRef = useRef(null);
   const [bitacoraTexto, setBitacoraTexto] = useState('');
   const [bitacoraApego, setBitacoraApego] = useState('');
   const [isakFile, setIsakFile] = useState(null);
@@ -366,12 +368,35 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     const r = {};
     RECO_KEYS.forEach(k => { r[k] = (recoForm[k] || '').trim(); });
     if (!RECO_KEYS.some(k => r[k])) { setErr('Escribe al menos una recomendación en alguna sección.'); return; }
-    const arr = [...(sel.recomendaciones || []), { ...r, fecha: Date.now() }];
+    let arr;
+    if (recoEditIdx != null && (sel.recomendaciones || [])[recoEditIdx]) {
+      // Editar: reemplaza esa recomendación, conservando su fecha original.
+      const orig = sel.recomendaciones[recoEditIdx];
+      arr = (sel.recomendaciones || []).map((x, k) => k === recoEditIdx ? { ...x, ...r, fecha: orig.fecha } : x);
+    } else {
+      arr = [...(sel.recomendaciones || []), { ...r, fecha: Date.now() }];
+    }
     try {
       await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr });
-      setRecoForm({ estudios: '', suplementos: '', ejercicio: '', hidratacion: '', generales: '' });
+      setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = ''; return o; }, {}));
+      setRecoEditIdx(null);
       setErr('');
     } catch (e) { setErr('No se pudo guardar la recomendación: ' + e.message); }
+  };
+
+  const editarReco = (idx) => {
+    const r = (sel.recomendaciones || [])[idx];
+    if (!r) return;
+    setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = r[k] || ''; return o; }, {}));
+    setRecoEditIdx(idx);
+    setErr('');
+    setTimeout(() => { try { recoFormRef.current && recoFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 50);
+  };
+
+  const cancelarEdicionReco = () => {
+    setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = ''; return o; }, {}));
+    setRecoEditIdx(null);
+    setErr('');
   };
 
   const removeReco = async (i) => {
@@ -1038,7 +1063,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
               <span style={panel === 'reco' ? S.chevOpen : S.chev}>⌄</span>
             </button>
             {panel === 'reco' && (
-              <div style={S.panelBody}>
+              <div style={S.panelBody} ref={recoFormRef}>
                 <div style={S.note}>Cada recomendación se publica con fecha y hora; el paciente la verá en su sección "Recomendaciones". Usa los botones para agregar atajos a cada apartado.</div>
                 {RECO_SECCIONES.map(sec => (
                   <div key={sec.key} style={S.recoSeccion}>
@@ -1058,7 +1083,9 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                   </div>
                 ))}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, marginBottom: 14, flexWrap: 'wrap' }}>
-                  <button style={S.saveBtn} onClick={addReco}>+ Agregar recomendación</button>
+                  <button style={S.saveBtn} onClick={addReco}>{recoEditIdx != null ? 'Guardar cambios' : '+ Agregar recomendación'}</button>
+                  {recoEditIdx != null && <button style={S.smallBtn} onClick={cancelarEdicionReco}>Cancelar</button>}
+                  {recoEditIdx != null && <span style={{ fontSize: 12, color: '#9A7B2E', fontWeight: 600 }}>Editando una recomendación existente</span>}
                   {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
                 </div>
                 {(!sel.recomendaciones || sel.recomendaciones.length === 0)
@@ -1077,6 +1104,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                               </div>))
                             : <div style={S.recoText}>{r.texto || ''}</div>}
                         </div>
+                        <button style={S.smallBtn} onClick={() => editarReco(idx)} title="Editar esta recomendación">Editar</button>
                         <button style={S.smallBtn} onClick={() => generarPDFReco(r)} title="Generar PDF de esta recomendación">PDF</button>
                         <button style={S.rm} onClick={() => removeReco(idx)} title="Eliminar">×</button>
                       </div>
