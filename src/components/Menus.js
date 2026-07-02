@@ -717,6 +717,36 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       <div style={S.card}>
         <div style={S.eyebrow}>Balance por grupo</div>
         <h2 style={S.balTitle}>Distribución del plan vs. menús</h2>
+
+        <div style={S.balSub}>Equivalencias por tiempo · editable</div>
+        <div style={S.balWrap}>
+          <table style={{ ...S.balTable, minWidth: 540 }}>
+            <thead>
+              <tr>
+                <th style={{ ...S.balTh, textAlign: 'left' }}>Grupo</th>
+                {tiempos.map((t, idx) => <th key={t.id || idx} style={S.balTh}>{t.nombre}</th>)}
+                <th style={S.balTh}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {GRUPOS.map((_, g) => g).filter(g => (planEq && num(planEq[g]) > 0) || sumaPorGrupo(g) > 0).map(g => (
+                <tr key={'eqm' + g}>
+                  <td style={{ ...S.balTd, textAlign: 'left', fontWeight: 700 }}>{GSHORT[g]}</td>
+                  {tiempos.map((t, idx) => (
+                    <td key={idx} style={S.balTd}>
+                      <input style={S.eqInput} inputMode="decimal" placeholder="—"
+                        value={num(t.eq[g]) ? t.eq[g] : ''}
+                        onChange={e => setEqCell(idx, g, e.target.value)} />
+                    </td>
+                  ))}
+                  <td style={{ ...S.balTd, fontWeight: 700 }}>{fmt(sumaPorGrupo(g))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ ...S.balSub, marginTop: 18 }}>Comparación · plan vs. lo distribuido</div>
         <div style={S.balWrap}>
           <table style={S.balTable}>
             <thead>
@@ -886,6 +916,7 @@ const styles = {
   balTd: { textAlign: 'right', padding: '7px 10px', color: T.pine, borderBottom: `1px solid ${T.lineSoft || T.line}` },
   balRowBad: { background: '#FBF1EC' },
   balRowOk: { background: '#EDF4EF' },
+  balSub: { fontSize: 12, fontWeight: 700, color: T.pine, margin: '2px 0 8px' },
   balHint: { marginTop: 10, fontSize: 11.5, color: T.inkSoft, lineHeight: 1.5 },
   modalWrap: { position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 50 },
   modalCard: { background: T.surface, borderRadius: 16, padding: '22px 22px 20px', width: '100%', maxWidth: 460, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' },
