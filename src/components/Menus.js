@@ -456,13 +456,18 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     setStatus('guardando'); setRep('Guardando borrador…');
     try {
       await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos: tiemposSinFoto(), nOpciones } });
-      await guardarFotos();
-      setStatus('guardado'); setRep('Borrador guardado ✓ (texto e imágenes). Puedes salir y retomarlo después.');
-      return true;
     } catch (e) {
       setStatus('error'); setRep('No se pudo guardar el borrador: ' + e.message);
       return false;
     }
+    // Las imágenes van en un documento aparte; si fallan (p. ej. reglas de Firestore), NO se pierde el texto.
+    try {
+      await guardarFotos();
+      setStatus('guardado'); setRep('Borrador guardado ✓ (texto e imágenes). Puedes salir y retomarlo después.');
+    } catch (e) {
+      setStatus('guardado'); setRep('Borrador guardado ✓ (el texto quedó bien), pero las imágenes no se pudieron guardar: ' + (e.code || e.message) + '. Falta permitir la colección "menuFotos" en las reglas de Firestore.');
+    }
+    return true;
   };
 
   const guardarConAlcance = async (scope) => {
@@ -473,10 +478,11 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     // 1) Guardar SIEMPRE los menús primero (un fallo del PDF no debe hacer perder el trabajo).
     try {
       await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos: tiemposSinFoto(), nOpciones } });
-      await guardarFotos();
     } catch (e) {
       setStatus('error'); setRep('No se pudieron guardar los menús: ' + e.message); return;
     }
+    // Las imágenes van en un documento aparte y no son críticas para el reporte; si fallan, seguimos.
+    try { await guardarFotos(); } catch (_) { /* faltan reglas de Firestore para "menuFotos"; el texto y el PDF continúan */ }
     setStatus('guardado');
     // 2) Generar el PDF, subirlo a Drive y registrarlo en "Planes".
     const url = process.env.REACT_APP_APPSCRIPT_URL;
