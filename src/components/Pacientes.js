@@ -173,7 +173,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   // Señal desde el menú lateral: al dar clic en "Pacientes" ya estando aquí, regresa al listado.
   useEffect(() => {
     if (!resetToList) return; // no corre en el montaje inicial (empieza en 0)
-    setSelId(null); setSub('dash'); setNuevo(false); setMenuId(null); setInbody(null); setMenuReabrir(null); setErr('');
+    setSelId(null); setSub('dash'); setNuevo(false); setMenuId(null); setInbody(null); setMenuReabrir(null); setErr(''); setBusca('');
   }, [resetToList]);
 
   const irNuevo = () => { setErr(''); pushNav(); setNuevo(true); };
