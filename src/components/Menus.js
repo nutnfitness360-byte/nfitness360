@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { db, storage } from '../firebase/config';
-import { doc, updateDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadString, getDownloadURL } from 'firebase/storage';
+import { db } from '../firebase/config';
+import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { buildReportHTML, generarPorcionesTexto, esPorciones } from '../report/reporteHTML';
 
 /* ============================================================
@@ -139,6 +138,21 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   });
   const [nOpciones, setNOpciones] = useState(savedNOp);
   const [status, setStatus] = useState(savedMenus ? 'guardado' : 'nuevo');
+
+  // Carga las imágenes guardadas (documento aparte) y las une a los tiempos por su id.
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'menuFotos', patient.id));
+        if (cancel || !snap.exists()) return;
+        const fotos = (snap.data() || {}).fotos || {};
+        if (!Object.keys(fotos).length) return;
+        setTiempos(ts => ts.map(t => (fotos[t.id] ? { ...t, foto: fotos[t.id] } : t)));
+      } catch (_) { /* si no se pueden leer, el menú sigue funcionando sin imágenes */ }
+    })();
+    return () => { cancel = true; };
+  }, [patient.id]);
   const [rep, setRep] = useState('');
   const [iaBusy, setIaBusy] = useState(false);
   const [opBusy, setOpBusy] = useState(''); // "idx:oi" de la opción que se está generando
@@ -229,23 +243,17 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
 
   const procesarFoto = async (idx, file) => {
     if (!file || !(file.type || '').startsWith('image/')) return;
-    const t = tiempos[idx];
     setSubiendoFoto(idx);
-    const conTiempo = (p, ms, etiqueta) => Promise.race([
+    const conTiempo = (p, ms) => Promise.race([
       p,
-      new Promise((_, rej) => setTimeout(() => rej(new Error('tiempo de espera agotado en ' + etiqueta)), ms)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('tiempo de espera agotado al procesar la imagen')), ms)),
     ]);
     try {
-      const data = await conTiempo(compressImage(file), 15000, 'el procesamiento de la imagen');
-      // Sube a Firebase Storage y guarda solo el ENLACE (así el documento del paciente no se infla).
-      const path = `menu-fotos/${patient.id}/${(t && t.id) || idx}-${Date.now()}.jpg`;
-      const sref = storageRef(storage, path);
-      await conTiempo(uploadString(sref, data, 'data_url'), 25000, 'la subida a Storage');
-      const url = await conTiempo(getDownloadURL(sref), 15000, 'la obtención del enlace');
-      setT(idx, { foto: url });
+      const data = await conTiempo(compressImage(file), 15000); // JPEG comprimido (data URL)
+      setT(idx, { foto: data }); // se guarda aparte (en Firestore) al pulsar "Guardar borrador"
     } catch (e) {
       setStatus('error');
-      setRep('No se pudo subir la imagen: ' + (e.code || e.message) + '. Verifica que Firebase Storage esté activado y con reglas que permitan la escritura.');
+      setRep('No se pudo procesar la imagen: ' + (e.code || e.message) + '. Prueba con otra imagen (JPG o PNG).');
     } finally {
       setSubiendoFoto(null);
     }
@@ -435,11 +443,21 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     catch (_) { setRep('No se pudo copiar automáticamente; selecciona y copia el texto.'); }
   };
 
+  // Las imágenes (base64) NO se guardan en el documento del paciente (lo inflarían y rebasaría 1 MB);
+  // van en un documento aparte 'menuFotos/{pacienteId}', indexadas por el id del tiempo.
+  const tiemposSinFoto = () => tiempos.map(t => ({ ...t, foto: '' }));
+  const guardarFotos = async () => {
+    const fotos = {};
+    tiempos.forEach(t => { if (t.id && typeof t.foto === 'string' && t.foto.startsWith('data:')) fotos[t.id] = t.foto; });
+    await setDoc(doc(db, 'menuFotos', patient.id), { fotos }, { merge: false });
+  };
+
   const guardarBorrador = async () => {
     setStatus('guardando'); setRep('Guardando borrador…');
     try {
-      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos, nOpciones } });
-      setStatus('guardado'); setRep('Borrador guardado ✓ (sin generar el reporte). Puedes salir y retomarlo después.');
+      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos: tiemposSinFoto(), nOpciones } });
+      await guardarFotos();
+      setStatus('guardado'); setRep('Borrador guardado ✓ (texto e imágenes). Puedes salir y retomarlo después.');
       return true;
     } catch (e) {
       setStatus('error'); setRep('No se pudo guardar el borrador: ' + e.message);
@@ -454,7 +472,8 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     setStatus('guardando'); setRep('Guardando menús…');
     // 1) Guardar SIEMPRE los menús primero (un fallo del PDF no debe hacer perder el trabajo).
     try {
-      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos, nOpciones } });
+      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos: tiemposSinFoto(), nOpciones } });
+      await guardarFotos();
     } catch (e) {
       setStatus('error'); setRep('No se pudieron guardar los menús: ' + e.message); return;
     }
@@ -491,7 +510,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         await updateDoc(doc(db, 'pacientes', patient.id), { planes: [...(patient.planes || []), nuevo] });
         // Archiva este menú (contenido editable + PDF) en el historial para poder reabrirlo después.
         try {
-          const tiemposSnap = tiempos.map(t => ({ ...t, foto: (typeof t.foto === 'string' && t.foto.startsWith('http')) ? t.foto : '' })); // conserva enlaces de imagen; descarta base64 heredado
+          const tiemposSnap = tiempos.map(t => ({ ...t, foto: '' })); // las imágenes viven en 'menuFotos', no en el historial
           const snap = { fecha: new Date().toISOString().slice(0, 10), nombre: baseNombre, link: data.link, tiempos: tiemposSnap, nOpciones };
           const hist = [...(patient.menusHistorial || []), snap].slice(-24);
           await updateDoc(doc(db, 'pacientes', patient.id), { menusHistorial: hist });
@@ -800,7 +819,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
               >
                 <div style={S.photoLabel}>Foto ejemplo</div>
                 {subiendoFoto === idx
-                  ? <div style={S.photoEmpty}>Subiendo imagen…</div>
+                  ? <div style={S.photoEmpty}>Procesando imagen…</div>
                   : t.foto
                     ? <img src={t.foto} alt="" style={S.photo} />
                     : <div style={S.photoEmpty}>{dragOver === idx ? 'Suelta la imagen' : 'Sin foto · arrastra una imagen aquí'}</div>}
