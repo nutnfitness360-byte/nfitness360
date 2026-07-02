@@ -231,17 +231,21 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     if (!file || !(file.type || '').startsWith('image/')) return;
     const t = tiempos[idx];
     setSubiendoFoto(idx);
+    const conTiempo = (p, ms, etiqueta) => Promise.race([
+      p,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('tiempo de espera agotado en ' + etiqueta)), ms)),
+    ]);
     try {
-      const data = await compressImage(file); // comprime a JPEG (data URL)
+      const data = await conTiempo(compressImage(file), 15000, 'el procesamiento de la imagen');
       // Sube a Firebase Storage y guarda solo el ENLACE (así el documento del paciente no se infla).
       const path = `menu-fotos/${patient.id}/${(t && t.id) || idx}-${Date.now()}.jpg`;
       const sref = storageRef(storage, path);
-      await uploadString(sref, data, 'data_url');
-      const url = await getDownloadURL(sref);
+      await conTiempo(uploadString(sref, data, 'data_url'), 25000, 'la subida a Storage');
+      const url = await conTiempo(getDownloadURL(sref), 15000, 'la obtención del enlace');
       setT(idx, { foto: url });
     } catch (e) {
       setStatus('error');
-      setRep('No se pudo subir la imagen: ' + (e.code || e.message) + '. Revisa las reglas de Firebase Storage.');
+      setRep('No se pudo subir la imagen: ' + (e.code || e.message) + '. Verifica que Firebase Storage esté activado y con reglas que permitan la escritura.');
     } finally {
       setSubiendoFoto(null);
     }
