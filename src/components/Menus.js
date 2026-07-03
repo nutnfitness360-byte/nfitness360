@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { buildReportHTML, generarPorcionesTexto, esPorciones } from '../report/reporteHTML';
+import HistoriaClinica from './HistoriaClinica';
 
 /* ============================================================
    NFITNESS 360 — Menús por tiempo de comida
@@ -155,6 +156,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   }, [patient.id]);
   const [rep, setRep] = useState('');
   const [iaBusy, setIaBusy] = useState(false);
+  const [verHistoria, setVerHistoria] = useState(false);
   const [opBusy, setOpBusy] = useState(''); // "idx:oi" de la opción que se está generando
   const [dragOver, setDragOver] = useState(null); // idx del tiempo sobre el que se arrastra una imagen
   const [subiendoFoto, setSubiendoFoto] = useState(null); // idx del tiempo cuya imagen se está subiendo
@@ -705,6 +707,9 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       </div>
 
       <div style={S.toolbar}>
+        {patient.historia && (
+          <button style={S.toolBtn} onClick={() => setVerHistoria(true)} title="Consultar la historia clínica sin salir">Ver historia clínica</button>
+        )}
         <button style={S.toolBtn} onClick={() => setShowCfg(true)}>Reconfigurar</button>
         <button style={S.toolBtn} onClick={redistribuir}>Redistribuir equivalentes</button>
         <button style={{ ...S.toolBtn, ...S.iaBtn }} onClick={generarIA} disabled={iaBusy}>{iaBusy ? 'Generando…' : 'Generar todos con IA ✦'}</button>
@@ -712,6 +717,21 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         <button style={S.toolBtn} onClick={() => { setSegNota(ultimaNota ? (ultimaNota.texto || '') : ''); setShowSeg(true); }} disabled={iaBusy || segBusy}>Aplicar cambios de seguimiento ✦</button>
       </div>
       <div style={S.iaNote}>Puedes generar todos los menús de golpe, o regenerar <b>una sola opción</b> con el botón <b>IA ✦</b> de cada tarjeta — así arreglas las que no sirven sin tocar las que ya quedaron bien. La IA solo sugiere: <b>revisa y edita</b> antes de guardar.</div>
+
+      {verHistoria && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div onClick={() => setVerHistoria(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
+          <div style={{ position: 'relative', width: 'min(640px, 94vw)', height: '100%', background: 'var(--bg)', boxShadow: '-10px 0 30px rgba(0,0,0,0.22)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--card)' }}>
+              <span style={{ fontWeight: 700, color: 'var(--dark)', fontSize: 14 }}>Historia clínica · {patient.nombre || ''} <span style={{ fontWeight: 400, color: 'var(--stone)', fontSize: 12 }}>(solo lectura)</span></span>
+              <button style={S.toolBtn} onClick={() => setVerHistoria(false)}>Cerrar ✕</button>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <HistoriaClinica initial={patient.historia} codigo={patient.codigo} readOnly onBack={() => setVerHistoria(false)} />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={S.card}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
