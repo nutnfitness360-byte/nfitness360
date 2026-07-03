@@ -761,7 +761,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                   {tiempos.map((t, idx) => (
                     <td key={idx} style={S.balTd}>
                       <input style={S.eqInput} inputMode="decimal" placeholder="—"
-                        value={num(t.eq[g]) ? t.eq[g] : ''}
+                        value={(t.eq[g] === '' || t.eq[g] === 0 || t.eq[g] === '0') ? '' : t.eq[g]}
                         onChange={e => setEqCell(idx, g, e.target.value)} />
                     </td>
                   ))}
