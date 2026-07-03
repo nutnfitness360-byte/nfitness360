@@ -88,7 +88,7 @@ export default function Plan({ patient, pdata, onBack }) {
     sexo: pdata.sexo || 'Femenino', grasa: pdata.grasa || '',
   });
   const [eq, setEq] = useState(() => (Array.isArray(saved.eq) && saved.eq.length === GRUPOS.length) ? saved.eq.map(String) : GRUPOS.map(() => '0'));
-  const [meta, setMeta] = useState(() => saved.meta || { energia: '', pP: 30, pL: 20, pC: 50, factor: 1.55 });
+  const [meta, setMeta] = useState(() => ({ ...(saved.meta || { pP: 30, pL: 20, pC: 50, factor: 1.55 }), energia: '' }));
   const [status, setStatus] = useState(patient.plan ? 'guardado' : 'nuevo');
 
   const setP = (k, v) => { setPp(p => ({ ...p, [k]: v })); setStatus('nuevo'); };
@@ -110,9 +110,9 @@ export default function Plan({ patient, pdata, onBack }) {
   const sugerido = isFin(mifflin) ? mifflin * factor : NaN;
 
   useEffect(() => {
-    const e0 = num(meta.energia) || (isFin(sugerido) ? r0(sugerido) : 0);
-    if (!num(meta.energia) && isFin(sugerido)) setMeta(m => ({ ...m, energia: r0(sugerido) }));
-    // Plan nuevo (sin equivalentes guardados): aplicar la plantilla base.
+    // La energía meta (B) arranca vacía en cada cálculo: no se hereda del plan anterior ni se autollena.
+    const e0 = num(meta.energia);
+    // Plan nuevo (sin equivalentes guardados): aplicar la plantilla base solo si ya hay energía.
     const teniaEq = Array.isArray(saved.eq) && saved.eq.some(v => num(v) > 0);
     const eqVacios = eq.every(v => num(v) === 0);
     if (!teniaEq && eqVacios && e0) setEq(plantillaEq(e0, num(meta.pP), num(meta.pL), num(meta.pC)).map(String));
