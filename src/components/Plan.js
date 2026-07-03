@@ -8,6 +8,8 @@ import HistoriaClinica from './HistoriaClinica';
    Mismo diseño que el panel original, conectado a Firestore.
    ============================================================ */
 
+const CODE_PREFIX = process.env.REACT_APP_CODE_PREFIX || 'NF-';
+
 const T = {
   bg: '#EEE4DA', surface: '#FFFFFF', ink: '#36302B', inkSoft: '#978C87',
   line: '#E3D8CC', lineSoft: '#EFE7DD', pine: '#211C17', amber: '#CDA788',
@@ -189,7 +191,7 @@ export default function Plan({ patient, pdata, onBack }) {
             <div style={styles.eyebrow}>Panel de la nutrióloga</div>
             <h1 style={styles.h1}>Cálculo del plan nutricional</h1>
             <div style={styles.idBlock}>
-              <span style={styles.noPill}>{patient.codigo || 'NF-…'}</span>
+              <span style={styles.noPill}>{patient.codigo || (CODE_PREFIX + '…')}</span>
               <p style={styles.patientLine}>{patient.nombre}{patient.objetivo ? ' · ' + patient.objetivo : ''}</p>
             </div>
           </div>
