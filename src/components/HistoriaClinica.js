@@ -86,7 +86,7 @@ function baseSeed() {
   return {
     datos: {
       nombre: "", pacienteNo: "", fecha: "", fechaNacimiento: "", edad: "", sexo: "Femenino",
-      peso: "", talla: "", correo: "", ocupacion: "", objetivo: "",
+      peso: "", talla: "", correo: "", telefono: "", ocupacion: "", objetivo: "",
     },
     padecimientos: { lista: [], medicamentos: "" },
     bioquimica: {
@@ -182,6 +182,7 @@ function histParts(data) {
   const content =
     card("1", "Datos generales", rows([
       ["Correo electrónico", d.correo],
+      ["Número telefónico", d.telefono],
       ["Ocupación", d.ocupacion], ["Objetivo", d.objetivo],
     ])) +
     card("2", "Antecedentes y estilo de vida", rows([
@@ -629,6 +630,10 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
             <Field label="Correo electrónico" full>
               <input style={styles.input} value={data.datos.correo} placeholder="correo@ejemplo.com"
                 onChange={(e) => setField("datos", "correo", e.target.value)} />
+            </Field>
+            <Field label="Número telefónico" full>
+              <input style={styles.input} value={data.datos.telefono || ""} placeholder="10 dígitos" inputMode="tel"
+                onChange={(e) => setField("datos", "telefono", e.target.value)} />
             </Field>
             <Field label="Ocupación (trabaja / estudia)" full>
               <input style={styles.input} value={data.datos.ocupacion}
