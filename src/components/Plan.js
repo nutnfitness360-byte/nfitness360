@@ -92,6 +92,7 @@ export default function Plan({ patient, pdata, onBack }) {
   const [meta, setMeta] = useState(() => ({ ...(saved.meta || { pP: 30, pL: 20, pC: 50, factor: 1.55 }), energia: '' }));
   const [status, setStatus] = useState(patient.plan ? 'guardado' : 'nuevo');
   const [verHistoria, setVerHistoria] = useState(false);
+  const [exitModal, setExitModal] = useState(null); // { proceed } | null
 
   const setP = (k, v) => { setPp(p => ({ ...p, [k]: v })); setStatus('nuevo'); };
   const setM = (k, v) => { setMeta(m => ({ ...m, [k]: v })); setStatus('nuevo'); };
@@ -156,23 +157,33 @@ export default function Plan({ patient, pdata, onBack }) {
   const gkgC = peso > 0 ? r1(tot.hc / peso) : null;
 
   const guardar = async () => {
-    if (sumaPct !== 100) { setStatus('error'); return; }
+    if (sumaPct !== 100) { setStatus('error'); return false; }
     setStatus('guardando');
     const plan = {
       eq: eq.map(num), meta: { energia: num(meta.energia), pP, pL, pC, factor },
       totales: { kcal: r0(tot.kcal), prot: r0(tot.prot), lip: r0(tot.lip), hc: r0(tot.hc), distP: r1(distP), distL: r1(distL), distC: r1(distC) },
       fecha: new Date().toISOString().slice(0, 10),
     };
-    try { await updateDoc(doc(db, 'pacientes', patient.id), { plan }); setStatus('guardado'); }
-    catch (e) { setStatus('error'); }
+    try { await updateDoc(doc(db, 'pacientes', patient.id), { plan }); setStatus('guardado'); return true; }
+    catch (e) { setStatus('error'); return false; }
   };
+
+  // --- Aviso de cambios sin guardar al salir ---
+  const hayContenido = num(meta.energia) > 0 || eq.some(v => num(v) > 0);
+  const dirty = hayContenido && status !== 'guardado';
+  const requestExit = (proceed) => {
+    if (dirty) setExitModal({ proceed: (typeof proceed === 'function' ? proceed : () => {}) });
+    else if (typeof proceed === 'function') proceed();
+  };
+  const salirAhora = () => { const p = exitModal && exitModal.proceed; setExitModal(null); if (p) p(); };
+  const guardarYSalir = async () => { const p = exitModal && exitModal.proceed; const ok = await guardar(); if (ok) { setExitModal(null); if (p) p(); } };
 
   return (
     <div style={styles.root}>
       <style>{css}</style>
 
       <header style={styles.header}>
-        <button style={styles.back} onClick={onBack}>← {patient.nombre}</button>
+        <button style={styles.back} onClick={() => requestExit(onBack)}>← {patient.nombre}</button>
         <div style={styles.titleRow}>
           <div style={{ flex: 1 }}>
             <div style={styles.eyebrow}>Panel de la nutrióloga</div>
@@ -336,11 +347,26 @@ export default function Plan({ patient, pdata, onBack }) {
             {status === 'nuevo' && 'Cambios sin guardar.'}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button style={styles.volverBtn} onClick={onBack}>← Atrás</button>
+            <button style={styles.volverBtn} onClick={() => requestExit(onBack)}>← Atrás</button>
             <button style={styles.primaryBtn} className="nf-primary" onClick={guardar}>Guardar plan</button>
           </div>
         </div>
       </main>
+
+      {exitModal && (
+        <div style={styles.modalWrap}>
+          <div style={{ ...styles.modalCard, maxWidth: 420 }}>
+            <div style={styles.exitTitle}>¿Quieres salir?</div>
+            <div style={styles.exitText}>No has guardado tu trabajo.</div>
+            <div style={styles.exitBtns}>
+              <button style={styles.volverBtn} onClick={salirAhora}>Salir</button>
+              <button style={styles.primaryBtn} className="nf-primary" onClick={guardarYSalir} disabled={status === 'guardando'}>
+                {status === 'guardando' ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -473,6 +499,11 @@ const styles = {
   primaryBtn: { background: T.amber, color: '#211C17', border: 'none', padding: '12px 24px', borderRadius: 11, fontSize: 14.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
   volverBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.pine}`, padding: '12px 20px', borderRadius: 11, fontSize: 14.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
   verHBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.pine}`, padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
+  modalWrap: { position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1100 },
+  modalCard: { background: T.surface, borderRadius: 16, padding: '22px 22px 20px', width: '100%', maxWidth: 460, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' },
+  exitTitle: { fontSize: 18, fontWeight: 800, color: T.pine, marginBottom: 8 },
+  exitText: { fontSize: 14, color: T.ink, lineHeight: 1.5, marginBottom: 20 },
+  exitBtns: { display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' },
   templateBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono, alignSelf: 'flex-start' },
 };
 
