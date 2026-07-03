@@ -195,10 +195,13 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
 
   const derivar = (h) => {
     const d = (h && h.datos) || {};
-    return {
+    const out = {
       nombre: (d.nombre || '').trim(), edad: d.edad || '', sexo: d.sexo || 'Femenino',
       estatura: d.talla || '', objetivo: d.objetivo || '', correo: (d.correo || '').trim().toLowerCase(),
     };
+    const tel = (d.telefono || '').trim();
+    if (tel) out.contacto = tel;
+    return out;
   };
 
   // Opción C: copia el sexo (y nombre) al registro de suscriptor, si hay correo vinculado.
@@ -721,7 +724,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                 </select>
               </Field>
               <Field l="Estatura (cm)"><input style={S.inp} inputMode="decimal" value={infoForm.estatura} onChange={e => setInfoForm({ ...infoForm, estatura: e.target.value })} /></Field>
-              <Field l="Contacto"><input style={S.inp} value={infoForm.contacto} onChange={e => setInfoForm({ ...infoForm, contacto: e.target.value })} /></Field>
+              <Field l="Número telefónico"><input style={S.inp} inputMode="tel" value={infoForm.contacto} onChange={e => setInfoForm({ ...infoForm, contacto: e.target.value })} /></Field>
               <Field l="Objetivo"><input style={S.inp} value={infoForm.objetivo} onChange={e => setInfoForm({ ...infoForm, objetivo: e.target.value })} /></Field>
               <button style={S.saveBtn} onClick={guardarInfo}>Guardar cambios</button>
             </div>
@@ -731,7 +734,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
               <Info l="Sexo" v={sel.sexo || '—'} />
               <Info l="Estatura" v={sel.estatura ? sel.estatura + ' cm' : '—'} />
               <Info l="Inicio" v={sel.inicio ? fmtFecha(sel.inicio) : '—'} />
-              <Info l="Contacto" v={sel.contacto || '—'} />
+              <Info l="Número telefónico" v={sel.contacto || '—'} />
               <Info l="Objetivo" v={sel.objetivo || '—'} />
             </div>
           )}
