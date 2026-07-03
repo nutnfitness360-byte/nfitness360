@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
+import HistoriaClinica from './HistoriaClinica';
 
 /* ============================================================
    NFITNESS 360 — Cálculo del plan nutricional (SMAE)
@@ -90,6 +91,7 @@ export default function Plan({ patient, pdata, onBack }) {
   const [eq, setEq] = useState(() => (Array.isArray(saved.eq) && saved.eq.length === GRUPOS.length) ? saved.eq.map(String) : GRUPOS.map(() => '0'));
   const [meta, setMeta] = useState(() => ({ ...(saved.meta || { pP: 30, pL: 20, pC: 50, factor: 1.55 }), energia: '' }));
   const [status, setStatus] = useState(patient.plan ? 'guardado' : 'nuevo');
+  const [verHistoria, setVerHistoria] = useState(false);
 
   const setP = (k, v) => { setPp(p => ({ ...p, [k]: v })); setStatus('nuevo'); };
   const setM = (k, v) => { setMeta(m => ({ ...m, [k]: v })); setStatus('nuevo'); };
@@ -182,7 +184,27 @@ export default function Plan({ patient, pdata, onBack }) {
           </div>
           <SaveBadge status={status} />
         </div>
+        {patient.historia && (
+          <button style={styles.verHBtn} onClick={() => setVerHistoria(true)} title="Consultar la historia clínica sin salir del cálculo">
+            Ver historia clínica
+          </button>
+        )}
       </header>
+
+      {verHistoria && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div onClick={() => setVerHistoria(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
+          <div style={{ position: 'relative', width: 'min(640px, 94vw)', height: '100%', background: 'var(--bg)', boxShadow: '-10px 0 30px rgba(0,0,0,0.22)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--card)' }}>
+              <span style={{ fontWeight: 700, color: 'var(--dark)', fontSize: 14 }}>Historia clínica · {patient.nombre || ''} <span style={{ fontWeight: 400, color: 'var(--stone)', fontSize: 12 }}>(solo lectura)</span></span>
+              <button style={styles.verHBtn} onClick={() => setVerHistoria(false)}>Cerrar ✕</button>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <HistoriaClinica initial={patient.historia} codigo={patient.codigo} readOnly onBack={() => setVerHistoria(false)} />
+            </div>
+          </div>
+        </div>
+      )}
 
       <main style={styles.main}>
         {/* SECCIÓN A */}
@@ -450,6 +472,7 @@ const styles = {
   footerInfo: { fontSize: 12.5, color: T.inkSoft },
   primaryBtn: { background: T.amber, color: '#211C17', border: 'none', padding: '12px 24px', borderRadius: 11, fontSize: 14.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
   volverBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.pine}`, padding: '12px 20px', borderRadius: 11, fontSize: 14.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
+  verHBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.pine}`, padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
   templateBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono, alignSelf: 'flex-start' },
 };
 
