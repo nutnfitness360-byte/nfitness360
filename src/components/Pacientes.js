@@ -188,10 +188,11 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const irNuevo = () => { setErr(''); pushNav(); setNuevo(true); };
   const irSub = (s) => { pushNav(); setPanel(null); setSub(s); };
 
+  const CODE_PREFIX = process.env.REACT_APP_CODE_PREFIX || 'NF-';
   const nextCodigo = () => {
     let mx = 0;
-    pacientes.forEach(p => { const m = /NF-(\d+)/.exec(p.codigo || ''); if (m) mx = Math.max(mx, +m[1]); });
-    return 'NF-' + String(mx + 1).padStart(4, '0');
+    pacientes.forEach(p => { const m = /(\d+)/.exec(p.codigo || ''); if (m) mx = Math.max(mx, +m[1]); });
+    return CODE_PREFIX + String(mx + 1).padStart(4, '0');
   };
 
   const derivar = (h) => {
