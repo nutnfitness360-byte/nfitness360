@@ -15,6 +15,9 @@ const COLOR_LABELS = [
   ['stone', 'Piedra (texto secundario)'],
   ['card', 'Tarjetas (fondo)'],
   ['border', 'Bordes'],
+  ['ink', 'Texto principal (cálido)'],
+  ['mint', 'Fondos suaves (tablas, tintes)'],
+  ['danger', 'Alertas / rojo'],
 ];
 
 // Carga una imagen, la redimensiona (máx 480px de ancho) y la devuelve como PNG
