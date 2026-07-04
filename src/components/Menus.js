@@ -285,7 +285,8 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         const equivalentes = t.eq.map((n, g) => ({ grupo: GRUPOS[g][0], n: round2(num(n)) })).filter(x => x.n > 0);
         const ind = (t.indicacion || '').trim();
         const nombreIA = ind ? (t.nombre + ' — indicación del nutriólogo: ' + ind) : t.nombre;
-        return { nombre: nombreIA, hora: t.hora, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) } };
+        const evitar = (t.opciones || []).map(o => (o.nombre || '').trim()).filter(Boolean);
+        return { nombre: nombreIA, hora: t.hora, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) }, evitar };
       });
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
