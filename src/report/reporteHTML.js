@@ -33,7 +33,7 @@ const cntPorc = (r, w) => `${fmtRac(r)} ${w}${Math.round(r * 100) / 100 > 1 ? 's
 // que va después de "{raciones} {Grupo}:" (las verduras van libres, sin conteo).
 const PORCIONES_CFG = [
   { cat: 'Verduras', uno: 'Verdura', groups: [3], libre: true, ej: () => 'diferentes ya sean en sopa, ensalada, cocidas o al grill' },
-  { cat: 'Proteínas', uno: 'Proteína', groups: [5, 6, 7, 8], ej: (r) => `${grPorc(30, r)}g ya cocida en cualquier guisado (preferir carnes blancas; nada frito, empanizado, capeado ni crudo)` },
+  { cat: 'Proteínas', uno: 'Proteína', groups: [5, 6, 7, 8], ej: (r) => `${grPorc(30, r)}g ya cocida en cualquier guisado (preferir carnes blancas; nada frito, empanizado, capeado)` },
   { cat: 'Cereales', uno: 'Cereal', groups: [0, 1], ej: (r) => `${grPorc(50, r)}g de arroz integral o pasta cocida ó ${cntPorc(r, 'tortilla')} de maíz ó ${cntPorc(r, 'paquete')} de salmas ó ${grPorc(70, r)}g de papa o camote cocido` },
   { cat: 'Leguminosas', uno: 'Leguminosa', groups: [2], ej: (r) => `${grPorc(80, r)}g de frijol, lenteja o garbanzo cocido` },
   { cat: 'Grasas', uno: 'Grasa', groups: [13, 14], ej: (r) => `${grPorc(30, r)}g de aguacate ó ${cntPorc(r, 'cdita')} de aceite de oliva ó ${cntPorc(r, 'cdita')} de mayonesa de aguacate` },
