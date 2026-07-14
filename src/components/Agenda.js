@@ -27,15 +27,39 @@ const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 
 // Horario por defecto (se usa si aún no se ha configurado en Configuración → Horarios de atención).
 // Bloqueados: domingo (0), martes (2) y jueves (4). Abre 09:00; cierra 18:00 (sábado 13:00).
 // semanas: [] = todas las semanas del mes. [1,3] = solo 1ª y 3ª semana (p. ej. 1er y 3er sábado).
+// franjas: cada día puede tener varias franjas horarias, cada una con su modalidad:
+//          mod = 'ambas' | 'presencial' | 'online'
 export const HORARIO_DEFAULT = {
-  0: { activo: false, apertura: '09:00', cierre: '14:00', semanas: [] }, // Domingo
-  1: { activo: true,  apertura: '09:00', cierre: '18:00', semanas: [] }, // Lunes
-  2: { activo: false, apertura: '09:00', cierre: '18:00', semanas: [] }, // Martes
-  3: { activo: true,  apertura: '09:00', cierre: '18:00', semanas: [] }, // Miércoles
-  4: { activo: false, apertura: '09:00', cierre: '18:00', semanas: [] }, // Jueves
-  5: { activo: true,  apertura: '09:00', cierre: '18:00', semanas: [] }, // Viernes
-  6: { activo: true,  apertura: '09:00', cierre: '13:00', semanas: [] }, // Sábado
+  0: { activo: false, semanas: [], franjas: [{ ini: '09:00', fin: '14:00', mod: 'ambas' }] }, // Domingo
+  1: { activo: true,  semanas: [], franjas: [{ ini: '09:00', fin: '18:00', mod: 'ambas' }] }, // Lunes
+  2: { activo: false, semanas: [], franjas: [{ ini: '09:00', fin: '18:00', mod: 'ambas' }] }, // Martes
+  3: { activo: true,  semanas: [], franjas: [{ ini: '09:00', fin: '18:00', mod: 'ambas' }] }, // Miércoles
+  4: { activo: false, semanas: [], franjas: [{ ini: '09:00', fin: '18:00', mod: 'ambas' }] }, // Jueves
+  5: { activo: true,  semanas: [], franjas: [{ ini: '09:00', fin: '18:00', mod: 'ambas' }] }, // Viernes
+  6: { activo: true,  semanas: [], franjas: [{ ini: '09:00', fin: '13:00', mod: 'ambas' }] }, // Sábado
 };
+
+export const MODALIDADES = [
+  ['ambas', 'Ambas'],
+  ['presencial', 'Presencial'],
+  ['online', 'En línea'],
+];
+
+// Devuelve las franjas de una config de día (soporta el formato antiguo apertura/cierre).
+export function franjasDe(cfg) {
+  if (!cfg) return [];
+  if (Array.isArray(cfg.franjas) && cfg.franjas.length) return cfg.franjas;
+  if (cfg.apertura && cfg.cierre) return [{ ini: cfg.apertura, fin: cfg.cierre, mod: 'ambas' }]; // compatibilidad
+  return [];
+}
+
+// ¿La franja sirve para la modalidad pedida? (esOnline = true / false / null = cualquiera)
+function franjaSirve(f, esOnline) {
+  const mod = f.mod || 'ambas';
+  if (esOnline === null || esOnline === undefined) return true;
+  if (mod === 'ambas') return true;
+  return esOnline ? (mod === 'online') : (mod === 'presencial');
+}
 
 // Qué ocurrencia del día es dentro del mes: el 3er sábado del mes → 3.
 function ocurrenciaEnMes(key) {
@@ -46,34 +70,35 @@ function ocurrenciaEnMes(key) {
 function toKey(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function dowDe(key) { const [y,m,d] = key.split('-'); return new Date(+y,+m-1,+d).getDay(); }
 // Config del día según el horario semanal.
-function diaCfg(hor, key) { const h = (hor || HORARIO_DEFAULT)[dowDe(key)] || HORARIO_DEFAULT[dowDe(key)]; return h || { activo: false, apertura: '09:00', cierre: '18:00', semanas: [] }; }
+function diaCfg(hor, key) { const h = (hor || HORARIO_DEFAULT)[dowDe(key)] || HORARIO_DEFAULT[dowDe(key)]; return h || { activo: false, semanas: [], franjas: [] }; }
 
-// ¿Ese día hay atención? Prioridad:
-//  1) Excepción por fecha  (exc[fecha] = 'cerrado' | { apertura, cierre })  → manda sobre todo
+// Franjas efectivas del día. Prioridad:
+//  1) Excepción por fecha  (exc[fecha] = 'cerrado' | { franjas } | { apertura, cierre })  → manda sobre todo
 //  2) Regla de semanas del mes (p. ej. sábado solo 1ª y 3ª semana)
-//  3) Día activo/inactivo en el horario semanal
-function diaAbierto(key, hor, exc) {
+//  3) Día activo/inactivo del horario semanal
+// esOnline: true (solo online) | false (solo presencial) | null (cualquiera)
+function franjasDelDia(key, hor, exc, esOnline) {
   const e = (exc || {})[key];
-  if (e === 'cerrado') return false;              // cerrado extraordinario (vacaciones, festivo…)
-  if (e && typeof e === 'object') return true;    // abierto extraordinario
-  const c = diaCfg(hor, key);
-  if (!c.activo) return false;
-  const sem = Array.isArray(c.semanas) ? c.semanas : [];
-  if (sem.length && sem.indexOf(ocurrenciaEnMes(key)) === -1) return false; // no toca esta semana
-  return true;
-}
-
-// Horas de apertura/cierre efectivas (la excepción abierta puede traer horario propio).
-function horasDe(key, hor, exc) {
-  const e = (exc || {})[key];
-  const c = diaCfg(hor, key);
+  let fr = [];
+  if (e === 'cerrado') return [];                                     // cerrado extraordinario
   if (e && typeof e === 'object') {
-    return { apertura: e.apertura || c.apertura || '09:00', cierre: e.cierre || c.cierre || '18:00' };
+    fr = franjasDe(e);                                                // abierto extraordinario
+  } else {
+    const c = diaCfg(hor, key);
+    if (!c.activo) return [];
+    const sem = Array.isArray(c.semanas) ? c.semanas : [];
+    if (sem.length && sem.indexOf(ocurrenciaEnMes(key)) === -1) return []; // no toca esta semana
+    fr = franjasDe(c);
   }
-  return { apertura: c.apertura || '09:00', cierre: c.cierre || '18:00' };
+  return fr.filter(f => f && f.ini && f.fin && f.ini < f.fin && franjaSirve(f, esOnline));
 }
 
-function bloqueado(key, hor, exc) { return !diaAbierto(key, hor, exc); }
+// ¿Hay atención ese día? (sin filtrar modalidad → para pintar el calendario)
+function diaAbierto(key, hor, exc, esOnline) {
+  return franjasDelDia(key, hor, exc, (esOnline === undefined ? null : esOnline)).length > 0;
+}
+
+function bloqueado(key, hor, exc) { return !diaAbierto(key, hor, exc, null); }
 function fmtDate(key) {
   const [y,m,d] = key.split('-');
   return new Date(+y,+m-1,+d).toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'}).replace(/^\w/,c=>c.toUpperCase());
@@ -102,19 +127,23 @@ function durDeCita(c) {
 // Genera los horarios candidatos del día: rejilla base de 30 min + puntos de
 // continuación (cada 10 min) tras cada cita existente. Marca cuáles caben para
 // la duración elegida (sin traslaparse con citas existentes).
-function generarSlots(dateKey, durMin, citasDelDia, hor, exc) {
-  if (!diaAbierto(dateKey, hor, exc)) return [];
-  const h = horasDe(dateKey, hor, exc);
-  const apertura = toMin(h.apertura);
-  const fin = toMin(h.cierre);
-  if (!(fin > apertura)) return [];
+function generarSlots(dateKey, durMin, citasDelDia, hor, exc, esOnline) {
+  const franjas = franjasDelDia(dateKey, hor, exc, (esOnline === undefined ? null : esOnline));
+  if (!franjas.length) return [];
   const ocup = citasDelDia.map(c => { const s = toMin(c.hora); return { s, e: s + durDeCita(c) }; });
   const set = new Set();
-  for (let t = apertura; t <= fin; t += 30) set.add(t);            // rejilla base 30 min
-  ocup.forEach(o => { let c = o.e; while (c % 30 !== 0 && c <= fin) { set.add(c); c += 10; } }); // continuación 10 min
-  const cand = [...set].filter(t => t >= apertura && t <= fin).sort((a,b)=>a-b);
+  franjas.forEach(f => {
+    const ini = toMin(f.ini), fin = toMin(f.fin);
+    for (let t = ini; t <= fin; t += 30) set.add(t);                                             // rejilla base 30 min
+    ocup.forEach(o => { let c = o.e; while (c % 30 !== 0 && c <= fin) { if (c >= ini) set.add(c); c += 10; } }); // continuación 10 min
+  });
+  // La cita debe caber COMPLETA dentro de alguna franja válida.
+  const cabe = (t, d) => franjas.some(f => t >= toMin(f.ini) && (t + d) <= toMin(f.fin));
   const choca = (s, d) => ocup.some(o => s < o.e && o.s < s + d);
-  return cand.map(t => ({ hora: fromMin(t), disponible: durMin ? !choca(t, durMin) : false }));
+  const cand = [...set].sort((a, b) => a - b);
+  return cand
+    .filter(t => (durMin ? cabe(t, durMin) : franjas.some(f => t >= toMin(f.ini) && t <= toMin(f.fin))))
+    .map(t => ({ hora: fromMin(t), disponible: durMin ? !choca(t, durMin) : false }));
 }
 
 export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSolicitarCancelar }) {
@@ -190,7 +219,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const citaDates = new Set(citas.filter(c => c.estado !== 'cancelada').filter(esPropia).map(c => c.fecha));
 
   const servSel = SERVICIOS.find(s => s.id === mTipo) || null;
-  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, ocupadasDia, horario, excepciones);
+  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, ocupadasDia, horario, excepciones, servSel ? !!servSel.online : null);
 
   const abrirModal = () => {
     setMPaciente(''); setMPacienteEmail(''); setMTipo(null);
@@ -470,7 +499,11 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
             {!servSel
               ? <div className="empty-state">Selecciona el tipo de consulta para ver los horarios.</div>
               : slots.length === 0
-                ? <div className="empty-state">No hay horarios para este día.</div>
+                ? <div className="empty-state">
+                    {diaAbierto(selDate, horario, excepciones, null)
+                      ? ('Este día no hay atención ' + (servSel.online ? 'en línea' : 'presencial') + '. Elige otro día o cambia el tipo de consulta.')
+                      : 'No hay horarios para este día.'}
+                  </div>
                 : slots.every(s => !s.disponible)
                   ? <div className="empty-state">Sin horarios disponibles (día lleno).</div>
                   : (
