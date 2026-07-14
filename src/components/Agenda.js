@@ -26,20 +26,54 @@ const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 
 // ---- Disponibilidad ----
 // Horario por defecto (se usa si aún no se ha configurado en Configuración → Horarios de atención).
 // Bloqueados: domingo (0), martes (2) y jueves (4). Abre 09:00; cierra 18:00 (sábado 13:00).
+// semanas: [] = todas las semanas del mes. [1,3] = solo 1ª y 3ª semana (p. ej. 1er y 3er sábado).
 export const HORARIO_DEFAULT = {
-  0: { activo: false, apertura: '09:00', cierre: '14:00' }, // Domingo
-  1: { activo: true,  apertura: '09:00', cierre: '18:00' }, // Lunes
-  2: { activo: false, apertura: '09:00', cierre: '18:00' }, // Martes
-  3: { activo: true,  apertura: '09:00', cierre: '18:00' }, // Miércoles
-  4: { activo: false, apertura: '09:00', cierre: '18:00' }, // Jueves
-  5: { activo: true,  apertura: '09:00', cierre: '18:00' }, // Viernes
-  6: { activo: true,  apertura: '09:00', cierre: '13:00' }, // Sábado
+  0: { activo: false, apertura: '09:00', cierre: '14:00', semanas: [] }, // Domingo
+  1: { activo: true,  apertura: '09:00', cierre: '18:00', semanas: [] }, // Lunes
+  2: { activo: false, apertura: '09:00', cierre: '18:00', semanas: [] }, // Martes
+  3: { activo: true,  apertura: '09:00', cierre: '18:00', semanas: [] }, // Miércoles
+  4: { activo: false, apertura: '09:00', cierre: '18:00', semanas: [] }, // Jueves
+  5: { activo: true,  apertura: '09:00', cierre: '18:00', semanas: [] }, // Viernes
+  6: { activo: true,  apertura: '09:00', cierre: '13:00', semanas: [] }, // Sábado
 };
+
+// Qué ocurrencia del día es dentro del mes: el 3er sábado del mes → 3.
+function ocurrenciaEnMes(key) {
+  const d = parseInt(key.split('-')[2], 10);
+  return Math.floor((d - 1) / 7) + 1;
+}
 
 function toKey(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function dowDe(key) { const [y,m,d] = key.split('-'); return new Date(+y,+m-1,+d).getDay(); }
-function diaCfg(hor, key) { const h = (hor || HORARIO_DEFAULT)[dowDe(key)] || HORARIO_DEFAULT[dowDe(key)]; return h || { activo: false, apertura: '09:00', cierre: '18:00' }; }
-function bloqueado(key, hor) { return !diaCfg(hor, key).activo; }
+// Config del día según el horario semanal.
+function diaCfg(hor, key) { const h = (hor || HORARIO_DEFAULT)[dowDe(key)] || HORARIO_DEFAULT[dowDe(key)]; return h || { activo: false, apertura: '09:00', cierre: '18:00', semanas: [] }; }
+
+// ¿Ese día hay atención? Prioridad:
+//  1) Excepción por fecha  (exc[fecha] = 'cerrado' | { apertura, cierre })  → manda sobre todo
+//  2) Regla de semanas del mes (p. ej. sábado solo 1ª y 3ª semana)
+//  3) Día activo/inactivo en el horario semanal
+function diaAbierto(key, hor, exc) {
+  const e = (exc || {})[key];
+  if (e === 'cerrado') return false;              // cerrado extraordinario (vacaciones, festivo…)
+  if (e && typeof e === 'object') return true;    // abierto extraordinario
+  const c = diaCfg(hor, key);
+  if (!c.activo) return false;
+  const sem = Array.isArray(c.semanas) ? c.semanas : [];
+  if (sem.length && sem.indexOf(ocurrenciaEnMes(key)) === -1) return false; // no toca esta semana
+  return true;
+}
+
+// Horas de apertura/cierre efectivas (la excepción abierta puede traer horario propio).
+function horasDe(key, hor, exc) {
+  const e = (exc || {})[key];
+  const c = diaCfg(hor, key);
+  if (e && typeof e === 'object') {
+    return { apertura: e.apertura || c.apertura || '09:00', cierre: e.cierre || c.cierre || '18:00' };
+  }
+  return { apertura: c.apertura || '09:00', cierre: c.cierre || '18:00' };
+}
+
+function bloqueado(key, hor, exc) { return !diaAbierto(key, hor, exc); }
 function fmtDate(key) {
   const [y,m,d] = key.split('-');
   return new Date(+y,+m-1,+d).toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'}).replace(/^\w/,c=>c.toUpperCase());
@@ -52,10 +86,9 @@ function citaPasada(c) {
   return !isNaN(dt.getTime()) && dt.getTime() < Date.now();
 }
 function fromMin(m) { return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
-function proxDisponible(date, hor) {
-  const H = hor || HORARIO_DEFAULT;
+function proxDisponible(date, hor, exc) {
   const d = new Date(date);
-  for (let i = 0; i < 14; i++) { const c = H[d.getDay()]; if (c && c.activo) return d; d.setDate(d.getDate()+1); }
+  for (let i = 0; i < 60; i++) { if (diaAbierto(toKey(d), hor, exc)) return d; d.setDate(d.getDate()+1); }
   return date;
 }
 // Duración (min) de una cita existente (compatibilidad con citas viejas que solo tienen 'motivo')
@@ -69,11 +102,11 @@ function durDeCita(c) {
 // Genera los horarios candidatos del día: rejilla base de 30 min + puntos de
 // continuación (cada 10 min) tras cada cita existente. Marca cuáles caben para
 // la duración elegida (sin traslaparse con citas existentes).
-function generarSlots(dateKey, durMin, citasDelDia, hor) {
-  const cfg = diaCfg(hor, dateKey);
-  if (!cfg.activo) return [];
-  const apertura = toMin(cfg.apertura || '09:00');
-  const fin = toMin(cfg.cierre || '18:00');
+function generarSlots(dateKey, durMin, citasDelDia, hor, exc) {
+  if (!diaAbierto(dateKey, hor, exc)) return [];
+  const h = horasDe(dateKey, hor, exc);
+  const apertura = toMin(h.apertura);
+  const fin = toMin(h.cierre);
   if (!(fin > apertura)) return [];
   const ocup = citasDelDia.map(c => { const s = toMin(c.hora); return { s, e: s + durDeCita(c) }; });
   const set = new Set();
@@ -111,6 +144,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const [showSug, setShowSug] = useState(false);
   const [precios, setPrecios] = useState({});
   const [horario, setHorario] = useState(HORARIO_DEFAULT);
+  const [excepciones, setExcepciones] = useState({});
   const [mMetodoPago, setMMetodoPago] = useState('efectivo');
 
   useEffect(() => {
@@ -131,19 +165,20 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
       const d = (snap && snap.data()) || {};
       setPrecios(d.precios || {});
       setHorario({ ...HORARIO_DEFAULT, ...(d.horario || {}) });
+      setExcepciones(d.excepciones || {});
     }, () => {});
   }, []);
 
   // Si el día seleccionado quedó en un día sin atención (según el horario configurado), salta al siguiente hábil.
   useEffect(() => {
-    if (bloqueado(selDate, horario)) {
+    if (bloqueado(selDate, horario, excepciones)) {
       const [y, m, d] = selDate.split('-');
-      const prox = proxDisponible(new Date(+y, +m - 1, +d), horario);
+      const prox = proxDisponible(new Date(+y, +m - 1, +d), horario, excepciones);
       const key = toKey(prox);
       if (key !== selDate) setSelDate(key);
     }
     // eslint-disable-next-line
-  }, [horario]);
+  }, [horario, excepciones]);
 
   const emailUser = (user.email || '').toLowerCase();
   const esPropia = (c) => isNutri || (c.pacienteEmail || '').toLowerCase() === emailUser;
@@ -155,7 +190,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const citaDates = new Set(citas.filter(c => c.estado !== 'cancelada').filter(esPropia).map(c => c.fecha));
 
   const servSel = SERVICIOS.find(s => s.id === mTipo) || null;
-  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, ocupadasDia, horario);
+  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, ocupadasDia, horario, excepciones);
 
   const abrirModal = () => {
     setMPaciente(''); setMPacienteEmail(''); setMTipo(null);
@@ -172,7 +207,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
       return;
     }
     if (!servSel) { alert('Selecciona el tipo de consulta.'); return; }
-    if (bloqueado(selDate, horario)) { alert('Ese día no hay atención. Elige otro día.'); return; }
+    if (bloqueado(selDate, horario, excepciones)) { alert('Ese día no hay atención. Elige otro día.'); return; }
     if (!mHora) { alert('Selecciona un horario.'); return; }
     const objetivoFinal = mObjetivo === 'Otro' ? (mObjetivoOtro.trim() || 'Otro') : mObjetivo;
     const correo = (isNutri ? mPacienteEmail : user.email || '').toLowerCase();
@@ -295,9 +330,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
     for (let i=0; i<first; i++) cells.push(<div key={'e'+i} className="cal-day empty" />);
     for (let d=1; d<=days; d++) {
       const key = view.y+'-'+String(view.m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-      const dow = new Date(view.y, view.m, d).getDay();
-      const cfgDia = horario[dow] || HORARIO_DEFAULT[dow];
-      const bloq = !(cfgDia && cfgDia.activo);
+      const bloq = bloqueado(key, horario, excepciones);
       let cls = 'cal-day';
       if (bloq) cls += ' sunday';                       // reutiliza el estilo "deshabilitado"
       if (key === toKey(hoy)) cls += ' today';
@@ -331,7 +364,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
         </div>
 
         <div className="section-label">{fmtDate(selDate)}</div>
-        {bloqueado(selDate, horario)
+        {bloqueado(selDate, horario, excepciones)
           ? <div className="empty-state">Día no disponible para citas.</div>
           : citasDia.length === 0
             ? <div className="empty-state">Sin citas este día</div>
@@ -374,7 +407,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
               </div>
             ))
         }
-        <button className="btn-primary" onClick={abrirModal} disabled={bloqueado(selDate, horario)}>
+        <button className="btn-primary" onClick={abrirModal} disabled={bloqueado(selDate, horario, excepciones)}>
           + {isNutri ? 'Nueva cita' : 'Agendar cita'}
         </button>
       </div>
