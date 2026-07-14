@@ -24,14 +24,22 @@ const OBJETIVOS = ['Aumento de masa muscular','Baja de grasa','Recomposición co
 const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
 
 // ---- Disponibilidad ----
-// Bloqueados: domingo (0), martes (2) y jueves (4)
-const DOW_BLOQ = new Set([0, 2, 4]);
-const APERTURA = 9 * 60;                 // 09:00
-const ultimoInicio = (dow) => (dow === 6 ? 13 * 60 : 18 * 60); // Sábado 13:00, L/X/V 18:00
+// Horario por defecto (se usa si aún no se ha configurado en Configuración → Horarios de atención).
+// Bloqueados: domingo (0), martes (2) y jueves (4). Abre 09:00; cierra 18:00 (sábado 13:00).
+export const HORARIO_DEFAULT = {
+  0: { activo: false, apertura: '09:00', cierre: '14:00' }, // Domingo
+  1: { activo: true,  apertura: '09:00', cierre: '18:00' }, // Lunes
+  2: { activo: false, apertura: '09:00', cierre: '18:00' }, // Martes
+  3: { activo: true,  apertura: '09:00', cierre: '18:00' }, // Miércoles
+  4: { activo: false, apertura: '09:00', cierre: '18:00' }, // Jueves
+  5: { activo: true,  apertura: '09:00', cierre: '18:00' }, // Viernes
+  6: { activo: true,  apertura: '09:00', cierre: '13:00' }, // Sábado
+};
 
 function toKey(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function dowDe(key) { const [y,m,d] = key.split('-'); return new Date(+y,+m-1,+d).getDay(); }
-function bloqueado(key) { return DOW_BLOQ.has(dowDe(key)); }
+function diaCfg(hor, key) { const h = (hor || HORARIO_DEFAULT)[dowDe(key)] || HORARIO_DEFAULT[dowDe(key)]; return h || { activo: false, apertura: '09:00', cierre: '18:00' }; }
+function bloqueado(key, hor) { return !diaCfg(hor, key).activo; }
 function fmtDate(key) {
   const [y,m,d] = key.split('-');
   return new Date(+y,+m-1,+d).toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'}).replace(/^\w/,c=>c.toUpperCase());
@@ -44,9 +52,10 @@ function citaPasada(c) {
   return !isNaN(dt.getTime()) && dt.getTime() < Date.now();
 }
 function fromMin(m) { return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
-function proxDisponible(date) {
+function proxDisponible(date, hor) {
+  const H = hor || HORARIO_DEFAULT;
   const d = new Date(date);
-  for (let i = 0; i < 14; i++) { if (!DOW_BLOQ.has(d.getDay())) return d; d.setDate(d.getDate()+1); }
+  for (let i = 0; i < 14; i++) { const c = H[d.getDay()]; if (c && c.activo) return d; d.setDate(d.getDate()+1); }
   return date;
 }
 // Duración (min) de una cita existente (compatibilidad con citas viejas que solo tienen 'motivo')
@@ -60,15 +69,17 @@ function durDeCita(c) {
 // Genera los horarios candidatos del día: rejilla base de 30 min + puntos de
 // continuación (cada 10 min) tras cada cita existente. Marca cuáles caben para
 // la duración elegida (sin traslaparse con citas existentes).
-function generarSlots(dateKey, durMin, citasDelDia) {
-  const dow = dowDe(dateKey);
-  if (DOW_BLOQ.has(dow)) return [];
-  const fin = ultimoInicio(dow);
+function generarSlots(dateKey, durMin, citasDelDia, hor) {
+  const cfg = diaCfg(hor, dateKey);
+  if (!cfg.activo) return [];
+  const apertura = toMin(cfg.apertura || '09:00');
+  const fin = toMin(cfg.cierre || '18:00');
+  if (!(fin > apertura)) return [];
   const ocup = citasDelDia.map(c => { const s = toMin(c.hora); return { s, e: s + durDeCita(c) }; });
   const set = new Set();
-  for (let t = APERTURA; t <= fin; t += 30) set.add(t);            // rejilla base 30 min
+  for (let t = apertura; t <= fin; t += 30) set.add(t);            // rejilla base 30 min
   ocup.forEach(o => { let c = o.e; while (c % 30 !== 0 && c <= fin) { set.add(c); c += 10; } }); // continuación 10 min
-  const cand = [...set].filter(t => t >= APERTURA && t <= fin).sort((a,b)=>a-b);
+  const cand = [...set].filter(t => t >= apertura && t <= fin).sort((a,b)=>a-b);
   const choca = (s, d) => ocup.some(o => s < o.e && o.s < s + d);
   return cand.map(t => ({ hora: fromMin(t), disponible: durMin ? !choca(t, durMin) : false }));
 }
@@ -99,6 +110,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const [pacientesList, setPacientesList] = useState([]);
   const [showSug, setShowSug] = useState(false);
   const [precios, setPrecios] = useState({});
+  const [horario, setHorario] = useState(HORARIO_DEFAULT);
   const [mMetodoPago, setMMetodoPago] = useState('efectivo');
 
   useEffect(() => {
@@ -116,9 +128,22 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
 
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
-      const d = (snap && snap.data()) || {}; setPrecios(d.precios || {});
+      const d = (snap && snap.data()) || {};
+      setPrecios(d.precios || {});
+      setHorario({ ...HORARIO_DEFAULT, ...(d.horario || {}) });
     }, () => {});
   }, []);
+
+  // Si el día seleccionado quedó en un día sin atención (según el horario configurado), salta al siguiente hábil.
+  useEffect(() => {
+    if (bloqueado(selDate, horario)) {
+      const [y, m, d] = selDate.split('-');
+      const prox = proxDisponible(new Date(+y, +m - 1, +d), horario);
+      const key = toKey(prox);
+      if (key !== selDate) setSelDate(key);
+    }
+    // eslint-disable-next-line
+  }, [horario]);
 
   const emailUser = (user.email || '').toLowerCase();
   const esPropia = (c) => isNutri || (c.pacienteEmail || '').toLowerCase() === emailUser;
@@ -130,7 +155,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const citaDates = new Set(citas.filter(c => c.estado !== 'cancelada').filter(esPropia).map(c => c.fecha));
 
   const servSel = SERVICIOS.find(s => s.id === mTipo) || null;
-  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, ocupadasDia);
+  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, ocupadasDia, horario);
 
   const abrirModal = () => {
     setMPaciente(''); setMPacienteEmail(''); setMTipo(null);
@@ -147,7 +172,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
       return;
     }
     if (!servSel) { alert('Selecciona el tipo de consulta.'); return; }
-    if (bloqueado(selDate)) { alert('Ese día no hay atención. Elige otro día.'); return; }
+    if (bloqueado(selDate, horario)) { alert('Ese día no hay atención. Elige otro día.'); return; }
     if (!mHora) { alert('Selecciona un horario.'); return; }
     const objetivoFinal = mObjetivo === 'Otro' ? (mObjetivoOtro.trim() || 'Otro') : mObjetivo;
     const correo = (isNutri ? mPacienteEmail : user.email || '').toLowerCase();
@@ -271,7 +296,8 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
     for (let d=1; d<=days; d++) {
       const key = view.y+'-'+String(view.m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
       const dow = new Date(view.y, view.m, d).getDay();
-      const bloq = DOW_BLOQ.has(dow);
+      const cfgDia = horario[dow] || HORARIO_DEFAULT[dow];
+      const bloq = !(cfgDia && cfgDia.activo);
       let cls = 'cal-day';
       if (bloq) cls += ' sunday';                       // reutiliza el estilo "deshabilitado"
       if (key === toKey(hoy)) cls += ' today';
@@ -305,7 +331,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
         </div>
 
         <div className="section-label">{fmtDate(selDate)}</div>
-        {bloqueado(selDate)
+        {bloqueado(selDate, horario)
           ? <div className="empty-state">Día no disponible para citas.</div>
           : citasDia.length === 0
             ? <div className="empty-state">Sin citas este día</div>
@@ -348,7 +374,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
               </div>
             ))
         }
-        <button className="btn-primary" onClick={abrirModal} disabled={bloqueado(selDate)}>
+        <button className="btn-primary" onClick={abrirModal} disabled={bloqueado(selDate, horario)}>
           + {isNutri ? 'Nueva cita' : 'Agendar cita'}
         </button>
       </div>
