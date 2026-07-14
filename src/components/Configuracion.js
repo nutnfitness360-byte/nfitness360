@@ -1,11 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { HORARIO_DEFAULT } from './Agenda';
 import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
 
 // Bloqueo de marca por instancia (definido aquí para no depender de otro archivo):
 // si REACT_APP_BRANDING_LOCKED === 'true', no se muestra el editor de colores.
 const BRANDING_LOCKED = String(process.env.REACT_APP_BRANDING_LOCKED || '').toLowerCase() === 'true';
+
+const DIAS_SEMANA = [
+  [1, 'Lunes'], [2, 'Martes'], [3, 'Miércoles'], [4, 'Jueves'],
+  [5, 'Viernes'], [6, 'Sábado'], [0, 'Domingo'],
+];
 
 const COLOR_LABELS = [
   ['gold', 'Acento (botones, detalles)'],
@@ -55,6 +61,31 @@ export default function Configuracion() {
 
   useEffect(() => { setColorsLocal(colors); }, [colors]);
 
+  // --- Horarios de atención ---
+  const [horario, setHorario] = useState(HORARIO_DEFAULT);
+  const [horBusy, setHorBusy] = useState(false);
+  const [horMsg, setHorMsg] = useState('');
+  useEffect(() => {
+    return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
+      const d = (snap && snap.data()) || {};
+      setHorario({ ...HORARIO_DEFAULT, ...(d.horario || {}) });
+    }, () => {});
+  }, []);
+  const setDia = (dow, patch) => setHorario(h => ({ ...h, [dow]: { ...(h[dow] || HORARIO_DEFAULT[dow]), ...patch } }));
+  const guardarHorario = async () => {
+    const invalido = DIAS_SEMANA.some(([dow]) => {
+      const c = horario[dow] || {};
+      return c.activo && !(c.apertura && c.cierre && c.apertura < c.cierre);
+    });
+    if (invalido) { setHorMsg('Revisa los horarios: la hora de cierre debe ser posterior a la de apertura.'); return; }
+    setHorBusy(true); setHorMsg('');
+    try {
+      await setDoc(doc(db, 'config', 'dashboard'), { horario }, { merge: true });
+      setHorMsg('Horarios guardados. Ya se reflejan en la agenda.');
+    } catch (e) { setHorMsg('No se pudo guardar: ' + e.message); }
+    setHorBusy(false);
+  };
+
   const logoSrc = (logo === undefined) ? '/logo.png' : logo;
 
   const guardar = async (patch) => {
@@ -82,7 +113,8 @@ export default function Configuracion() {
   };
 
   return (
-    <div className="card" style={{ maxWidth: 760 }}>
+    <>
+      <div className="card" style={{ maxWidth: 760 }}>
       <div className="card-title">Configuración de marca</div>
       <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 22, lineHeight: 1.5 }}>
         Personaliza el logo y los colores de este sistema. Los cambios aplican solo a esta instancia.
@@ -130,9 +162,61 @@ export default function Configuracion() {
         </div>
       )}
       {msg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{msg}</span> : null}
-    </div>
+      </div>
+
+      <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
+        <div className="card-title">Horarios de atención</div>
+        <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 18, lineHeight: 1.5 }}>
+          Define los días y el horario en que atiendes. La agenda solo ofrecerá citas dentro de estos horarios,
+          y los días desactivados aparecerán como no disponibles para tus pacientes.
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {DIAS_SEMANA.map(([dow, nombre]) => {
+            const c = horario[dow] || HORARIO_DEFAULT[dow];
+            return (
+              <div key={dow} style={H.row}>
+                <label style={H.dayToggle}>
+                  <input type="checkbox" checked={!!c.activo}
+                    onChange={e => setDia(dow, { activo: e.target.checked })} />
+                  <span style={{ fontWeight: 700, color: c.activo ? 'var(--dark)' : 'var(--stone)' }}>{nombre}</span>
+                </label>
+                {c.activo ? (
+                  <div style={H.hours}>
+                    <span style={H.lbl}>De</span>
+                    <input type="time" value={c.apertura || '09:00'} style={H.time}
+                      onChange={e => setDia(dow, { apertura: e.target.value })} />
+                    <span style={H.lbl}>a</span>
+                    <input type="time" value={c.cierre || '18:00'} style={H.time}
+                      onChange={e => setDia(dow, { cierre: e.target.value })} />
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>Sin atención</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 16 }}>
+          <button style={B.primary} onClick={guardarHorario} disabled={horBusy}>
+            {horBusy ? 'Guardando…' : 'Guardar horarios'}
+          </button>
+          <button style={B.ghost} onClick={() => setHorario(HORARIO_DEFAULT)} disabled={horBusy}>Restablecer</button>
+        </div>
+        {horMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{horMsg}</span> : null}
+      </div>
+    </>
   );
 }
+
+const H = {
+  row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)' },
+  dayToggle: { display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, cursor: 'pointer', minWidth: 130 },
+  hours: { display: 'flex', alignItems: 'center', gap: 8 },
+  lbl: { fontSize: 12.5, color: 'var(--stone)' },
+  time: { border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff' },
+};
 
 const B = {
   label: { fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--stone)', marginBottom: 8 },
