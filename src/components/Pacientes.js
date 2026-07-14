@@ -664,11 +664,11 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
 
   /* ----- VISTA: historia clínica (alta de paciente nuevo) ----- */
   if (nuevo) {
-    return <HistoriaClinica codigo={nextCodigo()} onSave={guardarHistoriaNueva} onBack={volver} />;
+    return <HistoriaClinica codigo={nextCodigo()} onSave={guardarHistoriaNueva} onBack={volver} onGuardChange={onRegisterExitGuard} />;
   }
   /* ----- VISTA: historia clínica de un paciente existente ----- */
   if (sel && sub === 'historia') {
-    return <HistoriaClinica initial={sel.historia} codigo={sel.codigo} onSave={guardarHistoriaExistente} onBack={volver} />;
+    return <HistoriaClinica initial={sel.historia} codigo={sel.codigo} onSave={guardarHistoriaExistente} onBack={volver} onGuardChange={onRegisterExitGuard} />;
   }
 
   /* ----- VISTA: dashboard de un paciente ----- */
@@ -685,7 +685,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       const pdata = inbody
         ? { peso: inbody.peso || (m ? m.peso : ''), talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: inbody.grasa || (m ? m.grasa : ''), tmb: inbody.tmb || '' }
         : { peso: m ? m.peso : '', talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: m ? m.grasa : '', tmb: (m && m.tmb) || '' };
-      return <Plan patient={sel} pdata={pdata} onBack={volver} />;
+      return <Plan patient={sel} pdata={pdata} onBack={volver} onGuardChange={onRegisterExitGuard} />;
     }
     if (sub === 'menus') {
       return <Menus key={menuReabrir ? ('h-' + (menuReabrir.fecha || '') + (menuReabrir.nombre || '')) : 'actual'} patient={sel} onBack={volver} initialMenus={menuReabrir} onGuardChange={onRegisterExitGuard} />;
