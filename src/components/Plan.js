@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
 import HistoriaClinica from './HistoriaClinica';
@@ -84,7 +84,7 @@ const FACTORES = [
   ['1.9', 'Muy intensa'],
 ];
 
-export default function Plan({ patient, pdata, onBack }) {
+export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   const saved = patient.plan || {};
   const [pp, setPp] = useState({
     peso: pdata.peso || '', talla: pdata.talla || '', edad: pdata.edad || '',
@@ -173,10 +173,17 @@ export default function Plan({ patient, pdata, onBack }) {
   // --- Aviso de cambios sin guardar al salir ---
   const hayContenido = num(meta.energia) > 0 || eq.some(v => num(v) > 0);
   const dirty = hayContenido && status !== 'guardado';
-  const requestExit = (proceed) => {
-    if (dirty) setExitModal({ proceed: (typeof proceed === 'function' ? proceed : () => {}) });
+  const dirtyRef = useRef(false);
+  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
+  const requestExit = useCallback((proceed) => {
+    if (dirtyRef.current) setExitModal({ proceed: (typeof proceed === 'function' ? proceed : () => {}) });
     else if (typeof proceed === 'function') proceed();
-  };
+  }, []);
+  // Registra el guardián: cualquier navegación (menú lateral) pasará por aquí.
+  useEffect(() => {
+    if (onGuardChange) onGuardChange(requestExit);
+    return () => { if (onGuardChange) onGuardChange(null); };
+  }, [onGuardChange, requestExit]);
   const salirAhora = () => { const p = exitModal && exitModal.proceed; setExitModal(null); if (p) p(); };
   const guardarYSalir = async () => { const p = exitModal && exitModal.proceed; const ok = await guardar(); if (ok) { setExitModal(null); if (p) p(); } };
 
