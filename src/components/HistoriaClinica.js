@@ -382,6 +382,9 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
   const [status, setStatus] = useState("guardado");
   const [anaStatus, setAnaStatus] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [exitModal, setExitModal] = useState(null); // { proceed } | null
+  // Copia de referencia para detectar cambios sin guardar.
+  const baselineRef = useRef(JSON.stringify(initial || {}));
   const [pdfStatus, setPdfStatus] = useState("");
   const [kcalBusy, setKcalBusy] = useState(false);
   const [kcalErr, setKcalErr] = useState("");
@@ -491,18 +494,30 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
 
   const guardar = () => { setConfirmOpen(true); };
 
-  const guardarYGenerar = async () => {
+  // --- Aviso de cambios sin guardar al salir ---
+  const dirty = !readOnly && JSON.stringify(data) !== baselineRef.current;
+  const requestExit = (proceed) => {
+    if (dirty) setExitModal({ proceed: (typeof proceed === "function" ? proceed : () => {}) });
+    else if (typeof proceed === "function") proceed();
+  };
+  const salirAhora = () => { const p = exitModal && exitModal.proceed; setExitModal(null); if (p) p(); };
+
+  const guardarYGenerar = async (despues) => {
     setConfirmOpen(false);
     if (typeof onSave !== "function") return;
     setStatus("guardando");
     // 1) Guardar la historia PRIMERO (rápido). Nunca depende del PDF.
     try {
       await Promise.resolve(onSave(data));
+      baselineRef.current = JSON.stringify(data); // ya no hay cambios pendientes
       setStatus("guardado");
+      setExitModal(null);
     } catch (e) {
       setStatus("error");
+      setExitModal(null);
       return;
     }
+    if (typeof despues === "function") { despues(); return; }
     // 2) Generar y subir el PDF del historial a Drive (mejor esfuerzo, en segundo plano).
     const nombre = (data.datos.nombre || "").trim();
     const url = process.env.REACT_APP_APPSCRIPT_URL;
@@ -516,6 +531,11 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
         });
       } catch (e) { /* el PDF es secundario; la historia ya quedó guardada */ }
     }
+  };
+
+  const guardarYSalir = () => {
+    const p = exitModal && exitModal.proceed;
+    guardarYGenerar(p);
   };
 
   const generarPDF = async () => {
@@ -577,7 +597,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
               </p>
             </div>
           </div>
-          <button style={styles.ghostBtn} onClick={onBack}>← Volver</button>
+          <button style={styles.ghostBtn} onClick={() => requestExit(onBack)}>← Volver</button>
         </div>
 
         <nav style={styles.tabs}>
@@ -1089,7 +1109,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
           )}
         </div>
         <div style={styles.footerBtns}>
-          <button style={styles.secondaryBtn} onClick={onBack} className="nf-secondary">
+          <button style={styles.secondaryBtn} onClick={() => requestExit(onBack)} className="nf-secondary">
             ← Atrás
           </button>
           {!readOnly && (
@@ -1112,6 +1132,20 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
             <div style={styles.modalBtns}>
               <button style={styles.modalNo} onClick={() => setConfirmOpen(false)}>No</button>
               <button style={styles.modalSi} onClick={guardarYGenerar}>Sí</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {exitModal && (
+        <div style={styles.modalOverlay} onClick={() => setExitModal(null)}>
+          <div style={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: T.pine, marginBottom: 8 }}>¿Quieres salir?</div>
+            <div style={styles.modalText}>No has guardado tus cambios.</div>
+            <div style={styles.modalBtns}>
+              <button style={styles.modalNo} onClick={salirAhora}>Salir</button>
+              <button style={styles.modalSi} onClick={guardarYSalir} disabled={status === "guardando"}>
+                {status === "guardando" ? "Guardando…" : "Guardar"}
+              </button>
             </div>
           </div>
         </div>
