@@ -365,7 +365,7 @@ function toISODate(s) {
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
 }
 
-export default function HistoriaClinica({ initial, codigo, onSave, onBack, readOnly }) {
+export default function HistoriaClinica({ initial, codigo, onSave, onBack, readOnly, onGuardChange }) {
   const [data, setData] = useState(() => {
     const s = baseSeed();
     if (initial && typeof initial === "object") {
@@ -496,10 +496,17 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
 
   // --- Aviso de cambios sin guardar al salir ---
   const dirty = !readOnly && JSON.stringify(data) !== baselineRef.current;
-  const requestExit = (proceed) => {
-    if (dirty) setExitModal({ proceed: (typeof proceed === "function" ? proceed : () => {}) });
+  const dirtyRef = useRef(false);
+  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
+  const requestExit = useCallback((proceed) => {
+    if (dirtyRef.current) setExitModal({ proceed: (typeof proceed === "function" ? proceed : () => {}) });
     else if (typeof proceed === "function") proceed();
-  };
+  }, []);
+  // Registra el guardián: cualquier navegación (menú lateral, pestañas) pasará por aquí.
+  useEffect(() => {
+    if (onGuardChange) onGuardChange(requestExit);
+    return () => { if (onGuardChange) onGuardChange(null); };
+  }, [onGuardChange, requestExit]);
   const salirAhora = () => { const p = exitModal && exitModal.proceed; setExitModal(null); if (p) p(); };
 
   const guardarYGenerar = async (despues) => {
