@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { HORARIO_DEFAULT } from './Agenda';
+import { HORARIO_DEFAULT, MODALIDADES, franjasDe } from './Agenda';
 import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
 
 // Bloqueo de marca por instancia (definido aquí para no depender de otro archivo):
@@ -82,20 +82,38 @@ export default function Configuracion() {
     const next = cur.includes(n) ? cur.filter(x => x !== n) : [...cur, n].sort((a, b) => a - b);
     return { ...h, [dow]: { ...c, semanas: next } };
   });
+  // --- Franjas horarias por día (cada una con su modalidad) ---
+  const setFranjas = (dow, franjas) => setHorario(h => ({ ...h, [dow]: { ...(h[dow] || HORARIO_DEFAULT[dow]), franjas } }));
+  const setFranja = (dow, i, patch) => {
+    const cur = franjasDe(horario[dow] || HORARIO_DEFAULT[dow]);
+    setFranjas(dow, cur.map((f, k) => (k === i ? { ...f, ...patch } : f)));
+  };
+  const addFranja = (dow) => {
+    const cur = franjasDe(horario[dow] || HORARIO_DEFAULT[dow]);
+    const ult = cur[cur.length - 1];
+    setFranjas(dow, [...cur, { ini: (ult && ult.fin) || '15:00', fin: '19:00', mod: 'ambas' }]);
+  };
+  const delFranja = (dow, i) => {
+    const cur = franjasDe(horario[dow] || HORARIO_DEFAULT[dow]);
+    if (cur.length <= 1) return; // siempre queda al menos una
+    setFranjas(dow, cur.filter((_, k) => k !== i));
+  };
+
   const addExcepcion = (tipo) => {
     if (!excFecha) { setHorMsg('Elige una fecha para la excepción.'); return; }
-    setExcepciones(e => ({ ...e, [excFecha]: tipo === 'cerrado' ? 'cerrado' : { apertura: '09:00', cierre: '14:00' } }));
+    setExcepciones(e => ({ ...e, [excFecha]: tipo === 'cerrado' ? 'cerrado' : { franjas: [{ ini: '09:00', fin: '14:00', mod: 'ambas' }] } }));
     setExcFecha(''); setHorMsg('');
   };
-  const setExcHora = (fecha, campo, val) => setExcepciones(e => ({ ...e, [fecha]: { ...(typeof e[fecha] === 'object' ? e[fecha] : {}), [campo]: val } }));
   const delExcepcion = (fecha) => setExcepciones(e => { const n = { ...e }; delete n[fecha]; return n; });
   const fmtFecha = (f) => { const [y, m, d] = f.split('-'); return new Date(+y, +m - 1, +d).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }); };
   const guardarHorario = async () => {
     const invalido = DIAS_SEMANA.some(([dow]) => {
       const c = horario[dow] || {};
-      return c.activo && !(c.apertura && c.cierre && c.apertura < c.cierre);
+      if (!c.activo) return false;
+      const fr = franjasDe(c);
+      return !fr.length || fr.some(f => !(f.ini && f.fin && f.ini < f.fin));
     });
-    if (invalido) { setHorMsg('Revisa los horarios: la hora de cierre debe ser posterior a la de apertura.'); return; }
+    if (invalido) { setHorMsg('Revisa los horarios: en cada franja, la hora de fin debe ser posterior a la de inicio.'); return; }
     setHorBusy(true); setHorMsg('');
     try {
       await setDoc(doc(db, 'config', 'dashboard'), { horario, excepciones }, { merge: true });
@@ -200,29 +218,41 @@ export default function Configuracion() {
                   <span style={{ fontWeight: 700, color: c.activo ? 'var(--dark)' : 'var(--stone)' }}>{nombre}</span>
                 </label>
                 {c.activo ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                    <div style={H.hours}>
-                      <span style={H.lbl}>De</span>
-                      <input type="time" value={c.apertura || '09:00'} style={H.time}
-                        onChange={e => setDia(dow, { apertura: e.target.value })} />
-                      <span style={H.lbl}>a</span>
-                      <input type="time" value={c.cierre || '18:00'} style={H.time}
-                        onChange={e => setDia(dow, { cierre: e.target.value })} />
-                    </div>
-                    <div style={H.hours}>
-                      <span style={H.lbl} title="Deja todas sin marcar para atender cada semana">Semanas:</span>
-                      {[1, 2, 3, 4, 5].map(n => {
-                        const sem = Array.isArray(c.semanas) ? c.semanas : [];
-                        const on = sem.includes(n);
-                        return (
-                          <button key={n} type="button" onClick={() => toggleSemana(dow, n)}
-                            title={'Atender el ' + n + 'º ' + nombre.toLowerCase() + ' del mes'}
-                            style={{ ...H.week, ...(on ? H.weekOn : {}) }}>{n}º</button>
-                        );
-                      })}
-                      {(!Array.isArray(c.semanas) || !c.semanas.length) && (
-                        <span style={{ fontSize: 11.5, color: 'var(--stone)' }}>todas</span>
-                      )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 280 }}>
+                    {franjasDe(c).map((f, i) => (
+                      <div key={i} style={H.hours}>
+                        <span style={H.lbl}>De</span>
+                        <input type="time" value={f.ini || '09:00'} style={H.time}
+                          onChange={e => setFranja(dow, i, { ini: e.target.value })} />
+                        <span style={H.lbl}>a</span>
+                        <input type="time" value={f.fin || '18:00'} style={H.time}
+                          onChange={e => setFranja(dow, i, { fin: e.target.value })} />
+                        <select value={f.mod || 'ambas'} style={{ ...H.time, cursor: 'pointer' }}
+                          onChange={e => setFranja(dow, i, { mod: e.target.value })}>
+                          {MODALIDADES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                        </select>
+                        {franjasDe(c).length > 1 && (
+                          <button style={H.del} onClick={() => delFranja(dow, i)} title="Quitar franja">×</button>
+                        )}
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                      <button style={H.addFranja} onClick={() => addFranja(dow)}>+ Franja</button>
+                      <div style={H.hours}>
+                        <span style={H.lbl} title="Deja todas sin marcar para atender cada semana">Semanas:</span>
+                        {[1, 2, 3, 4, 5].map(n => {
+                          const sem = Array.isArray(c.semanas) ? c.semanas : [];
+                          const on = sem.includes(n);
+                          return (
+                            <button key={n} type="button" onClick={() => toggleSemana(dow, n)}
+                              title={'Atender el ' + n + 'º ' + nombre.toLowerCase() + ' del mes'}
+                              style={{ ...H.week, ...(on ? H.weekOn : {}) }}>{n}º</button>
+                          );
+                        })}
+                        {(!Array.isArray(c.semanas) || !c.semanas.length) && (
+                          <span style={{ fontSize: 11.5, color: 'var(--stone)' }}>todas</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -261,16 +291,21 @@ export default function Configuracion() {
                       </span>
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{fmtFecha(f)}</span>
                     </div>
-                    {!cerrado && (
-                      <div style={H.hours}>
-                        <span style={H.lbl}>De</span>
-                        <input type="time" value={(v && v.apertura) || '09:00'} style={H.time}
-                          onChange={e => setExcHora(f, 'apertura', e.target.value)} />
-                        <span style={H.lbl}>a</span>
-                        <input type="time" value={(v && v.cierre) || '14:00'} style={H.time}
-                          onChange={e => setExcHora(f, 'cierre', e.target.value)} />
-                      </div>
-                    )}
+                    {!cerrado && (() => {
+                      const fr = franjasDe(v)[0] || { ini: '09:00', fin: '14:00', mod: 'ambas' };
+                      const upd = (patch) => setExcepciones(e => ({ ...e, [f]: { franjas: [{ ...fr, ...patch }] } }));
+                      return (
+                        <div style={H.hours}>
+                          <span style={H.lbl}>De</span>
+                          <input type="time" value={fr.ini} style={H.time} onChange={e => upd({ ini: e.target.value })} />
+                          <span style={H.lbl}>a</span>
+                          <input type="time" value={fr.fin} style={H.time} onChange={e => upd({ fin: e.target.value })} />
+                          <select value={fr.mod || 'ambas'} style={{ ...H.time, cursor: 'pointer' }} onChange={e => upd({ mod: e.target.value })}>
+                            {MODALIDADES.map(([val, l]) => <option key={val} value={val}>{l}</option>)}
+                          </select>
+                        </div>
+                      );
+                    })()}
                     <button style={H.del} onClick={() => delExcepcion(f)} title="Quitar excepción">×</button>
                   </div>
                 );
@@ -292,8 +327,8 @@ export default function Configuracion() {
 }
 
 const H = {
-  row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)' },
-  dayToggle: { display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, cursor: 'pointer', minWidth: 130 },
+  row: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)' },
+  dayToggle: { display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, cursor: 'pointer', minWidth: 130, paddingTop: 6 },
   hours: { display: 'flex', alignItems: 'center', gap: 8 },
   lbl: { fontSize: 12.5, color: 'var(--stone)' },
   time: { border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff' },
@@ -301,6 +336,7 @@ const H = {
   weekOn: { background: 'var(--gold)', color: '#fff', borderColor: 'var(--gold)' },
   pill: { fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 20, letterSpacing: 0.3 },
   del: { background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 20, lineHeight: 1, cursor: 'pointer', padding: '0 4px' },
+  addFranja: { background: '#fff', color: 'var(--gold)', border: '1px dashed var(--gold)', borderRadius: 8, padding: '5px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' },
 };
 
 const B = {
