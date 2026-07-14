@@ -63,15 +63,33 @@ export default function Configuracion() {
 
   // --- Horarios de atención ---
   const [horario, setHorario] = useState(HORARIO_DEFAULT);
+  const [excepciones, setExcepciones] = useState({});
+  const [excFecha, setExcFecha] = useState('');
   const [horBusy, setHorBusy] = useState(false);
   const [horMsg, setHorMsg] = useState('');
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
       const d = (snap && snap.data()) || {};
       setHorario({ ...HORARIO_DEFAULT, ...(d.horario || {}) });
+      setExcepciones(d.excepciones || {});
     }, () => {});
   }, []);
   const setDia = (dow, patch) => setHorario(h => ({ ...h, [dow]: { ...(h[dow] || HORARIO_DEFAULT[dow]), ...patch } }));
+  // Semanas del mes en que aplica el día ([] = todas).
+  const toggleSemana = (dow, n) => setHorario(h => {
+    const c = h[dow] || HORARIO_DEFAULT[dow];
+    const cur = Array.isArray(c.semanas) ? c.semanas : [];
+    const next = cur.includes(n) ? cur.filter(x => x !== n) : [...cur, n].sort((a, b) => a - b);
+    return { ...h, [dow]: { ...c, semanas: next } };
+  });
+  const addExcepcion = (tipo) => {
+    if (!excFecha) { setHorMsg('Elige una fecha para la excepción.'); return; }
+    setExcepciones(e => ({ ...e, [excFecha]: tipo === 'cerrado' ? 'cerrado' : { apertura: '09:00', cierre: '14:00' } }));
+    setExcFecha(''); setHorMsg('');
+  };
+  const setExcHora = (fecha, campo, val) => setExcepciones(e => ({ ...e, [fecha]: { ...(typeof e[fecha] === 'object' ? e[fecha] : {}), [campo]: val } }));
+  const delExcepcion = (fecha) => setExcepciones(e => { const n = { ...e }; delete n[fecha]; return n; });
+  const fmtFecha = (f) => { const [y, m, d] = f.split('-'); return new Date(+y, +m - 1, +d).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }); };
   const guardarHorario = async () => {
     const invalido = DIAS_SEMANA.some(([dow]) => {
       const c = horario[dow] || {};
@@ -80,8 +98,8 @@ export default function Configuracion() {
     if (invalido) { setHorMsg('Revisa los horarios: la hora de cierre debe ser posterior a la de apertura.'); return; }
     setHorBusy(true); setHorMsg('');
     try {
-      await setDoc(doc(db, 'config', 'dashboard'), { horario }, { merge: true });
-      setHorMsg('Horarios guardados. Ya se reflejan en la agenda.');
+      await setDoc(doc(db, 'config', 'dashboard'), { horario, excepciones }, { merge: true });
+      setHorMsg('Horarios y excepciones guardados. Ya se reflejan en la agenda.');
     } catch (e) { setHorMsg('No se pudo guardar: ' + e.message); }
     setHorBusy(false);
   };
@@ -182,13 +200,30 @@ export default function Configuracion() {
                   <span style={{ fontWeight: 700, color: c.activo ? 'var(--dark)' : 'var(--stone)' }}>{nombre}</span>
                 </label>
                 {c.activo ? (
-                  <div style={H.hours}>
-                    <span style={H.lbl}>De</span>
-                    <input type="time" value={c.apertura || '09:00'} style={H.time}
-                      onChange={e => setDia(dow, { apertura: e.target.value })} />
-                    <span style={H.lbl}>a</span>
-                    <input type="time" value={c.cierre || '18:00'} style={H.time}
-                      onChange={e => setDia(dow, { cierre: e.target.value })} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                    <div style={H.hours}>
+                      <span style={H.lbl}>De</span>
+                      <input type="time" value={c.apertura || '09:00'} style={H.time}
+                        onChange={e => setDia(dow, { apertura: e.target.value })} />
+                      <span style={H.lbl}>a</span>
+                      <input type="time" value={c.cierre || '18:00'} style={H.time}
+                        onChange={e => setDia(dow, { cierre: e.target.value })} />
+                    </div>
+                    <div style={H.hours}>
+                      <span style={H.lbl} title="Deja todas sin marcar para atender cada semana">Semanas:</span>
+                      {[1, 2, 3, 4, 5].map(n => {
+                        const sem = Array.isArray(c.semanas) ? c.semanas : [];
+                        const on = sem.includes(n);
+                        return (
+                          <button key={n} type="button" onClick={() => toggleSemana(dow, n)}
+                            title={'Atender el ' + n + 'º ' + nombre.toLowerCase() + ' del mes'}
+                            style={{ ...H.week, ...(on ? H.weekOn : {}) }}>{n}º</button>
+                        );
+                      })}
+                      {(!Array.isArray(c.semanas) || !c.semanas.length) && (
+                        <span style={{ fontSize: 11.5, color: 'var(--stone)' }}>todas</span>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>Sin atención</span>
@@ -196,6 +231,52 @@ export default function Configuracion() {
               </div>
             );
           })}
+        </div>
+
+        <div style={{ marginTop: 24 }}>
+          <div style={B.label}>Excepciones por fecha</div>
+          <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>
+            Días puntuales que se salen de tu horario: vacaciones, festivos, o un día extra de atención.
+            La excepción tiene prioridad sobre el horario semanal.
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+            <input type="date" value={excFecha} style={H.time} onChange={e => setExcFecha(e.target.value)} />
+            <button style={B.ghost} onClick={() => addExcepcion('cerrado')} disabled={horBusy}>Cerrar este día</button>
+            <button style={B.ghost} onClick={() => addExcepcion('abierto')} disabled={horBusy}>Abrir este día</button>
+          </div>
+
+          {Object.keys(excepciones).length === 0 ? (
+            <div style={{ fontSize: 12.5, color: 'var(--stone)' }}>Sin excepciones registradas.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {Object.keys(excepciones).sort().map(f => {
+                const v = excepciones[f];
+                const cerrado = v === 'cerrado';
+                return (
+                  <div key={f} style={H.row}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 200 }}>
+                      <span style={{ ...H.pill, background: cerrado ? '#F6E7E1' : '#E8F0EA', color: cerrado ? 'var(--danger, #B0593F)' : '#3E6B52' }}>
+                        {cerrado ? 'Cerrado' : 'Abierto'}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{fmtFecha(f)}</span>
+                    </div>
+                    {!cerrado && (
+                      <div style={H.hours}>
+                        <span style={H.lbl}>De</span>
+                        <input type="time" value={(v && v.apertura) || '09:00'} style={H.time}
+                          onChange={e => setExcHora(f, 'apertura', e.target.value)} />
+                        <span style={H.lbl}>a</span>
+                        <input type="time" value={(v && v.cierre) || '14:00'} style={H.time}
+                          onChange={e => setExcHora(f, 'cierre', e.target.value)} />
+                      </div>
+                    )}
+                    <button style={H.del} onClick={() => delExcepcion(f)} title="Quitar excepción">×</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 16 }}>
@@ -216,6 +297,10 @@ const H = {
   hours: { display: 'flex', alignItems: 'center', gap: 8 },
   lbl: { fontSize: 12.5, color: 'var(--stone)' },
   time: { border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff' },
+  week: { width: 30, height: 28, borderRadius: 7, border: '1px solid var(--border)', background: '#fff', color: 'var(--stone)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' },
+  weekOn: { background: 'var(--gold)', color: '#fff', borderColor: 'var(--gold)' },
+  pill: { fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 20, letterSpacing: 0.3 },
+  del: { background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 20, lineHeight: 1, cursor: 'pointer', padding: '0 4px' },
 };
 
 const B = {
