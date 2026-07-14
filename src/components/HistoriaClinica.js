@@ -123,7 +123,7 @@ function baseSeed() {
       notas: "",
     },
     sintomas: { digestivos: "", dermatologicos: "", energiaSueno: "", otros: "" },
-    antecedentes: { heredofamiliares: "", alcohol: "", tabaco: "", otros: "" },
+    antecedentes: { heredofamiliares: "", alcohol: "", tabaco: "", otros: "", periodo: "", ultimaCitaGineco: "", anticonceptivos: "" },
     dietetica: {
       alergias: "", agua: "", liquidos: "",
       leGusta: "", noLeGusta: "", despierta: "", duerme: "", notas: "",
@@ -201,7 +201,11 @@ function histParts(data) {
     card("2", "Antecedentes y estilo de vida", rows([
       ["Heredofamiliares", a.heredofamiliares], ["Alcohol", a.alcohol],
       ["Tabaco", a.tabaco], ["Otros", a.otros],
-    ])) +
+    ].concat((d.sexo || "") === "Femenino" ? [
+      ["Periodo menstrual", a.periodo],
+      ["Última cita con ginecólogo", a.ultimaCitaGineco ? fmtFechaMX(a.ultimaCitaGineco) : ""],
+      ["Anticonceptivos", a.anticonceptivos],
+    ] : []))) +
     card("3", "Padecimientos", padInner) +
     card("4", "Signos y síntomas", rows([
       ["Digestivos", si.digestivos], ["Dermatológicos", si.dermatologicos],
@@ -494,6 +498,9 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
 
   const guardar = () => { setConfirmOpen(true); };
 
+  // Los campos ginecológicos (sección 2) solo aplican a pacientes de sexo femenino.
+  const esFemenino = (data.datos.sexo || "") === "Femenino";
+
   // --- Aviso de cambios sin guardar al salir ---
   const dirty = !readOnly && JSON.stringify(data) !== baselineRef.current;
   const dirtyRef = useRef(false);
@@ -736,6 +743,31 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
                 placeholder="Notas adicionales…"
                 onChange={(e) => setField("antecedentes", "otros", e.target.value)} />
             </Field>
+
+            {esFemenino && (
+              <>
+                <Field label="Periodo menstrual">
+                  <select style={styles.input} value={data.antecedentes.periodo || ""}
+                    onChange={(e) => setField("antecedentes", "periodo", e.target.value)}>
+                    <option value="">Selecciona…</option>
+                    <option value="Regular">Regular</option>
+                    <option value="Irregular">Irregular</option>
+                  </select>
+                </Field>
+                <Field label="Última cita con ginecólogo">
+                  <input type="date" style={styles.input} value={data.antecedentes.ultimaCitaGineco || ""}
+                    onChange={(e) => setField("antecedentes", "ultimaCitaGineco", e.target.value)} />
+                </Field>
+                <Field label="Anticonceptivos" full>
+                  <select style={styles.input} value={data.antecedentes.anticonceptivos || ""}
+                    onChange={(e) => setField("antecedentes", "anticonceptivos", e.target.value)}>
+                    <option value="">Selecciona…</option>
+                    <option value="Sin anticonceptivos">Sin anticonceptivos</option>
+                    <option value="Con anticonceptivos">Con anticonceptivos</option>
+                  </select>
+                </Field>
+              </>
+            )}
           </Grid>
         </Section>
 
