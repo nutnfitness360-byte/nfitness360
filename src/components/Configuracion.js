@@ -237,7 +237,7 @@ export default function Configuracion() {
                       </div>
                     ))}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                      <button style={H.addFranja} onClick={() => addFranja(dow)}>+ Franja</button>
+                      <button style={H.addFranja} onClick={() => addFranja(dow)}>+ Tiempo</button>
                       <div style={H.hours}>
                         <span style={H.lbl} title="Deja todas sin marcar para atender cada semana">Semanas:</span>
                         {[1, 2, 3, 4, 5].map(n => {
