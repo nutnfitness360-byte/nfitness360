@@ -123,7 +123,7 @@ function baseSeed() {
       notas: "",
     },
     sintomas: { digestivos: "", dermatologicos: "", energiaSueno: "", otros: "" },
-    antecedentes: { heredofamiliares: "", alcohol: "", tabaco: "", otros: "", periodo: "", ultimaCitaGineco: "", anticonceptivos: "" },
+    antecedentes: { heredofamiliares: "", alcohol: "", tabaco: "", otros: "", periodo: "", ultimaCitaGineco: "", anticonceptivos: "", anticonceptivoDetalle: "" },
     dietetica: {
       alergias: "", agua: "", liquidos: "",
       leGusta: "", noLeGusta: "", despierta: "", duerme: "", notas: "",
@@ -205,7 +205,9 @@ function histParts(data) {
       ["Periodo menstrual", a.periodo],
       ["Última cita con ginecólogo", a.ultimaCitaGineco ? fmtFechaMX(a.ultimaCitaGineco) : ""],
       ["Anticonceptivos", a.anticonceptivos],
-    ] : []))) +
+    ].concat(a.anticonceptivos === "Con anticonceptivos" ? [
+      ["Nombre o tipo de anticonceptivo", a.anticonceptivoDetalle],
+    ] : []) : []))) +
     card("3", "Padecimientos", padInner) +
     card("4", "Signos y síntomas", rows([
       ["Digestivos", si.digestivos], ["Dermatológicos", si.dermatologicos],
@@ -766,6 +768,13 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
                     <option value="Con anticonceptivos">Con anticonceptivos</option>
                   </select>
                 </Field>
+                {data.antecedentes.anticonceptivos === "Con anticonceptivos" && (
+                  <Field label="Nombre o tipo de anticonceptivo" full>
+                    <input style={styles.input} value={data.antecedentes.anticonceptivoDetalle || ""}
+                      placeholder="Ej.: pastilla anticonceptiva, DIU, inyección…"
+                      onChange={(e) => setField("antecedentes", "anticonceptivoDetalle", e.target.value)} />
+                  </Field>
+                )}
               </>
             )}
           </Grid>
