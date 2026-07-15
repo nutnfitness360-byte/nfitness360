@@ -8,7 +8,7 @@ import Pacientes from '../components/Pacientes';
 import Configuracion from '../components/Configuracion';
 
 function initials(name) { return name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'NU'; }
-const SERVICIOS_NOMBRES = ['Primera vez', 'Seguimiento', 'Deportivo', 'Seguimiento deportivo', 'Online', 'Deportivo online'];
+const SERVICIOS_NOMBRES_DEFAULT = ['Primera vez', 'Seguimiento', 'Deportivo', 'Seguimiento deportivo', 'Online', 'Deportivo online'];
 const money = (n) => '$' + Math.round(n || 0).toLocaleString('es-MX');
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -42,7 +42,7 @@ export default function NutriDashboard() {
   };
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
-  const [cfg, setCfg] = useState({ pendientes: [], precios: {} });
+  const [cfg, setCfg] = useState({ pendientes: [], precios: {}, servicios: [] });
   const [nuevoPend, setNuevoPend] = useState('');
   const [editaPrecios, setEditaPrecios] = useState(false);
 
@@ -62,12 +62,12 @@ export default function NutriDashboard() {
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
       const d = snap.exists() ? snap.data() : {};
-      setCfg({ pendientes: Array.isArray(d.pendientes) ? d.pendientes : [], precios: d.precios || {} });
+      setCfg({ pendientes: Array.isArray(d.pendientes) ? d.pendientes : [], precios: d.precios || {}, servicios: Array.isArray(d.servicios) ? d.servicios : [] });
     });
   }, []);
 
   const guardarCfg = async (patch) => {
-    const next = { pendientes: cfg.pendientes, precios: cfg.precios, ...patch };
+    const next = { pendientes: cfg.pendientes, precios: cfg.precios, servicios: cfg.servicios, ...patch };
     setCfg(next);
     try { await setDoc(doc(db, 'config', 'dashboard'), next, { merge: true }); } catch (e) { /* no bloquear UI */ }
   };
@@ -91,11 +91,12 @@ export default function NutriDashboard() {
   const conteoTipo = {};
   citasMes.forEach(c => { const t = c.tipoNombre || c.motivo || 'Otro'; conteoTipo[t] = (conteoTipo[t] || 0) + 1; });
   const precios = cfg.precios || {};
+  const serviciosNombres = (cfg.servicios && cfg.servicios.length) ? cfg.servicios.map(s => s.nombre) : SERVICIOS_NOMBRES_DEFAULT;
   const porServicio = Object.keys(conteoTipo).map(t => ({ tipo: t, n: conteoTipo[t], ingreso: conteoTipo[t] * (precios[t] || 0) }))
     .sort((a, b) => b.ingreso - a.ingreso);
   const ingresoMes = porServicio.reduce((a, s) => a + s.ingreso, 0);
   const masVende = Object.keys(conteoTipo).sort((a, b) => conteoTipo[b] - conteoTipo[a])[0];
-  const hayPrecios = SERVICIOS_NOMBRES.some(s => (precios[s] || 0) > 0);
+  const hayPrecios = serviciosNombres.some(s => (precios[s] || 0) > 0);
 
   // ---- Retención (semáforo por fecha del último PLAN generado) ----
   // El reloj de "regreso a consulta" arranca el día en que se generó el plan completo
@@ -220,7 +221,7 @@ export default function NutriDashboard() {
               {editaPrecios && (
                 <div style={D.preciosBox}>
                   <div style={{ fontSize: 12, color: 'var(--stone)', marginBottom: 8 }}>Precio por tipo de consulta (MXN). El ingreso se calcula como citas × precio.</div>
-                  {SERVICIOS_NOMBRES.map(s => (
+                  {serviciosNombres.map(s => (
                     <div key={s} style={D.precioRow}>
                       <span style={{ flex: 1, fontSize: 13, color: 'var(--dark)' }}>{s}</span>
                       <span style={{ color: 'var(--stone)', fontSize: 13 }}>$</span>
