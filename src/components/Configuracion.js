@@ -13,6 +13,9 @@ const DIAS_SEMANA = [
   [5, 'Viernes'], [6, 'Sábado'], [0, 'Domingo'],
 ];
 
+// Mismos servicios que usa el resumen financiero del panel de inicio.
+const SERVICIOS_NOMBRES = ['Primera vez', 'Seguimiento', 'Deportivo', 'Seguimiento deportivo', 'Online', 'Deportivo online'];
+
 const COLOR_LABELS = [
   ['gold', 'Acento (botones, detalles)'],
   ['dark', 'Oscuro (barras y texto fuerte)'],
@@ -67,13 +70,26 @@ export default function Configuracion() {
   const [excFecha, setExcFecha] = useState('');
   const [horBusy, setHorBusy] = useState(false);
   const [horMsg, setHorMsg] = useState('');
+  const [precios, setPrecios] = useState({});
+  const [precioBusy, setPrecioBusy] = useState(false);
+  const [precioMsg, setPrecioMsg] = useState('');
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
       const d = (snap && snap.data()) || {};
       setHorario({ ...HORARIO_DEFAULT, ...(d.horario || {}) });
       setExcepciones(d.excepciones || {});
+      setPrecios(d.precios || {});
     }, () => {});
   }, []);
+  const guardarPrecios = async () => {
+    setPrecioBusy(true); setPrecioMsg('');
+    try {
+      await setDoc(doc(db, 'config', 'dashboard'), { precios }, { merge: true });
+      setPrecioMsg('Precios guardados.');
+    } catch (e) { setPrecioMsg('No se pudo guardar: ' + e.message); }
+    setPrecioBusy(false);
+  };
+
   const setDia = (dow, patch) => setHorario(h => ({ ...h, [dow]: { ...(h[dow] || HORARIO_DEFAULT[dow]), ...patch } }));
   // Semanas del mes en que aplica el día ([] = todas).
   const toggleSemana = (dow, n) => setHorario(h => {
@@ -321,6 +337,32 @@ export default function Configuracion() {
           <button style={B.ghost} onClick={() => setHorario(HORARIO_DEFAULT)} disabled={horBusy}>Restablecer</button>
         </div>
         {horMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{horMsg}</span> : null}
+      </div>
+
+      <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
+        <div className="card-title">Precios de servicios</div>
+        <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>
+          Solo visible para ti. Se usan para el resumen financiero del panel de inicio.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 10 }}>
+          {SERVICIOS_NOMBRES.map(s => (
+            <label key={s} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)', fontSize: 13.5 }}>
+              <span>{s}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ color: 'var(--stone)' }}>$</span>
+                <input inputMode="numeric" value={precios[s] || ''} placeholder="0"
+                  onChange={e => setPrecios(p => ({ ...p, [s]: parseFloat(e.target.value) || 0 }))}
+                  style={{ width: 90, padding: '7px 9px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, textAlign: 'right', fontFamily: 'var(--font)' }} />
+              </span>
+            </label>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 16 }}>
+          <button style={B.primary} onClick={guardarPrecios} disabled={precioBusy}>
+            {precioBusy ? 'Guardando…' : 'Guardar precios'}
+          </button>
+        </div>
+        {precioMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{precioMsg}</span> : null}
       </div>
     </>
   );
