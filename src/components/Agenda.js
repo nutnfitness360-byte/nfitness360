@@ -7,7 +7,7 @@ const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto'
 const DIAS = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
 
 // Tipos de consulta (definen la duración de la cita)
-const SERVICIOS = [
+export const SERVICIOS_DEFAULT = [
   { id: 'primera',       nombre: 'Primera vez',           dur: 60, online: false },
   { id: 'seguimiento',   nombre: 'Seguimiento',           dur: 30, online: false },
   { id: 'deportivo',     nombre: 'Deportivo',             dur: 60, online: false },
@@ -15,7 +15,7 @@ const SERVICIOS = [
   { id: 'online',        nombre: 'Online',                dur: 40, online: true  },
   { id: 'online_dep',    nombre: 'Deportivo online',      dur: 40, online: true  },
 ];
-const DUR_POR_ID = Object.fromEntries(SERVICIOS.map(s => [s.id, s.dur]));
+const DUR_POR_ID = Object.fromEntries(SERVICIOS_DEFAULT.map(s => [s.id, s.dur]));
 
 // Objetivo (independiente del tipo de consulta)
 const OBJETIVOS = ['Aumento de masa muscular','Baja de grasa','Recomposición corporal','Salud','Rendimiento deportivo','Otro'];
@@ -172,6 +172,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const [pacientesList, setPacientesList] = useState([]);
   const [showSug, setShowSug] = useState(false);
   const [precios, setPrecios] = useState({});
+  const [servicios, setServicios] = useState(SERVICIOS_DEFAULT);
   const [horario, setHorario] = useState(HORARIO_DEFAULT);
   const [excepciones, setExcepciones] = useState({});
   const [mMetodoPago, setMMetodoPago] = useState('efectivo');
@@ -193,6 +194,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
       const d = (snap && snap.data()) || {};
       setPrecios(d.precios || {});
+      setServicios(Array.isArray(d.servicios) && d.servicios.length ? d.servicios : SERVICIOS_DEFAULT);
       setHorario({ ...HORARIO_DEFAULT, ...(d.horario || {}) });
       setExcepciones(d.excepciones || {});
     }, () => {});
@@ -218,7 +220,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const citasDia = citasDelDia.filter(esPropia).slice().sort((a,b) => a.hora.localeCompare(b.hora));
   const citaDates = new Set(citas.filter(c => c.estado !== 'cancelada').filter(esPropia).map(c => c.fecha));
 
-  const servSel = SERVICIOS.find(s => s.id === mTipo) || null;
+  const servSel = servicios.find(s => s.id === mTipo) || null;
   const slots = generarSlots(selDate, servSel ? servSel.dur : 0, ocupadasDia, horario, excepciones, servSel ? !!servSel.online : null);
 
   const abrirModal = () => {
@@ -475,7 +477,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
 
             <div className="section-label">Tipo de consulta</div>
             <div className="motivos-grid">
-              {SERVICIOS.map(s => (
+              {servicios.map(s => (
                 <button key={s.id}
                   className={`motivo-btn${mTipo === s.id ? ' selected' : ''}`}
                   onClick={() => { setMTipo(s.id); setMHora(null); }}>
