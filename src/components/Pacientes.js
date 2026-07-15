@@ -5,6 +5,7 @@ import Plan from './Plan';
 import Menus from './Menus';
 import HistoriaClinica from './HistoriaClinica';
 import InBodyModal from './InBodyModal';
+import ImportarPacientes from './ImportarPacientes';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 
 /* ===== utilidades ===== */
@@ -91,6 +92,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [busca, setBusca] = useState('');
   const [orden, setOrden] = useState('alfabetico'); // 'alfabetico' | 'creacion-desc' | 'creacion-asc'
   const [vistaOpen, setVistaOpen] = useState(false);
+  const [openImport, setOpenImport] = useState(false);
   const [menuId, setMenuId] = useState(null);
   const [menuReabrir, setMenuReabrir] = useState(null);
   const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', apego: '' });
@@ -1252,9 +1254,18 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
               </>
             )}
           </div>
+          <button style={S.smallBtn} onClick={() => setOpenImport(true)}>Importar</button>
           <button style={S.smallBtn} onClick={irNuevo}>+ Nuevo paciente</button>
         </div>
       </div>
+      <ImportarPacientes
+        open={openImport}
+        onClose={() => setOpenImport(false)}
+        pacientes={pacientes}
+        prefix={CODE_PREFIX}
+      />
+
+
       {err && <div style={S.err}>{err}</div>}
 
       <div className="card">
