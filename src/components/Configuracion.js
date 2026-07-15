@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { HORARIO_DEFAULT, MODALIDADES, franjasDe } from './Agenda';
+import { HORARIO_DEFAULT, MODALIDADES, franjasDe, SERVICIOS_DEFAULT } from './Agenda';
 import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
 
 // Bloqueo de marca por instancia (definido aquí para no depender de otro archivo):
@@ -12,9 +12,6 @@ const DIAS_SEMANA = [
   [1, 'Lunes'], [2, 'Martes'], [3, 'Miércoles'], [4, 'Jueves'],
   [5, 'Viernes'], [6, 'Sábado'], [0, 'Domingo'],
 ];
-
-// Mismos servicios que usa el resumen financiero del panel de inicio.
-const SERVICIOS_NOMBRES = ['Primera vez', 'Seguimiento', 'Deportivo', 'Seguimiento deportivo', 'Online', 'Deportivo online'];
 
 const COLOR_LABELS = [
   ['gold', 'Acento (botones, detalles)'],
@@ -71,6 +68,8 @@ export default function Configuracion() {
   const [horBusy, setHorBusy] = useState(false);
   const [horMsg, setHorMsg] = useState('');
   const [precios, setPrecios] = useState({});
+  const [servicios, setServicios] = useState(SERVICIOS_DEFAULT);
+  const [nuevoServ, setNuevoServ] = useState({ nombre: '', dur: 30, online: false, precio: '' });
   const [precioBusy, setPrecioBusy] = useState(false);
   const [precioMsg, setPrecioMsg] = useState('');
   useEffect(() => {
@@ -79,13 +78,37 @@ export default function Configuracion() {
       setHorario({ ...HORARIO_DEFAULT, ...(d.horario || {}) });
       setExcepciones(d.excepciones || {});
       setPrecios(d.precios || {});
+      setServicios(Array.isArray(d.servicios) && d.servicios.length ? d.servicios : SERVICIOS_DEFAULT);
     }, () => {});
   }, []);
-  const guardarPrecios = async () => {
+  const slug = (t) => (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24) || 'srv';
+
+  const agregarServicio = () => {
+    const nombre = (nuevoServ.nombre || '').trim();
+    if (!nombre) { setPrecioMsg('Escribe un nombre para el servicio.'); return; }
+    if (servicios.some(s => s.nombre.toLowerCase() === nombre.toLowerCase())) { setPrecioMsg('Ya existe un servicio con ese nombre.'); return; }
+    const dur = parseInt(nuevoServ.dur, 10) || 30;
+    let id = slug(nombre); if (servicios.some(s => s.id === id)) id = id + '_' + Math.random().toString(36).slice(2, 6);
+    setServicios(prev => [...prev, { id, nombre, dur, online: !!nuevoServ.online }]);
+    const precio = parseFloat(nuevoServ.precio) || 0;
+    if (precio) setPrecios(p => ({ ...p, [nombre]: precio }));
+    setNuevoServ({ nombre: '', dur: 30, online: false, precio: '' });
+    setPrecioMsg('');
+  };
+
+  const quitarServicio = (id) => {
+    const s = servicios.find(x => x.id === id);
+    setServicios(prev => prev.filter(x => x.id !== id));
+    if (s) setPrecios(p => { const n = { ...p }; delete n[s.nombre]; return n; });
+  };
+
+  const editarServicio = (id, patch) => setServicios(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s));
+
+  const guardarServicios = async () => {
     setPrecioBusy(true); setPrecioMsg('');
     try {
-      await setDoc(doc(db, 'config', 'dashboard'), { precios }, { merge: true });
-      setPrecioMsg('Precios guardados.');
+      await setDoc(doc(db, 'config', 'dashboard'), { servicios, precios }, { merge: true });
+      setPrecioMsg('Servicios y precios guardados.');
     } catch (e) { setPrecioMsg('No se pudo guardar: ' + e.message); }
     setPrecioBusy(false);
   };
@@ -340,26 +363,58 @@ export default function Configuracion() {
       </div>
 
       <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
-        <div className="card-title">Precios de servicios</div>
+        <div className="card-title">Servicios y precios</div>
         <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>
-          Solo visible para ti. Se usan para el resumen financiero del panel de inicio.
+          Solo visible para ti. Define las consultas que se pueden agendar, su duración y su precio. Se usan en la agenda y en el resumen financiero.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 10 }}>
-          {SERVICIOS_NOMBRES.map(s => (
-            <label key={s} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)', fontSize: 13.5 }}>
-              <span>{s}</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ color: 'var(--stone)' }}>$</span>
-                <input inputMode="numeric" value={precios[s] || ''} placeholder="0"
-                  onChange={e => setPrecios(p => ({ ...p, [s]: parseFloat(e.target.value) || 0 }))}
-                  style={{ width: 90, padding: '7px 9px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, textAlign: 'right', fontFamily: 'var(--font)' }} />
-              </span>
-            </label>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {servicios.map(s => (
+            <div key={s.id} style={P.row}>
+              <span style={{ flex: '1 1 160px', fontSize: 13.5, fontWeight: 600 }}>{s.nombre}</span>
+              <label style={P.field}>
+                <input inputMode="numeric" value={s.dur || ''} placeholder="30"
+                  onChange={e => editarServicio(s.id, { dur: parseInt(e.target.value, 10) || 0 })} style={P.num} />
+                <span style={P.unit}>min</span>
+              </label>
+              <label style={P.check}>
+                <input type="checkbox" checked={!!s.online} onChange={e => editarServicio(s.id, { online: e.target.checked })} />
+                En línea
+              </label>
+              <label style={P.field}>
+                <span style={P.unit}>$</span>
+                <input inputMode="numeric" value={precios[s.nombre] || ''} placeholder="0"
+                  onChange={e => setPrecios(p => ({ ...p, [s.nombre]: parseFloat(e.target.value) || 0 }))} style={P.num} />
+              </label>
+              <button title="Quitar servicio" style={P.del} onClick={() => quitarServicio(s.id)}>✕</button>
+            </div>
           ))}
         </div>
+
+        <div style={{ ...P.row, marginTop: 12, background: 'var(--cream)' }}>
+          <input placeholder="Nuevo servicio" value={nuevoServ.nombre}
+            onChange={e => setNuevoServ(v => ({ ...v, nombre: e.target.value }))}
+            style={{ flex: '1 1 160px', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+          <label style={P.field}>
+            <input inputMode="numeric" placeholder="30" value={nuevoServ.dur}
+              onChange={e => setNuevoServ(v => ({ ...v, dur: e.target.value }))} style={P.num} />
+            <span style={P.unit}>min</span>
+          </label>
+          <label style={P.check}>
+            <input type="checkbox" checked={nuevoServ.online} onChange={e => setNuevoServ(v => ({ ...v, online: e.target.checked }))} />
+            En línea
+          </label>
+          <label style={P.field}>
+            <span style={P.unit}>$</span>
+            <input inputMode="numeric" placeholder="0" value={nuevoServ.precio}
+              onChange={e => setNuevoServ(v => ({ ...v, precio: e.target.value }))} style={P.num} />
+          </label>
+          <button style={B.ghost} onClick={agregarServicio}>Agregar</button>
+        </div>
+
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 16 }}>
-          <button style={B.primary} onClick={guardarPrecios} disabled={precioBusy}>
-            {precioBusy ? 'Guardando…' : 'Guardar precios'}
+          <button style={B.primary} onClick={guardarServicios} disabled={precioBusy}>
+            {precioBusy ? 'Guardando…' : 'Guardar servicios'}
           </button>
         </div>
         {precioMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{precioMsg}</span> : null}
@@ -367,6 +422,15 @@ export default function Configuracion() {
     </>
   );
 }
+
+const P = {
+  row: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)', flexWrap: 'wrap' },
+  field: { display: 'flex', alignItems: 'center', gap: 4 },
+  num: { width: 64, padding: '7px 8px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, textAlign: 'right', fontFamily: 'var(--font)' },
+  unit: { fontSize: 12.5, color: 'var(--stone)' },
+  check: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--stone)', cursor: 'pointer' },
+  del: { background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 14, padding: '4px 6px' },
+};
 
 const H = {
   row: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)' },
