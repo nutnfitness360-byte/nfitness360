@@ -426,10 +426,10 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                     </div>
                   )}
                 </div>
-                {!isNutri && c.estado !== 'cancelada' && citaPasada(c)
+                {c.estado !== 'cancelada' && citaPasada(c)
                   ? <span className="badge" style={{ background: '#ECE7E1', color: '#7A6F66' }}>Concluida</span>
                   : <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>}
-                {c.estado !== 'cancelada' && (isNutri || !citaPasada(c)) && (
+                {c.estado !== 'cancelada' && !citaPasada(c) && (
                   <button onClick={() => (!isNutri && onSolicitarCancelar) ? onSolicitarCancelar(c) : setLocalModal(c)} title="Cancelar cita"
                     style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid #B0593F', borderRadius: 8, fontSize: 11, fontWeight: 600, color: '#B0593F', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', flexShrink: 0 }}>
                     Cancelar
