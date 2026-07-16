@@ -225,7 +225,9 @@ export default function PacienteDashboard() {
   }, [user]);
 
   const hoyKey = new Date().toISOString().slice(0, 10);
-  const proxima = citas.find(c => c.fecha >= hoyKey && c.estado !== 'cancelada');
+  const ahoraMs = Date.now();
+  const yaPaso = (c) => { const dt = new Date(c.fecha + 'T' + (c.hora || '23:59') + ':00'); return !isNaN(dt.getTime()) && dt.getTime() < ahoraMs; };
+  const proxima = citas.find(c => c.fecha >= hoyKey && c.estado !== 'cancelada' && !yaPaso(c));
   const nombre = user?.displayName?.split(' ')[0] || 'bienvenida';
 
   const generarPDFReco = async (reco) => {
