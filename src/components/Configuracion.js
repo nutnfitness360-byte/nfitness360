@@ -72,6 +72,9 @@ export default function Configuracion() {
   const [nuevoServ, setNuevoServ] = useState({ nombre: '', dur: 30, online: false, precio: '' });
   const [precioBusy, setPrecioBusy] = useState(false);
   const [precioMsg, setPrecioMsg] = useState('');
+  const [reactivacion, setReactivacion] = useState({ activo: false, dias: 45 });
+  const [reactBusy, setReactBusy] = useState(false);
+  const [reactMsg, setReactMsg] = useState('');
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
       const d = (snap && snap.data()) || {};
@@ -79,8 +82,23 @@ export default function Configuracion() {
       setExcepciones(d.excepciones || {});
       setPrecios(d.precios || {});
       setServicios(Array.isArray(d.servicios) && d.servicios.length ? d.servicios : SERVICIOS_DEFAULT);
+      setReactivacion({ activo: !!(d.reactivacion && d.reactivacion.activo), dias: (d.reactivacion && d.reactivacion.dias) || 45 });
     }, () => {});
   }, []);
+  const guardarReactivacion = async () => {
+    setReactBusy(true); setReactMsg('');
+    try {
+      const dias = parseInt(reactivacion.dias, 10) || 45;
+      await setDoc(doc(db, 'config', 'dashboard'), { reactivacion: { activo: !!reactivacion.activo, dias } }, { merge: true });
+      const url = process.env.REACT_APP_APPSCRIPT_URL;
+      if (url) {
+        await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'setReactivacion', activo: !!reactivacion.activo, dias }), redirect: 'follow' });
+      }
+      setReactMsg('Configuración guardada.');
+    } catch (e) { setReactMsg('No se pudo guardar: ' + e.message); }
+    setReactBusy(false);
+  };
+
   const slug = (t) => (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24) || 'srv';
 
   const agregarServicio = () => {
@@ -418,6 +436,30 @@ export default function Configuracion() {
           </button>
         </div>
         {precioMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{precioMsg}</span> : null}
+      </div>
+
+      <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
+        <div className="card-title">Reactivación de pacientes inactivos</div>
+        <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>
+          Envía automáticamente un correo cálido a los pacientes que llevan cierto tiempo sin un plan nuevo, invitándolos a retomar su seguimiento. Se envía una sola vez por periodo de inactividad, y te llega un resumen de a quién se le mandó.
+        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, marginBottom: 14 }}>
+          <input type="checkbox" checked={!!reactivacion.activo} onChange={e => setReactivacion(r => ({ ...r, activo: e.target.checked }))} />
+          Activar envío automático
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5 }}>
+          Enviar después de
+          <input inputMode="numeric" value={reactivacion.dias}
+            onChange={e => setReactivacion(r => ({ ...r, dias: e.target.value.replace(/[^0-9]/g, '') }))}
+            style={{ width: 64, padding: '7px 9px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, textAlign: 'right', fontFamily: 'var(--font)' }} />
+          días de inactividad
+        </label>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 16 }}>
+          <button style={B.primary} onClick={guardarReactivacion} disabled={reactBusy}>
+            {reactBusy ? 'Guardando…' : 'Guardar'}
+          </button>
+        </div>
+        {reactMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{reactMsg}</span> : null}
       </div>
     </>
   );
