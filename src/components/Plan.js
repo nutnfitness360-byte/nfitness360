@@ -131,9 +131,10 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   useEffect(() => {
     if (primeraRender.current) { primeraRender.current = false; return; }
     const e = num(meta.energia);
-    if (e > 0) { setEq(plantillaEq(e, num(meta.pP), num(meta.pL), num(meta.pC)).map(String)); setStatus('nuevo'); }
+    const sumaPctM = num(meta.pP) + num(meta.pL) + num(meta.pC);
+    if (e > 0 && sumaPctM === 100) { setEq(plantillaEq(e, num(meta.pP), num(meta.pL), num(meta.pC)).map(String)); setStatus('nuevo'); }
     // eslint-disable-next-line
-  }, [meta.energia]);
+  }, [meta.energia, meta.pP, meta.pL, meta.pC]);
 
   const energia = num(meta.energia);
   const pP = num(meta.pP), pL = num(meta.pL), pC = num(meta.pC);
