@@ -745,11 +745,12 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
 
         <div style={S.balSub}>Equivalencias por tiempo · editable</div>
         <div style={S.balWrap}>
-          <table style={{ ...S.balTable, minWidth: 540 }}>
+          <table style={{ ...S.balTable, minWidth: 600 }}>
             <thead>
               <tr>
                 <th style={{ ...S.balTh, textAlign: 'left' }}>Grupo</th>
                 {tiempos.map((t, idx) => <th key={t.id || idx} style={S.balTh}>{t.nombre}</th>)}
+                <th style={{ ...S.balTh, color: T.amber }}>Plan</th>
                 <th style={S.balTh}>Total</th>
               </tr>
             </thead>
@@ -766,6 +767,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                         onChange={e => setEqCell(idx, g, e.target.value)} />
                     </td>
                   ))}
+                  <td style={{ ...S.balTd, fontWeight: 700, color: T.amber }}>{fmt(num(planEq ? planEq[g] : 0))}</td>
                   <td style={{ ...S.balTd, fontWeight: 700 }}>{fmt(sumaPorGrupo(g))}</td>
                 </tr>
                 );
