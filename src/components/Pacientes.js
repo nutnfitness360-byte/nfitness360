@@ -225,7 +225,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     const der = derivar(h);
     if (!der.nombre) { setErr('Escribe el nombre en "Datos generales".'); throw new Error('sin nombre'); }
     const ref = await addDoc(collection(db, 'pacientes'), {
-      codigo: (h.datos && h.datos.pacienteNo) || nextCodigo(), ...der, contacto: '',
+      codigo: (h.datos && h.datos.pacienteNo) || nextCodigo(), ...der,
       historia: h, inicio: hoyISO(), mediciones: [], planes: [], creado: Date.now(),
     });
     mirrorSuscriptor(der.correo, der.sexo, der.nombre);
