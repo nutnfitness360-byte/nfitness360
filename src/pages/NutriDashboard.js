@@ -43,6 +43,7 @@ export default function NutriDashboard() {
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [cfg, setCfg] = useState({ pendientes: [], precios: {}, servicios: [] });
+  const [filtroRet, setFiltroRet] = useState(null);
   const [nuevoPend, setNuevoPend] = useState('');
   const [editaPrecios, setEditaPrecios] = useState(false);
 
@@ -126,6 +127,16 @@ export default function NutriDashboard() {
   const maxObj = objetivos.reduce((m, o) => Math.max(m, o.n), 0) || 1;
 
   const COLOR = { verde: '#9AB9AD', amarillo: '#CDA788', rojo: '#B0593F', sinplan: '#C9BFB4' };
+  const retFiltrada = filtroRet ? retencion.filter(r => r.color === filtroRet) : retencion;
+  const semBtn = (color, label) => (
+    <div
+      onClick={() => setFiltroRet(f => (f === color ? null : color))}
+      title="Filtrar pacientes de esta categoría"
+      style={{ ...D.semItem, cursor: 'pointer', padding: '3px 10px', borderRadius: 999, background: filtroRet === color ? 'var(--cream)' : 'transparent', fontWeight: filtroRet === color ? 700 : 400 }}
+    >
+      <span style={{ ...D.dot, background: COLOR[color] }} /> {cuenta[color]} {label}
+    </div>
+  );
 
   const CitaItem = ({ c }) => (
     <div style={{ borderBottom: '0.5px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
@@ -266,22 +277,24 @@ export default function NutriDashboard() {
               <div className="card">
                 <div className="card-title">Retención de pacientes</div>
                 <div style={D.semaforo}>
-                  <div style={D.semItem}><span style={{ ...D.dot, background: COLOR.verde }} /> {cuenta.verde} activos</div>
-                  <div style={D.semItem}><span style={{ ...D.dot, background: COLOR.amarillo }} /> {cuenta.amarillo} +30 días</div>
-                  <div style={D.semItem}><span style={{ ...D.dot, background: COLOR.rojo }} /> {cuenta.rojo} +45 días</div>
-                  {cuenta.sinplan > 0 && <div style={D.semItem}><span style={{ ...D.dot, background: COLOR.sinplan }} /> {cuenta.sinplan} sin plan</div>}
+                  {semBtn('verde', 'activos')}
+                  {semBtn('amarillo', '+30 días')}
+                  {semBtn('rojo', '+45 días')}
+                  {cuenta.sinplan > 0 && semBtn('sinplan', 'sin plan')}
                 </div>
                 <div style={D.retPct}><b style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 26, fontWeight: 800 }}>{pctRetencion}%</b> de retención <span style={{ color: 'var(--stone)' }}>(de pacientes con plan)</span></div>
                 <div style={{ marginTop: 10, maxHeight: 220, overflowY: 'auto' }}>
                   {retencion.length === 0
                     ? <div className="empty-state">Aún no hay pacientes registrados.</div>
-                    : retencion.map((r, i) => (
-                      <div key={i} style={D.retRow}>
-                        <span style={{ ...D.dot, background: COLOR[r.color] }} />
-                        <span style={{ flex: 1, fontSize: 13, color: 'var(--dark)' }}>{r.nombre}</span>
-                        <span style={{ fontSize: 11.5, color: 'var(--stone)' }}>{r.dias === null ? 'Sin plan aún' : r.dias <= 0 ? 'Plan de hoy' : `Hace ${r.dias} días`}</span>
-                      </div>
-                    ))}
+                    : retFiltrada.length === 0
+                      ? <div className="empty-state">No hay pacientes en esta categoría.</div>
+                      : retFiltrada.map((r, i) => (
+                        <div key={i} style={D.retRow}>
+                          <span style={{ ...D.dot, background: COLOR[r.color] }} />
+                          <span style={{ flex: 1, fontSize: 13, color: 'var(--dark)' }}>{r.nombre}</span>
+                          <span style={{ fontSize: 11.5, color: 'var(--stone)' }}>{r.dias === null ? 'Sin plan aún' : r.dias <= 0 ? 'Plan de hoy' : `Hace ${r.dias} días`}</span>
+                        </div>
+                      ))}
                 </div>
               </div>
 
