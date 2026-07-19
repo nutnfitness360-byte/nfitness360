@@ -37,6 +37,34 @@ const buildSupTable = (suplementacion) => {
     <div class="gold" style="margin:18px 0 20px;"></div>`;
 };
 
+// Bloque de tabla de análisis de estudio (valores fuera de rango) dentro de una recomendación.
+const buildAnalisisBlock = (analisis) => {
+  if (!analisis || typeof analisis !== "object") return "";
+  const fuera = Array.isArray(analisis.fueraDeRango) ? analisis.fueraDeRango : [];
+  const dentro = analisis.dentroDeRango || 0;
+  const total = Array.isArray(analisis.valores) ? analisis.valores.length : (fuera.length + dentro);
+  const titulo = [analisis.tipo, analisis.fecha].filter(Boolean).map(esc).join(" \u00b7 ") || "Análisis de estudio";
+  let tabla;
+  if (fuera.length) {
+    const filas = fuera.map((v) => {
+      const alto = v.estado === "alto";
+      const color = alto ? "#C0392B" : "#2563EB";
+      const badge = alto ? "\u2191 Alto" : "\u2193 Bajo";
+      const res = esc(v.resultado) + (v.unidad ? " " + esc(v.unidad) : "");
+      return `<tr><td>${esc(v.parametro)}</td><td>${res}</td><td>${esc(v.referencia || "\u2014")}</td>` +
+        `<td><span class="anabadge" style="background:${color};">${badge}</span></td></tr>`;
+    }).join("");
+    tabla = `<table class="anatable">` +
+      `<thead><tr><th>Parámetro</th><th>Resultado</th><th>Referencia</th><th>Estado</th></tr></thead>` +
+      `<tbody>${filas}</tbody></table>`;
+  } else {
+    tabla = `<div class="ananorm">Todos los valores leídos están dentro del rango de referencia.</div>`;
+  }
+  return `<div class="rsec"><div class="rst">Análisis de estudio \u2014 ${titulo}</div>${tabla}` +
+    `<div class="anafoot">${dentro} dentro de rango \u00b7 ${total} parámetro(s) leídos. ` +
+    `Lectura automática para revisión clínica; no sustituye el criterio profesional.</div></div>`;
+};
+
 export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suplementacion } = {}) {
   const recos = (Array.isArray(recomendaciones) ? recomendaciones.slice() : [])
     .sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
@@ -49,13 +77,14 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suple
   ];
   const items = recos.map((r) => {
     const conContenido = SECS.filter(([k]) => (r[k] || "").toString().trim());
-    const cuerpo = conContenido.length
+    const bloques = conContenido.length
       ? conContenido.map(([k, t]) => `<div class="rsec"><div class="rst">${esc(t)}</div><div class="rtext">${esc(r[k])}</div></div>`).join("")
-      : `<div class="rtext">${esc(r.texto)}</div>`;
+      : ((r.texto || "").toString().trim() ? `<div class="rtext">${esc(r.texto)}</div>` : "");
+    const cuerpo = (bloques || "") + buildAnalisisBlock(r.analisis);
     return `
       <div class="reco">
         <div class="rdate">${esc(fmtFechaHora(r.fecha))}</div>
-        ${cuerpo}
+        ${cuerpo || `<div class="rtext">\u2014</div>`}
       </div>`;
   }).join("");
   const vacio = `<div class="empty">Aún no hay recomendaciones registradas.</div>`;
@@ -83,6 +112,13 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suple
     .suptable td { font-size:12px; color:#3A332C; padding:7px 8px; border-bottom:1px solid #E0D6CB; }
     .suptable tr:last-child td { border-bottom:none; }
     .supnotas { font-size:11.5px; color:#6E645C; margin:8px 0 4px; }
+    .anatable { width:100%; border-collapse:collapse; margin:6px 0 4px; }
+    .anatable th { text-align:left; font-size:9.5px; letter-spacing:0.5px; text-transform:uppercase; color:#A1968C; padding:6px 8px; border-bottom:1.5px solid #CDA788; }
+    .anatable td { font-size:12px; color:#3A332C; padding:7px 8px; border-bottom:1px solid #E0D6CB; vertical-align:middle; }
+    .anatable tr:last-child td { border-bottom:none; }
+    .anabadge { display:inline-block; padding:1px 9px; border-radius:999px; font-size:10px; font-weight:bold; color:#FFFFFF; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .ananorm { font-size:12px; color:#3A332C; padding:4px 0; }
+    .anafoot { font-size:10.5px; color:#A1968C; margin-top:6px; }
     .ftr { display:flex; justify-content:space-between; align-items:flex-end; border-top:1px solid #E0D6CB; margin-top:18px; padding-top:14px; }
     .fnut { font-size:10.5px; color:#A1968C; line-height:1.5; }
     .fweb { font-size:10px; color:#CDA788; font-weight:bold; }
