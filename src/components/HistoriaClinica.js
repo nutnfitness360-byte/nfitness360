@@ -56,7 +56,8 @@ const SECTIONS = [
   { id: "suplementacion", n: "6", label: "Suplementación" },
   { id: "dietetica", n: "7", label: "Dietético" },
   { id: "ejercicio", n: "8", label: "Ejercicio" },
-  { id: "notas", n: "9", label: "Notas generales" },
+  { id: "deportiva", n: "9", label: "Nutrición deportiva" },
+  { id: "notas", n: "10", label: "Notas generales" },
 ];
 
 const TIEMPOS = ["Desayuno", "Colación", "Comida", "Colación", "Cena"];
@@ -134,6 +135,7 @@ function baseSeed() {
       comeAntes: "No", queComeAntes: "", comeDurante: "No", queComeDurante: "", comeDespues: "No", queComeDespues: "",
       hidratacion: "", notas: "",
     },
+    nutricionDeportiva: { texto: "" },
     notasGenerales: { texto: "" },
   };
 }
@@ -147,7 +149,8 @@ function histParts(data) {
 
   const d = data.datos, b = data.bioquimica, s = data.suplementacion,
     si = data.sintomas, a = data.antecedentes, di = data.dietetica, ej = data.ejercicio,
-    pad = data.padecimientos || { lista: [] }, ng = data.notasGenerales || { texto: "" };
+    pad = data.padecimientos || { lista: [] }, ng = data.notasGenerales || { texto: "" },
+    nd = data.nutricionDeportiva || { texto: "" };
 
   const rows = (arr) =>
     `<table class="rows">${arr.map((p) => `<tr><td class="lbl">${esc(p[0])}</td><td class="val">${v(p[1])}</td></tr>`).join("")}</table>`;
@@ -232,7 +235,10 @@ function histParts(data) {
       ["¿Come después de entrenar?", ej.comeDespues === "Sí" ? "Sí — " + (ej.queComeDespues || "—") : "No"],
       ["Notas", ej.notas],
     ])) +
-    card("9", "Notas generales", (ng.texto && ng.texto.trim())
+    card("9", "Nutrición deportiva", (nd.texto && nd.texto.trim())
+      ? `<div class="note">${v(nd.texto)}</div>`
+      : `<p class="empty">Sin notas de nutrición deportiva.</p>`) +
+    card("10", "Notas generales", (ng.texto && ng.texto.trim())
       ? `<div class="note">${v(ng.texto)}</div>`
       : `<p class="empty">Sin notas.</p>`) +
     `<div class="foot">Documento generado desde el panel de la nutrióloga · ${esc(d.pacienteNo || "")}</div>`;
@@ -1131,8 +1137,18 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
           </Grid>
         </Section>
 
-        {/* 9. NOTAS GENERALES */}
-        <Section reg={reg("notas")} sid="notas" title="Notas generales" n="9"
+        {/* 9. NUTRICIÓN DEPORTIVA */}
+        <Section reg={reg("deportiva")} sid="deportiva" title="Nutrición deportiva" n="9"
+          hint="Estrategia y notas de nutrición deportiva de la nutrióloga.">
+          <Field label="Notas de nutrición deportiva" full>
+            <textarea style={styles.textarea} rows={5} value={data.nutricionDeportiva.texto || ""}
+              placeholder="Periodización, timing de nutrientes, suplementación deportiva, hidratación, recuperación, competencias…"
+              onChange={(e) => setField("nutricionDeportiva", "texto", e.target.value)} />
+          </Field>
+        </Section>
+
+        {/* 10. NOTAS GENERALES */}
+        <Section reg={reg("notas")} sid="notas" title="Notas generales" n="10"
           hint="Espacio libre para cualquier observación adicional del paciente.">
           <Field label="Notas generales" full>
             <textarea style={styles.textarea} rows={5} value={data.notasGenerales.texto || ""}
