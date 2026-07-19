@@ -96,7 +96,7 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suple
       ${buildSupTable(suplementacion)}
       ${items || vacio}
       <div class="ftr">
-        <div class="fnut">Lic. N. Natalia Flores</div>
+        <div class="fnut">L.N. Natalia E. Flores Bonilla<br/>Céd. Prof. 12278012 · natalia.db@live.com</div>
         <div class="fweb">nfitness360.com</div>
       </div>
     </div>
