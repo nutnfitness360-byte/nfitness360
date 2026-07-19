@@ -474,7 +474,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales)) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
     setRecoPdfMsg('Generando PDF…');
     try {
-      const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now() });
+      const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now(), suplementacion: sel.historia?.suplementacion });
       const fechaImp = hoyISO(); // fecha de impresión (AAAA-MM-DD)
       const filename = `Recomendacion_${(sel.nombre || 'paciente').replace(/[^\w-]+/g, '_')}_${fechaImp}.pdf`;
       const res = await fetch(url, {
