@@ -108,6 +108,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [inbodyOpen, setInbodyOpen] = useState(false);
   const [inbody, setInbody] = useState(null);
   const [recoForm, setRecoForm] = useState({ estudios: '', suplementos: '', ejercicio: '', hidratacion: '', generales: '' });
+  const [recoAnalisis, setRecoAnalisis] = useState(null);
   const [recoEditIdx, setRecoEditIdx] = useState(null);
   const [recoChips, setRecoChips] = useState({});
   const [verHistoria, setVerHistoria] = useState(false);
@@ -156,6 +157,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     recoLoadedForRef.current = selId;
     const b = p.recomendacionBorrador || null;
     setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = (b && b[k]) || ''; return o; }, {}));
+    setRecoAnalisis((b && b.analisis) || null);
     setRecoEditIdx(null);
     setVerHistoria(false);
   }, [selId, pacientes]);
@@ -422,6 +424,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const guardarBorradorReco = async () => {
     if (!sel) return;
     const b = RECO_KEYS.reduce((o, k) => { o[k] = (recoForm[k] || ''); return o; }, {});
+    if (recoAnalisis) b.analisis = recoAnalisis;
     try {
       await updateDoc(doc(db, 'pacientes', sel.id), { recomendacionBorrador: b });
       setRecoPdfMsg('Borrador guardado ✓');
@@ -431,7 +434,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const addReco = async () => {
     const r = {};
     RECO_KEYS.forEach(k => { r[k] = (recoForm[k] || '').trim(); });
-    if (!RECO_KEYS.some(k => r[k])) { setErr('Escribe al menos una recomendación en alguna sección.'); return; }
+    if (recoAnalisis) r.analisis = recoAnalisis;
+    if (!RECO_KEYS.some(k => r[k]) && !recoAnalisis) { setErr('Escribe al menos una recomendación en alguna sección (o adjunta un análisis).'); return; }
     let arr;
     if (recoEditIdx != null && (sel.recomendaciones || [])[recoEditIdx]) {
       // Editar: reemplaza esa recomendación, conservando su fecha original.
@@ -444,6 +448,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       // Al publicar, se limpia el borrador guardado.
       await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr, recomendacionBorrador: {} });
       setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = ''; return o; }, {}));
+      setRecoAnalisis(null);
       setRecoEditIdx(null);
       setErr('');
     } catch (e) { setErr('No se pudo guardar la recomendación: ' + e.message); }
@@ -453,6 +458,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     const r = (sel.recomendaciones || [])[idx];
     if (!r) return;
     setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = r[k] || ''; return o; }, {}));
+    setRecoAnalisis(r.analisis || null);
     setRecoEditIdx(idx);
     setErr('');
     setTimeout(() => { try { recoFormRef.current && recoFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 50);
@@ -460,8 +466,24 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
 
   const cancelarEdicionReco = () => {
     setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = ''; return o; }, {}));
+    setRecoAnalisis(null);
     setRecoEditIdx(null);
     setErr('');
+  };
+
+  // Adjunta la tabla de análisis de un estudio al borrador de recomendación actual.
+  const adjuntarAnalisisAReco = (i) => {
+    const est = (sel.estudios || [])[i];
+    if (!est || !est.analisis) { setErr('Primero analiza el estudio.'); return; }
+    setRecoAnalisis({
+      tipo: est.analisis.tipo || '', fecha: est.analisis.fecha || '',
+      fueraDeRango: est.analisis.fueraDeRango || [],
+      dentroDeRango: est.analisis.dentroDeRango || 0,
+      valores: est.analisis.valores || [],
+    });
+    setPanel('reco');
+    setRecoPdfMsg('Tabla de análisis adjuntada a la recomendación. Publícala o genera el PDF para incluirla.');
+    setTimeout(() => { try { recoFormRef.current && recoFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 60);
   };
 
   const removeReco = async (i) => {
@@ -473,7 +495,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const generarPDFReco = async (reco) => {
     const url = process.env.REACT_APP_APPSCRIPT_URL;
     if (!url) { setRecoPdfMsg('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
-    if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales)) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
+    if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales || reco.analisis)) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
     setRecoPdfMsg('Generando PDF…');
     try {
       const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now(), suplementacion: sel.historia?.suplementacion });
@@ -1030,11 +1052,16 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                                 ) : (
                                   <div style={{ fontSize: 12, color: 'var(--dark)' }}>Todos los valores leídos están dentro del rango de referencia.</div>
                                 )}
-                                <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 10 }}>
-                                  {(r.analisis.dentroDeRango || 0)} dentro de rango · {(r.analisis.valores || []).length} parámetro(s) leídos ·{' '}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+                                  <button style={{ ...S.openBtn, border: 'none', cursor: 'pointer' }} onClick={() => adjuntarAnalisisAReco(idx)}>
+                                    Adjuntar a recomendaciones
+                                  </button>
                                   <button style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: 11 }} onClick={() => analizarEstudio(idx)} disabled={analizandoIdx === idx}>
                                     {analizandoIdx === idx ? 'Analizando…' : 'Volver a analizar'}
                                   </button>
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 8 }}>
+                                  {(r.analisis.dentroDeRango || 0)} dentro de rango · {(r.analisis.valores || []).length} parámetro(s) leídos.
                                 </div>
                               </div>
                             )}
@@ -1268,6 +1295,16 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                       placeholder={`Recomendaciones de ${sec.titulo.toLowerCase()}…`} />
                   </div>
                 ))}
+                {recoAnalisis && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 12, background: 'var(--mint)', border: '0.5px solid var(--border)', borderRadius: 10 }}>
+                    <div style={{ flex: 1, fontSize: 12, color: 'var(--dark)' }}>
+                      <b>Tabla de análisis adjunta</b>
+                      {recoAnalisis.tipo ? ' · ' + recoAnalisis.tipo : ''} ·{' '}
+                      {(recoAnalisis.fueraDeRango || []).length} valor(es) fuera de rango. Se incluirá en el PDF.
+                    </div>
+                    <button style={S.rm} onClick={() => setRecoAnalisis(null)} title="Quitar la tabla adjunta">×</button>
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, marginBottom: 14, flexWrap: 'wrap' }}>
                   <button style={S.saveBtn} onClick={addReco}>{recoEditIdx != null ? 'Guardar cambios' : '+ Agregar recomendación'}</button>
                   {recoEditIdx == null && <button style={S.smallBtn} onClick={guardarBorradorReco}>Guardar borrador</button>}
