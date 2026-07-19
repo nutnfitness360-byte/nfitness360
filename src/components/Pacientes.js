@@ -119,6 +119,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [isakBusy, setIsakBusy] = useState(false);
   const [estudioFile, setEstudioFile] = useState(null);
   const [estudioBusy, setEstudioBusy] = useState(false);
+  const [analizandoIdx, setAnalizandoIdx] = useState(null);
+  const [estudioAbierto, setEstudioAbierto] = useState(null);
   const [archSec, setArchSec] = useState({ plan: false, isak: false, inbody: false, estudios: false });
   const [panel, setPanel] = useState(null);
   const [ibFile, setIbFile] = useState(null);
@@ -556,7 +558,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       });
       const data = await resp.json().catch(() => null);
       if (!data || !data.ok || !data.link) throw new Error((data && data.error) || 'No se recibió el enlace del archivo.');
-      const arr = [...(sel.estudios || []), { nombre: estudioFile.name || filename, fecha, link: data.link }];
+      const arr = [...(sel.estudios || []), { nombre: estudioFile.name || filename, fecha, link: data.link, fileId: data.fileId || '' }];
       await updateDoc(doc(db, 'pacientes', sel.id), { estudios: arr });
       setEstudioFile(null); setErr('');
     } catch (e) { setErr('No se pudo cargar el estudio: ' + e.message); }
@@ -567,6 +569,35 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     if (!window.confirm('¿Quitar este estudio de la lista? (El archivo seguirá en Drive.)')) return;
     const arr = (sel.estudios || []).filter((_, k) => k !== i);
     try { await updateDoc(doc(db, 'pacientes', sel.id), { estudios: arr }); } catch (e) { setErr(e.message); }
+  };
+
+  const analizarEstudio = async (i) => {
+    const est = (sel.estudios || [])[i];
+    if (!est) return;
+    if (!est.fileId && !est.link) { setErr('Este estudio no tiene archivo asociado para analizar.'); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setErr('No está configurada la conexión para analizar archivos.'); return; }
+    setAnalizandoIdx(i); setErr('');
+    try {
+      const resp = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'analizarEstudio', fileId: est.fileId || '', link: est.link || '' }),
+        redirect: 'follow',
+      });
+      const data = await resp.json().catch(() => null);
+      if (!data || !data.ok) throw new Error((data && data.error) || 'No se pudo analizar el estudio.');
+      const analisis = {
+        fecha: data.fecha || '', tipo: data.tipo || '',
+        valores: data.valores || [], fueraDeRango: data.fueraDeRango || [],
+        dentroDeRango: data.dentroDeRango || 0, generadoEn: data.generadoEn || new Date().toISOString(),
+      };
+      const arr = (sel.estudios || []).map((r, k) => (k === i ? { ...r, analisis } : r));
+      await updateDoc(doc(db, 'pacientes', sel.id), { estudios: arr });
+      setEstudioAbierto(i);
+    } catch (e) {
+      setErr('No se pudo analizar el estudio: ' + e.message);
+    }
+    setAnalizandoIdx(null);
   };
 
   const archHeader = (id, titulo) => (
@@ -944,14 +975,69 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                       {(!sel.estudios || sel.estudios.length === 0)
                         ? <div className="empty-state">Aún no hay estudios clínicos.</div>
                         : [...sel.estudios].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
-                          <div key={idx} style={S.planRow}>
-                            <div style={S.planIcon}>PDF</div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Estudio clínico'}</div>
-                              <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+                          <div key={idx} style={{ marginBottom: 8 }}>
+                            <div style={{ ...S.planRow, marginBottom: 0 }}>
+                              <div style={S.planIcon}>PDF</div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Estudio clínico'}</div>
+                                <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>
+                                  {r.fecha ? fmtFecha(r.fecha) : ''}{r.analisis ? ' · Analizado' : ''}
+                                </div>
+                              </div>
+                              {r.analisis
+                                ? <button style={{ ...S.openBtn, border: 'none', cursor: 'pointer' }} onClick={() => setEstudioAbierto(estudioAbierto === idx ? null : idx)}>
+                                    {estudioAbierto === idx ? 'Ocultar' : 'Ver análisis'}
+                                  </button>
+                                : <button style={{ ...S.openBtn, border: 'none', cursor: 'pointer', opacity: analizandoIdx === idx ? 0.6 : 1 }} onClick={() => analizarEstudio(idx)} disabled={analizandoIdx === idx}>
+                                    {analizandoIdx === idx ? 'Analizando…' : 'Analizar'}
+                                  </button>}
+                              {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                              <button style={S.rm} onClick={() => removeEstudio(idx)} title="Quitar">×</button>
                             </div>
-                            {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
-                            <button style={S.rm} onClick={() => removeEstudio(idx)} title="Quitar">×</button>
+                            {r.analisis && estudioAbierto === idx && (
+                              <div style={{ marginTop: 6, padding: '12px 14px', background: 'var(--mint)', border: '0.5px solid var(--border)', borderRadius: 10 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--dark)' }}>
+                                  {r.analisis.tipo || 'Análisis del estudio'}{r.analisis.fecha ? ' · ' + r.analisis.fecha : ''}
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 2, marginBottom: 10 }}>
+                                  Lectura automática para revisión. No sustituye el criterio de la nutrióloga.
+                                </div>
+                                {(r.analisis.fueraDeRango && r.analisis.fueraDeRango.length > 0) ? (
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                                    <thead>
+                                      <tr style={{ textAlign: 'left', color: 'var(--stone)' }}>
+                                        <th style={{ padding: '4px 6px', fontWeight: 600 }}>Parámetro</th>
+                                        <th style={{ padding: '4px 6px', fontWeight: 600 }}>Resultado</th>
+                                        <th style={{ padding: '4px 6px', fontWeight: 600 }}>Referencia</th>
+                                        <th style={{ padding: '4px 6px', fontWeight: 600 }}>Estado</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {r.analisis.fueraDeRango.map((vv, k) => (
+                                        <tr key={k} style={{ borderTop: '0.5px solid var(--border)' }}>
+                                          <td style={{ padding: '6px', fontWeight: 600, color: 'var(--dark)' }}>{vv.parametro}</td>
+                                          <td style={{ padding: '6px', color: 'var(--dark)' }}>{vv.resultado}{vv.unidad ? ' ' + vv.unidad : ''}</td>
+                                          <td style={{ padding: '6px', color: 'var(--stone)' }}>{vv.referencia || '—'}</td>
+                                          <td style={{ padding: '6px' }}>
+                                            <span style={{ padding: '1px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#fff', background: vv.estado === 'alto' ? '#c0392b' : '#2563eb' }}>
+                                              {vv.estado === 'alto' ? '↑ Alto' : '↓ Bajo'}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                ) : (
+                                  <div style={{ fontSize: 12, color: 'var(--dark)' }}>Todos los valores leídos están dentro del rango de referencia.</div>
+                                )}
+                                <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 10 }}>
+                                  {(r.analisis.dentroDeRango || 0)} dentro de rango · {(r.analisis.valores || []).length} parámetro(s) leídos ·{' '}
+                                  <button style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: 11 }} onClick={() => analizarEstudio(idx)} disabled={analizandoIdx === idx}>
+                                    {analizandoIdx === idx ? 'Analizando…' : 'Volver a analizar'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                     </div>
