@@ -16,7 +16,28 @@ const fmtFechaHora = (ms) => {
   } catch (_) { return ""; }
 };
 
-export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha } = {}) {
+const buildSupTable = (suplementacion) => {
+  const items = (suplementacion && Array.isArray(suplementacion.items) ? suplementacion.items : [])
+    .filter((it) => it && (it.nombre || it.marca || it.dosis || it.frecuencia || it.horario));
+  if (!items.length) return "";
+  const filas = items.map((it) => `
+    <tr>
+      <td>${esc(it.nombre)}</td><td>${esc(it.marca)}</td><td>${esc(it.dosis)}</td>
+      <td>${esc(it.frecuencia)}</td><td>${esc(it.horario)}</td>
+    </tr>`).join("");
+  const notas = (suplementacion.notas || "").toString().trim();
+  return `
+    <div class="eyebrow">SUPLEMENTACIÓN ACTUAL</div>
+    <div class="rule"></div>
+    <table class="suptable">
+      <thead><tr><th>Suplemento</th><th>Marca</th><th>Dosis</th><th>Frecuencia</th><th>Horario</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    ${notas ? `<div class="supnotas"><b>Notas:</b> ${esc(notas)}</div>` : ""}
+    <div class="gold" style="margin:18px 0 20px;"></div>`;
+};
+
+export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suplementacion } = {}) {
   const recos = (Array.isArray(recomendaciones) ? recomendaciones.slice() : [])
     .sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
   const fechaDoc = new Date(fecha || Date.now())
@@ -57,6 +78,11 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha } = {}
     .rst { font-size:10px; letter-spacing:1px; color:#CDA788; font-weight:bold; text-transform:uppercase; margin-bottom:3px; }
     .rtext { font-size:13px; line-height:1.55; white-space:pre-wrap; color:#3A332C; }
     .empty { font-size:13px; color:#A1968C; padding:20px 0; }
+    .suptable { width:100%; border-collapse:collapse; margin-bottom:6px; }
+    .suptable th { text-align:left; font-size:9.5px; letter-spacing:0.5px; text-transform:uppercase; color:#A1968C; padding:6px 8px; border-bottom:1.5px solid #CDA788; }
+    .suptable td { font-size:12px; color:#3A332C; padding:7px 8px; border-bottom:1px solid #E0D6CB; }
+    .suptable tr:last-child td { border-bottom:none; }
+    .supnotas { font-size:11.5px; color:#6E645C; margin:8px 0 4px; }
     .ftr { display:flex; justify-content:space-between; align-items:flex-end; border-top:1px solid #E0D6CB; margin-top:18px; padding-top:14px; }
     .fnut { font-size:10.5px; color:#A1968C; line-height:1.5; }
     .fweb { font-size:10px; color:#CDA788; font-weight:bold; }
@@ -67,6 +93,7 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha } = {}
       <div class="eyebrow">RECOMENDACIONES</div>
       <div class="rule"></div>
       <div class="meta"><span><b>Paciente:</b> ${esc(nombre || "—")}</span><span><b>Fecha de impresión:</b> ${esc(fechaDoc)}</span></div>
+      ${buildSupTable(suplementacion)}
       ${items || vacio}
       <div class="ftr">
         <div class="fnut">Lic. N. Natalia Flores</div>
