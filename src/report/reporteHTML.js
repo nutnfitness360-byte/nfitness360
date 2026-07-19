@@ -9,6 +9,12 @@ const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAEhCAYAAADs24qx
 
 const TAUPE = '#8E837B', TAUPE2 = '#978C87', TAN = '#CDA788', CREAM = '#EEE4DA', INK = '#4A443E', LINE = '#E0D6CB', SOFT = '#6E645C';
 
+// Datos de membrete de la nutrióloga, mostrados en cada página del reporte.
+const NUTRI_NOMBRE = 'L.N. Natalia E. Flores Bonilla';
+const NUTRI_CEDULA = 'Céd. Prof. 12278012';
+const NUTRI_CORREO = 'natalia.db@live.com';
+const CORNER_BLOCK = `<div class="corner"><img src="${LOGO}"/><div class="signature">${NUTRI_NOMBRE}<br/>${NUTRI_CEDULA} · ${NUTRI_CORREO}</div></div>`;
+
 const GSHORT = ['Cereales', 'Cereales c/grasa', 'Leguminosas', 'Verdura', 'Fruta', 'P. animal MB', 'P. animal B', 'P. animal M', 'P. animal A', 'Leche desc.', 'Leche semi', 'Leche entera', 'Leche c/az.', 'Grasas', 'Grasas c/prot', 'Azúcares', 'Az. c/grasa', 'Libres'];
 
 const EQUIV_DB = {
@@ -149,7 +155,7 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
         </div>
       </div>
       ${chunk}
-      <img class="corner" src="${LOGO}"/>
+      ${CORNER_BLOCK}
     </div>`);
   }
 
@@ -164,7 +170,7 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
   const eqPage = `<div class="page">
     <div class="ptitle">EQUIVALENCIAS POR TIEMPO</div>
     <table class="eqt">${head}${rows}</table>
-    <img class="corner" src="${LOGO}"/>
+    ${CORNER_BLOCK}
   </div>`;
 
   // Página de referencia: base de equivalencias de alimentos (1 ración = 1 equivalente)
@@ -174,7 +180,7 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
   const refPage = `<div class="page">
     <div class="ptitle">EQUIVALENCIAS · 1 RACIÓN EQUIVALE A:</div>
     <div class="gwrap" style="grid-template-columns:repeat(${Object.keys(EQUIV_DB).length},1fr);">${refCols}</div>
-    <img class="corner" src="${LOGO}"/>
+    ${CORNER_BLOCK}
   </div>`;
 
   // páginas de lista del súper: una por opción (solo si se incluyen menús y hay listas)
@@ -188,7 +194,7 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
           <div class="ptitle">LISTA DEL SÚPER</div>
           <div class="lhead">OPCIÓN ${esc(String(L.opcion || ''))} · 5 DÍAS</div>
           <div class="lwrap">${cats}</div>
-          <img class="corner" src="${LOGO}"/>
+          ${CORNER_BLOCK}
         </div>`;
       })
     : [];
@@ -200,7 +206,9 @@ ${FONT_CSS}
 .page{width:297mm;height:210mm;padding:13mm 15mm;background:${CREAM};position:relative;page-break-after:always;overflow:hidden;}
 .page.last{page-break-after:auto;}
 .page:last-child{page-break-after:auto;}
-.corner{position:absolute;right:14mm;bottom:9mm;height:18px;}
+.corner{position:absolute;right:14mm;bottom:7mm;display:flex;align-items:center;gap:8px;}
+.corner img{height:18px;display:block;}
+.corner .signature{font-size:7.5px;line-height:1.35;color:${SOFT};text-align:right;white-space:nowrap;}
 .cover{display:flex;flex-direction:column;align-items:center;justify-content:center;}
 .cdate{position:absolute;top:34mm;font-size:15px;letter-spacing:6px;color:${SOFT};}
 .clogo{height:118px;} .cname{position:absolute;bottom:40mm;font-size:20px;letter-spacing:8px;color:${SOFT};}
@@ -240,7 +248,7 @@ ${FONT_CSS}
 .litem{display:flex;justify-content:space-between;gap:8px;font-size:11px;line-height:1.85;color:${INK};}
 .litem .qty{color:${SOFT};white-space:nowrap;}
 </style></head><body>
-<div class="page cover"><div class="cdate">${esc(fechaLarga())}</div><img class="clogo" src="${LOGO}"/><div class="cname">${esc(nom)}</div></div>
+<div class="page cover"><div class="cdate">${esc(fechaLarga())}</div><img class="clogo" src="${LOGO}"/><div class="cname">${esc(nom)}</div>${CORNER_BLOCK}</div>
 ${incluirMenus ? menuPages.join('') : ''}
 ${incluirEquivalencias ? (eqPage + refPage) : ''}
 ${listaPages.join('')}
