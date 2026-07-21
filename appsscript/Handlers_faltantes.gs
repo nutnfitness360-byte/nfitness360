@@ -195,6 +195,12 @@ function ajustarMenuIA_(body) {
       "3) Cada platillo debe seguir siendo APROPIADO para su tiempo de comida (desayuno con comida de desayuno, etc.) " +
       "y de la cocina mexicana.\n" +
       "4) Devuelve TODOS los tiempos y TODAS las opciones recibidas, en el MISMO ORDEN y en la misma cantidad.\n" +
+      "5) UNIDADES: estás en México. Usa SIEMPRE sistema métrico y medidas caseras mexicanas (g, ml, l, piezas, taza, " +
+      "cda, cdta). NUNCA uses onzas (oz), libras (lb) ni 'cups'. El queso panela va en gramos, jamás en onzas.\n" +
+      "6) COHERENCIA nombre↔preparación: tras el ajuste, cada 'nombre' y su 'prep' deben describir el mismo platillo. " +
+      "Todo ingrediente del nombre debe estar en la preparación con su cantidad, y la preparación no debe llevar " +
+      "ingredientes principales ausentes del nombre. Si cambias un ingrediente en la preparación, ajusta el nombre " +
+      "en consecuencia (y viceversa).\n" +
       "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
     var datos = { objetivo: body.objetivo || "", nota_de_seguimiento: nota, menu_actual: tiempos };
@@ -239,6 +245,74 @@ function saveEstudio_(body) {
       ok: true, action: "saveEstudio", patient: patient,
       fileId: file.getId(), link: file.getUrl(), filename: fname,
       folder: folder.getUrl(), compartido: compartido
+    });
+  } catch (e) {
+    return json_({ ok: false, error: e.message });
+  }
+}
+
+
+/* =====================================================================
+ *  5) analizarEstudio · lee un estudio de laboratorio (PDF o imagen) con IA
+ *     y devuelve una tabla de valores clasificados (alto / bajo / normal),
+ *     usando el rango de referencia impreso en el propio estudio.
+ *     No diagnostica: solo extrae y clasifica para revisión de la nutrióloga.
+ *  Acción: { action:"analizarEstudio", fileId?, link? }
+ * ===================================================================== */
+function analizarEstudio_(body) {
+  try {
+    var fileId = (body.fileId || "").toString();
+    // Si no llega fileId, intenta extraerlo del link de Drive.
+    if (!fileId && body.link) {
+      var m = String(body.link).match(/[-\w]{25,}/);
+      if (m) fileId = m[0];
+    }
+    if (!fileId) return json_({ ok: false, error: "No se recibió el identificador del estudio." });
+
+    var file = DriveApp.getFileById(fileId);
+    var blob = file.getBlob();
+    var mime = (blob.getContentType() || "application/pdf").toLowerCase();
+    var b64 = Utilities.base64Encode(blob.getBytes());
+
+    var bloque;
+    if (mime.indexOf("pdf") > -1) {
+      bloque = { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } };
+    } else if (mime.indexOf("image") > -1) {
+      var mt = mime;
+      if (mt.indexOf("jpg") > -1 || mt.indexOf("jpeg") > -1) mt = "image/jpeg";
+      else if (mt.indexOf("png") > -1) mt = "image/png";
+      else if (mt.indexOf("webp") > -1) mt = "image/webp";
+      else if (mt.indexOf("gif") > -1) mt = "image/gif";
+      bloque = { type: "image", source: { type: "base64", media_type: mt, data: b64 } };
+    } else {
+      return json_({ ok: false, error: "Formato no soportado. Usa PDF o imagen (JPG/PNG)." });
+    }
+
+    var sys = "Eres asistente clínico de una nutrióloga mexicana. Recibes un ESTUDIO DE LABORATORIO (PDF o imagen). " +
+      "Extrae CADA parámetro medido con su resultado, su unidad y su rango de referencia TAL COMO aparecen en el documento. " +
+      "Clasifica cada parámetro en 'estado': 'alto' (por encima del rango), 'bajo' (por debajo), 'normal' (dentro del rango) " +
+      "o 'sin_rango' (si el estudio no imprime rango para ese parámetro). Usa SIEMPRE el rango de referencia impreso en el " +
+      "propio estudio, no rangos de tu memoria. NO diagnostiques, NO interpretes clínicamente y NO propongas tratamiento: " +
+      "tu única tarea es leer, transcribir y clasificar los valores para que la nutrióloga los revise. " +
+      "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
+
+    var instruccion = "Analiza el estudio y responde SOLO con JSON con esta forma exacta: " +
+      "{\"fecha\":\"\",\"tipo\":\"\",\"valores\":[{\"parametro\":\"\",\"resultado\":\"\",\"unidad\":\"\",\"referencia\":\"\",\"estado\":\"alto\"}]}. " +
+      "'estado' solo puede ser: alto, bajo, normal o sin_rango. Incluye TODOS los parámetros que puedas leer con su valor. " +
+      "'fecha' es la fecha del estudio si aparece (formato YYYY-MM-DD si es posible). " +
+      "'tipo' es el tipo de estudio (p. ej. 'Química sanguínea', 'Biometría hemática', 'Perfil tiroideo'). " +
+      "Si el documento no es un estudio de laboratorio legible, devuelve valores como arreglo vacío.";
+
+    var p = iaJSON_(sys, instruccion, bloque);
+    var valores = (p && p.valores) ? p.valores : [];
+    var fuera = valores.filter(function (x) { return x && (x.estado === "alto" || x.estado === "bajo"); });
+    var dentro = valores.filter(function (x) { return x && x.estado === "normal"; }).length;
+
+    return json_({
+      ok: true, action: "analizarEstudio",
+      fecha: (p && p.fecha) || "", tipo: (p && p.tipo) || "",
+      valores: valores, fueraDeRango: fuera, dentroDeRango: dentro,
+      generadoEn: new Date().toISOString()
     });
   } catch (e) {
     return json_({ ok: false, error: e.message });
