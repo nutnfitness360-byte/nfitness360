@@ -225,6 +225,10 @@ function doPost(e) {
       return saveEstudio_(body);
     }
 
+    if (action === "analizarEstudio") {
+      return analizarEstudio_(body);
+    }
+
     if (action === "crearCheckoutStripe") {
       return crearCheckoutStripe_(body);
     }
@@ -947,6 +951,15 @@ function generarMenusIA_(body) {
     "DA PRIORIDAD a proponer platillos de esos candidatos cuando embonen con los equivalentes del tiempo, ADAPTANDO las " +
     "cantidades: multiplica la porción por equivalente de cada componente por el número de equivalentes de ese grupo en el tiempo. " +
     "Puedes complementar con platillos propios cuando ayude a la variedad o a cuadrar mejor los equivalentes/macros. " +
+    "UNIDADES: estás en México. Expresa SIEMPRE las cantidades en sistema métrico y medidas caseras mexicanas: " +
+    "gramos (g), mililitros (ml), litros (l), piezas, taza, cucharada (cda) y cucharadita (cdta). " +
+    "NUNCA uses onzas (oz), libras (lb) ni 'cups' del sistema estadounidense. Ejemplo: el queso panela va en gramos " +
+    "('40 g de queso panela'), jamás en onzas. " +
+    "COHERENCIA nombre↔preparación: el 'nombre' y la 'prep' deben describir EXACTAMENTE el mismo platillo. " +
+    "TODO ingrediente que aparezca en el 'nombre' debe aparecer también en la 'prep' con su cantidad, y la 'prep' " +
+    "no debe incluir ingredientes principales que el 'nombre' no mencione. Ejemplo: si el nombre dice 'con yogurt', " +
+    "la preparación DEBE indicar cuánto yogurt y cómo se usa; si la preparación no lleva yogurt, entonces el nombre " +
+    "tampoco debe decir 'con yogurt'. No dejes ingredientes anunciados en el nombre fuera de la preparación. " +
     "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
   var datos = {
@@ -960,7 +973,9 @@ function generarMenusIA_(body) {
 
   var instruccion = "Genera exactamente " + nOp + " opciones por cada tiempo, en el MISMO ORDEN recibido. " +
     "Cada opción debe tener 'nombre' (nombre del platillo) y 'prep' (preparación breve de 1-2 frases con cantidades " +
-    "acordes a los equivalentes). Responde SOLO con JSON con esta forma exacta: " +
+    "acordes a los equivalentes). El 'nombre' y la 'prep' deben ser coherentes: cada ingrediente nombrado en el título " +
+    "debe aparecer en la preparación con su cantidad, y la preparación no debe anunciar ingredientes ausentes del título. " +
+    "Responde SOLO con JSON con esta forma exacta: " +
     "{\"tiempos\":[{\"opciones\":[{\"nombre\":\"\",\"prep\":\"\"}]}]}. " +
     "Debe haber un elemento en 'tiempos' por cada tiempo recibido y en el mismo orden. " +
     "Si un tiempo trae una lista 'evitar', NO repitas esos platillos ni variantes muy similares (misma proteína + mismo cereal + misma preparación); propón opciones claramente DISTINTAS entre sí y distintas a las de 'evitar', variando la proteína, el cereal, la verdura o la técnica de preparación.\n\nDatos:\n" + JSON.stringify(datos);
@@ -1019,7 +1034,8 @@ function listaSuperIA_(body) {
     "genéricos y comprables (p. ej. 'Pechuga de pollo', 'Tortilla de maíz', 'Avena en hojuelas'), nunca nombres de " +
     "platillos. Agrupa por categoría de pasillo, usando exactamente estos nombres cuando apliquen: 'Frutas y verduras', " +
     "'Carnes, pollo y pescado', 'Lácteos y huevo', 'Cereales, granos y leguminosas', 'Abarrotes y aceites', 'Otros'. " +
-    "Da cantidades aproximadas y prácticas para el súper (kg, g, piezas, paquetes, litros). " +
+    "Da cantidades aproximadas y prácticas para el súper en sistema métrico mexicano (kg, g, piezas, paquetes, litros, ml). " +
+    "NUNCA uses onzas (oz), libras (lb) ni 'cups' del sistema estadounidense. " +
     "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
   var datos = {
