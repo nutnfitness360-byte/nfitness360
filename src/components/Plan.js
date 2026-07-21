@@ -91,7 +91,11 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
     sexo: pdata.sexo || 'Femenino', grasa: pdata.grasa || '',
   });
   const [eq, setEq] = useState(() => (Array.isArray(saved.eq) && saved.eq.length === GRUPOS.length) ? saved.eq.map(String) : GRUPOS.map(() => '0'));
-  const [meta, setMeta] = useState(() => ({ ...(saved.meta || { pP: 30, pL: 20, pC: 50, factor: 1.55 }), energia: '' }));
+  const [meta, setMeta] = useState(() => ({
+    ...(saved.meta || { pP: 30, pL: 20, pC: 50, factor: 1.55 }),
+    // Al reabrir un plan ya guardado se muestra su energía meta; en un cálculo nuevo arranca vacía.
+    energia: (saved.meta && num(saved.meta.energia) > 0) ? String(saved.meta.energia) : '',
+  }));
   const [status, setStatus] = useState(patient.plan ? 'guardado' : 'nuevo');
   const [verHistoria, setVerHistoria] = useState(false);
   const [exitModal, setExitModal] = useState(null); // { proceed } | null
@@ -115,7 +119,7 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   const sugerido = isFin(mifflin) ? mifflin * factor : NaN;
 
   useEffect(() => {
-    // La energía meta (B) arranca vacía en cada cálculo: no se hereda del plan anterior ni se autollena.
+    // La energía meta (B) se hereda solo al reabrir un plan guardado; en un cálculo nuevo arranca vacía.
     const e0 = num(meta.energia);
     // Plan nuevo (sin equivalentes guardados): aplicar la plantilla base solo si ya hay energía.
     const teniaEq = Array.isArray(saved.eq) && saved.eq.some(v => num(v) > 0);
