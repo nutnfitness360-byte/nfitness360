@@ -737,9 +737,15 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     const apegoData = bitacoraToApego(sel.bitacora);
     const ultApego = apegoData.length ? apegoData[apegoData.length - 1].apego : null;
     if (sub === 'plan') {
+      // La talla/edad/sexo alimentan el cálculo. Viven en el campo de nivel superior,
+      // pero para pacientes importados quedaron solo en la historia clínica: se toma de ahí como respaldo.
+      const hd = (sel.historia && sel.historia.datos) || {};
+      const tallaFb = (sel.estatura === 0 || sel.estatura) ? sel.estatura : (hd.talla || '');
+      const edadFb = (sel.edad === 0 || sel.edad) ? sel.edad : (hd.edad || '');
+      const sexoFb = sel.sexo || hd.sexo || 'Femenino';
       const pdata = inbody
-        ? { peso: inbody.peso || (m ? m.peso : ''), talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: inbody.grasa || (m ? m.grasa : ''), tmb: inbody.tmb || '' }
-        : { peso: m ? m.peso : '', talla: sel.estatura || '', edad: sel.edad || '', sexo: sel.sexo || 'Femenino', grasa: m ? m.grasa : '', tmb: (m && m.tmb) || '' };
+        ? { peso: inbody.peso || (m ? m.peso : ''), talla: tallaFb, edad: edadFb, sexo: sexoFb, grasa: inbody.grasa || (m ? m.grasa : ''), tmb: inbody.tmb || '' }
+        : { peso: m ? m.peso : '', talla: tallaFb, edad: edadFb, sexo: sexoFb, grasa: m ? m.grasa : '', tmb: (m && m.tmb) || '' };
       return <Plan patient={sel} pdata={pdata} onBack={volver} onGuardChange={onRegisterExitGuard} />;
     }
     if (sub === 'menus') {
