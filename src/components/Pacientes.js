@@ -109,6 +109,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [inbody, setInbody] = useState(null);
   const [recoForm, setRecoForm] = useState({ estudios: '', suplementos: '', ejercicio: '', hidratacion: '', generales: '' });
   const [recoAnalisis, setRecoAnalisis] = useState(null);
+  const [recoSup, setRecoSup] = useState([{ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '' }]);
   const [recoEditIdx, setRecoEditIdx] = useState(null);
   const [recoChips, setRecoChips] = useState({});
   const [verHistoria, setVerHistoria] = useState(false);
@@ -158,6 +159,9 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     const b = p.recomendacionBorrador || null;
     setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = (b && b[k]) || ''; return o; }, {}));
     setRecoAnalisis((b && b.analisis) || null);
+    setRecoSup((b && b.suplementacionTabla && Array.isArray(b.suplementacionTabla.items) && b.suplementacionTabla.items.length)
+      ? b.suplementacionTabla.items.map(x => ({ nombre: x.nombre || '', marca: x.marca || '', dosis: x.dosis || '', frecuencia: x.frecuencia || '', horario: x.horario || '' }))
+      : [{ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '' }]);
     setRecoEditIdx(null);
     setVerHistoria(false);
   }, [selId, pacientes]);
@@ -403,6 +407,14 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     });
   };
 
+  // --- Tabla de suplementos (editable) para la recomendación ---
+  const EMPTY_SUP = () => ({ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '' });
+  const supRowVacia = (r) => !(r && (r.nombre || r.marca || r.dosis || r.frecuencia || r.horario));
+  const setSupCampo = (i, campo, val) => setRecoSup(rows => rows.map((r, k) => k === i ? { ...r, [campo]: val } : r));
+  const addSupFila = (nombre = '') => setRecoSup(rows => [...rows, { ...EMPTY_SUP(), nombre }]);
+  const removeSupFila = (i) => setRecoSup(rows => { const nx = rows.filter((_, k) => k !== i); return nx.length ? nx : [EMPTY_SUP()]; });
+  const supInputStyle = { width: '100%', padding: '5px 7px', fontSize: 12, border: '0.5px solid var(--border)', borderRadius: 6, background: '#fff', color: 'var(--dark)', fontFamily: 'inherit', boxSizing: 'border-box' };
+
   // "Agregar": guarda un enlace rápido nuevo (compartido) y lo deja listo para usarse.
   const agregarChip = async (key) => {
     const txt = (window.prompt('Escribe el enlace rápido que quieres guardar (quedará disponible para futuras recomendaciones):') || '').trim();
@@ -425,6 +437,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     if (!sel) return;
     const b = RECO_KEYS.reduce((o, k) => { o[k] = (recoForm[k] || ''); return o; }, {});
     if (recoAnalisis) b.analisis = recoAnalisis;
+    const supB = recoSup.filter(r => !supRowVacia(r));
+    if (supB.length) b.suplementacionTabla = { items: supB };
     try {
       await updateDoc(doc(db, 'pacientes', sel.id), { recomendacionBorrador: b });
       setRecoPdfMsg('Borrador guardado ✓');
@@ -435,7 +449,10 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     const r = {};
     RECO_KEYS.forEach(k => { r[k] = (recoForm[k] || '').trim(); });
     if (recoAnalisis) r.analisis = recoAnalisis;
-    if (!RECO_KEYS.some(k => r[k]) && !recoAnalisis) { setErr('Escribe al menos una recomendación en alguna sección (o adjunta un análisis).'); return; }
+    // Tabla de suplementos que la nutrióloga llenó a mano para esta recomendación (viaja con ella y sale en el PDF).
+    const supItems = recoSup.filter(x => !supRowVacia(x));
+    if (supItems.length) r.suplementacionTabla = { items: supItems };
+    if (!RECO_KEYS.some(k => r[k]) && !recoAnalisis && !supItems.length) { setErr('Escribe al menos una recomendación en alguna sección (o llena la tabla de suplementos).'); return; }
     let arr;
     if (recoEditIdx != null && (sel.recomendaciones || [])[recoEditIdx]) {
       // Editar: reemplaza esa recomendación, conservando su fecha original.
@@ -449,6 +466,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr, recomendacionBorrador: {} });
       setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = ''; return o; }, {}));
       setRecoAnalisis(null);
+      setRecoSup([EMPTY_SUP()]);
       setRecoEditIdx(null);
       setErr('');
     } catch (e) { setErr('No se pudo guardar la recomendación: ' + e.message); }
@@ -459,6 +477,9 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     if (!r) return;
     setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = r[k] || ''; return o; }, {}));
     setRecoAnalisis(r.analisis || null);
+    setRecoSup((r.suplementacionTabla && Array.isArray(r.suplementacionTabla.items) && r.suplementacionTabla.items.length)
+      ? r.suplementacionTabla.items.map(x => ({ nombre: x.nombre || '', marca: x.marca || '', dosis: x.dosis || '', frecuencia: x.frecuencia || '', horario: x.horario || '' }))
+      : [EMPTY_SUP()]);
     setRecoEditIdx(idx);
     setErr('');
     setTimeout(() => { try { recoFormRef.current && recoFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 50);
@@ -467,6 +488,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const cancelarEdicionReco = () => {
     setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = ''; return o; }, {}));
     setRecoAnalisis(null);
+    setRecoSup([EMPTY_SUP()]);
     setRecoEditIdx(null);
     setErr('');
   };
@@ -498,7 +520,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales || reco.analisis)) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
     setRecoPdfMsg('Generando PDF…');
     try {
-      const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now(), suplementacion: sel.historia?.suplementacion });
+      const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now(), suplementacion: reco.suplementacionTabla || null });
       const fechaImp = hoyISO(); // fecha de impresión (AAAA-MM-DD)
       const filename = `Recomendacion_${(sel.nombre || 'paciente').replace(/[^\w-]+/g, '_')}_${fechaImp}.pdf`;
       const res = await fetch(url, {
@@ -1285,20 +1307,53 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                 {RECO_SECCIONES.map(sec => (
                   <div key={sec.key} style={S.recoSeccion}>
                     <div style={S.recoSeccionTitulo}>{sec.titulo}</div>
+                    {sec.key === 'suplementos' && (
+                      <div style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--mint)', border: '0.5px solid var(--border)', borderRadius: 10 }}>
+                        <div style={{ fontSize: 11, color: 'var(--stone)', fontWeight: 600, marginBottom: 8 }}>Tabla de suplementos de esta recomendación · se imprime en el PDF</div>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 560 }}>
+                            <thead>
+                              <tr style={{ textAlign: 'left', color: 'var(--stone)' }}>
+                                <th style={{ padding: '2px 4px', fontWeight: 600 }}>Suplemento</th>
+                                <th style={{ padding: '2px 4px', fontWeight: 600 }}>Marca</th>
+                                <th style={{ padding: '2px 4px', fontWeight: 600 }}>Dosis</th>
+                                <th style={{ padding: '2px 4px', fontWeight: 600 }}>Frecuencia</th>
+                                <th style={{ padding: '2px 4px', fontWeight: 600 }}>Horario</th>
+                                <th style={{ width: 26 }}></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {recoSup.map((row, i) => (
+                                <tr key={i}>
+                                  <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.nombre} placeholder="Ej. Vitamina D" onChange={e => setSupCampo(i, 'nombre', e.target.value)} /></td>
+                                  <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.marca} onChange={e => setSupCampo(i, 'marca', e.target.value)} /></td>
+                                  <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.dosis} placeholder="Ej. 2000 UI" onChange={e => setSupCampo(i, 'dosis', e.target.value)} /></td>
+                                  <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.frecuencia} placeholder="Ej. Diario" onChange={e => setSupCampo(i, 'frecuencia', e.target.value)} /></td>
+                                  <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.horario} placeholder="Ej. Mañana" onChange={e => setSupCampo(i, 'horario', e.target.value)} /></td>
+                                  <td style={{ padding: '3px 4px', textAlign: 'center' }}><button type="button" style={S.rm} title="Quitar" onClick={() => removeSupFila(i)}>×</button></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <button type="button" style={{ ...S.chipAdd, marginTop: 8 }} onClick={() => addSupFila()}>＋ Agregar suplemento</button>
+                      </div>
+                    )}
                     <div style={S.chipRow}>
                       {sec.items.map(it => {
                         const label = typeof it === 'string' ? it : it.l;
                         const ins = typeof it === 'string' ? it : (it.ins || it.l);
-                        return <button key={'p-' + label} type="button" style={S.chip} onClick={() => addChipTo(sec.key, ins)}>+ {label}</button>;
+                        const onClick = sec.key === 'suplementos' ? (() => addSupFila(label)) : (() => addChipTo(sec.key, ins));
+                        return <button key={'p-' + label} type="button" style={S.chip} onClick={onClick}>+ {label}</button>;
                       })}
                       {(recoChips[sec.key] || []).map(c => (
-                        <button key={'c-' + c} type="button" style={S.chip} onClick={() => addChipTo(sec.key, c)}>+ {c}</button>
+                        <button key={'c-' + c} type="button" style={S.chip} onClick={sec.key === 'suplementos' ? (() => addSupFila(c)) : (() => addChipTo(sec.key, c))}>+ {c}</button>
                       ))}
                       <button type="button" style={S.chipAdd} onClick={() => agregarChip(sec.key)} title="Guardar un enlace rápido nuevo para futuras recomendaciones">＋ Agregar</button>
                     </div>
                     <textarea style={S.recoArea} rows={3} value={recoForm[sec.key]}
                       onChange={e => setRecoForm(prev => ({ ...prev, [sec.key]: e.target.value }))}
-                      placeholder={`Recomendaciones de ${sec.titulo.toLowerCase()}…`} />
+                      placeholder={sec.key === 'suplementos' ? 'Notas adicionales de suplementos (opcional)…' : `Recomendaciones de ${sec.titulo.toLowerCase()}…`} />
                   </div>
                 ))}
                 {recoAnalisis && (
