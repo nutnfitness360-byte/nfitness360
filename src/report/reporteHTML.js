@@ -10,7 +10,7 @@ const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAEhCAYAAADs24qx
 const TAUPE = '#8E837B', TAUPE2 = '#978C87', TAN = '#CDA788', CREAM = '#EEE4DA', INK = '#4A443E', LINE = '#E0D6CB', SOFT = '#6E645C';
 
 // Datos de membrete de la nutrióloga, mostrados en cada página del reporte.
-const NUTRI_NOMBRE = 'L.N. Natalia E. Flores Bonilla';
+const NUTRI_NOMBRE = 'MSc. Natalia E. Flores Bonilla';
 const NUTRI_CEDULA = 'Céd. Prof. 12278012';
 const NUTRI_CORREO = 'natalia.db@live.com';
 const CORNER_BLOCK = `<div class="corner"><img src="${LOGO}"/><div class="signature">${NUTRI_NOMBRE}<br/>${NUTRI_CEDULA} · ${NUTRI_CORREO}</div></div>`;
