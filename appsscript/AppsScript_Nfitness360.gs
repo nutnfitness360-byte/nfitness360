@@ -955,6 +955,10 @@ function generarMenusIA_(body) {
     "gramos (g), mililitros (ml), litros (l), piezas, taza, cucharada (cda) y cucharadita (cdta). " +
     "NUNCA uses onzas (oz), libras (lb) ni 'cups' del sistema estadounidense. Ejemplo: el queso panela va en gramos " +
     "('40 g de queso panela'), jamás en onzas. " +
+    "INDICACIÓN DE LA NUTRIÓLOGA: cada tiempo puede traer 'indicacion_de_la_nutriologa'. Trátala como una GUÍA " +
+    "(estilo, ingredientes deseados o restricciones) que debes respetar, NUNCA como el texto del platillo a copiar. " +
+    "No la transcribas ni la repitas literalmente en el 'nombre'. Debes proponer un platillo CONCRETO Y DISTINTO que " +
+    "cumpla esa guía; si la indicación menciona un platillo, propón una VARIANTE diferente de esa idea, no el mismo texto. " +
     "COHERENCIA nombre↔preparación: el 'nombre' y la 'prep' deben describir EXACTAMENTE el mismo platillo. " +
     "TODO ingrediente que aparezca en el 'nombre' debe aparecer también en la 'prep' con su cantidad, y la 'prep' " +
     "no debe incluir ingredientes principales que el 'nombre' no mencione. Ejemplo: si el nombre dice 'con yogurt', " +
@@ -967,7 +971,7 @@ function generarMenusIA_(body) {
     totales_del_dia: body.totales || {},
     n_opciones_por_tiempo: nOp,
     tiempos: tiempos.map(function (t) {
-      return { nombre: t.nombre, hora: t.hora, equivalentes: t.equivalentes, objetivo_macros: t.objetivoMacros, evitar: t.evitar || [], candidatos_recetario: recetarioMuestra_(tiempoCategoria_(t.nombre), 22) };
+      return { nombre: t.nombre, hora: t.hora, indicacion_de_la_nutriologa: t.indicacion || "", equivalentes: t.equivalentes, objetivo_macros: t.objetivoMacros, evitar: t.evitar || [], candidatos_recetario: recetarioMuestra_(tiempoCategoria_(t.nombre), 22) };
     })
   };
 
@@ -978,7 +982,13 @@ function generarMenusIA_(body) {
     "Responde SOLO con JSON con esta forma exacta: " +
     "{\"tiempos\":[{\"opciones\":[{\"nombre\":\"\",\"prep\":\"\"}]}]}. " +
     "Debe haber un elemento en 'tiempos' por cada tiempo recibido y en el mismo orden. " +
-    "Si un tiempo trae una lista 'evitar', NO repitas esos platillos ni variantes muy similares (misma proteína + mismo cereal + misma preparación); propón opciones claramente DISTINTAS entre sí y distintas a las de 'evitar', variando la proteína, el cereal, la verdura o la técnica de preparación.\n\nDatos:\n" + JSON.stringify(datos);
+    "Si un tiempo trae una lista 'evitar', NO repitas esos platillos ni variantes muy similares (misma proteína + mismo cereal + misma preparación); propón opciones claramente DISTINTAS entre sí y distintas a las de 'evitar', variando la proteína, el cereal, la verdura o la técnica de preparación. " +
+    (body.regenerar ? ("MODO REGENERACIÓN: la nutrióloga pidió CAMBIAR una opción que no le convenció. " +
+      "Es OBLIGATORIO que el platillo que devuelvas sea claramente DIFERENTE a todos los de 'evitar': " +
+      "distinto nombre y distinta preparación, cambiando al menos la proteína principal o la técnica de cocción. " +
+      "Devolver un platillo igual o casi igual a alguno de 'evitar' es un ERROR. Si el tiempo trae " +
+      "'indicacion_de_la_nutriologa', respétala pero resuélvela con una propuesta NUEVA. ") : "") +
+    "\n\nDatos:\n" + JSON.stringify(datos);
 
   var payload = {
     model: IA_MODEL,
