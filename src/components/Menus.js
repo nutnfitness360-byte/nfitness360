@@ -3,6 +3,7 @@ import { db } from '../firebase/config';
 import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { buildReportHTML, generarPorcionesTexto, esPorciones } from '../report/reporteHTML';
 import HistoriaClinica from './HistoriaClinica';
+import NotasSeguimiento from './NotasSeguimiento';
 
 /* ============================================================
    NFITNESS 360 — Menús por tiempo de comida
@@ -157,6 +158,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const [rep, setRep] = useState('');
   const [iaBusy, setIaBusy] = useState(false);
   const [verHistoria, setVerHistoria] = useState(false);
+  const [verNotas, setVerNotas] = useState(false);
   const [opBusy, setOpBusy] = useState(''); // "idx:oi" de la opción que se está generando
   const [dragOver, setDragOver] = useState(null); // idx del tiempo sobre el que se arrastra una imagen
   const [subiendoFoto, setSubiendoFoto] = useState(null); // idx del tiempo cuya imagen se está subiendo
@@ -711,6 +713,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         {patient.historia && (
           <button style={S.toolBtn} onClick={() => setVerHistoria(true)} title="Consultar la historia clínica sin salir">Ver historia clínica</button>
         )}
+        <button style={S.toolBtn} onClick={() => setVerNotas(true)} title="Consultar las notas de seguimiento sin salir">Ver notas de seguimiento</button>
         <button style={S.toolBtn} onClick={() => setShowCfg(true)}>Reconfigurar</button>
         <button style={S.toolBtn} onClick={redistribuir}>Redistribuir equivalentes</button>
         <button style={{ ...S.toolBtn, ...S.iaBtn }} onClick={generarIA} disabled={iaBusy}>{iaBusy ? 'Generando…' : 'Generar todos con IA ✦'}</button>
@@ -718,6 +721,10 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         <button style={S.toolBtn} onClick={() => { setSegNota(ultimaNota ? (ultimaNota.texto || '') : ''); setShowSeg(true); }} disabled={iaBusy || segBusy}>Aplicar cambios de seguimiento ✦</button>
       </div>
       <div style={S.iaNote}>Puedes generar todos los menús de golpe, o regenerar <b>una sola opción</b> con el botón <b>IA ✦</b> de cada tarjeta — así arreglas las que no sirven sin tocar las que ya quedaron bien. La IA solo sugiere: <b>revisa y edita</b> antes de guardar.</div>
+
+      {verNotas && (
+        <NotasSeguimiento notas={patient.bitacora} nombre={patient.nombre} onClose={() => setVerNotas(false)} closeBtnStyle={S.toolBtn} />
+      )}
 
       {verHistoria && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
