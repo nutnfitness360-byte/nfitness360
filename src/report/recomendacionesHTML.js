@@ -6,13 +6,13 @@ const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAEhCAYAAADs24qx
 const esc = (s) => String(s == null ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const fmtFechaHora = (ms) => {
+// En el PDF del paciente se imprime solo la fecha; la hora se conserva en el registro
+// interno (r.fecha) para mantener el orden, pero no aporta valor en el reporte.
+const fmtFechaReco = (ms) => {
   try {
     const d = new Date(ms);
     if (isNaN(d.getTime())) return "";
-    const f = d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
-    const h = d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
-    return f + " \u00b7 " + h;
+    return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
   } catch (_) { return ""; }
 };
 
@@ -83,7 +83,7 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suple
     const cuerpo = (bloques || "") + buildAnalisisBlock(r.analisis);
     return `
       <div class="reco">
-        <div class="rdate">${esc(fmtFechaHora(r.fecha))}</div>
+        <div class="rdate">${esc(fmtFechaReco(r.fecha))}</div>
         ${cuerpo || `<div class="rtext">\u2014</div>`}
       </div>`;
   }).join("");
