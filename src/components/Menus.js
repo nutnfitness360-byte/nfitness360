@@ -176,6 +176,25 @@ function NotasSeguimiento({ notas, nombre, onClose, closeBtnStyle }) {
   );
 }
 
+
+/* La IA a veces devuelve los títulos con Cada Palabra En Mayúscula.
+   Los normalizamos a "solo la primera palabra con mayúscula".
+   Las siglas en mayúsculas (p. ej. BCAA) se respetan. */
+const tituloOracion = (txt) => {
+  const t = (txt || '').toString().trim();
+  if (!t) return '';
+  // Si el título viene TODO en mayúsculas, no hay siglas que respetar: se pasa completo a minúsculas.
+  const todoMayus = t === t.toLocaleUpperCase('es-MX');
+  let primera = true;
+  return t.split(/(\s+)/).map((w) => {
+    if (!w || /^\s+$/.test(w)) return w;
+    if (!todoMayus && /^[A-ZÁÉÍÓÚÑÜ0-9]{2,}$/.test(w)) return w;   // siglas: BCAA, EGO
+    const min = w.toLocaleLowerCase('es-MX');
+    if (primera) { primera = false; return min.charAt(0).toLocaleUpperCase('es-MX') + min.slice(1); }
+    return min;
+  }).join('');
+};
+
 export default function Menus({ patient, onBack, initialMenus = null, onGuardChange }) {
   const plan = patient.plan || {};
   const ultimaNota = (() => {
@@ -368,7 +387,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           usados[ridx] = true;
           const r = aiList[ridx];
           if (!r || !Array.isArray(r.opciones)) return;
-          const ops = r.opciones.slice(0, nOpciones).map(o => ({ nombre: (o && o.nombre) || '', prep: (o && o.prep) || '' }));
+          const ops = r.opciones.slice(0, nOpciones).map(o => ({ nombre: tituloOracion(o && o.nombre), prep: (o && o.prep) || '' }));
           while (ops.length < nOpciones) ops.push(nuevaOpcion());
           next[origIdx] = { ...next[origIdx], opciones: ops };
         });
@@ -409,7 +428,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           if (!r || !Array.isArray(r.opciones)) return;
           const orig = next[origIdx];
           const nOps = (orig.opciones || []).length || 1;
-          const ops = r.opciones.slice(0, nOps).map(o => ({ nombre: (o && o.nombre) || '', prep: (o && o.prep) || '' }));
+          const ops = r.opciones.slice(0, nOps).map(o => ({ nombre: tituloOracion(o && o.nombre), prep: (o && o.prep) || '' }));
           while (ops.length < nOps) ops.push(nuevaOpcion());
           next[origIdx] = { ...orig, opciones: ops };
         });
@@ -447,7 +466,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       const nueva = data && data.ok && Array.isArray(data.tiempos) && data.tiempos[0] && Array.isArray(data.tiempos[0].opciones) ? data.tiempos[0].opciones[0] : null;
       if (!nueva) throw new Error((data && data.error) || 'No se recibió la opción.');
-      setOpcion(idx, oi, { nombre: nueva.nombre || '', prep: nueva.prep || '' });
+      setOpcion(idx, oi, { nombre: tituloOracion(nueva.nombre), prep: nueva.prep || '' });
       setRep('Opción ' + (oi + 1) + ' de ' + t.nombre + ' regenerada. Revísala antes de guardar.');
     } catch (e) {
       setRep('No se pudo generar la opción: ' + e.message);
