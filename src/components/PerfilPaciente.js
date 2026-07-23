@@ -87,6 +87,12 @@ export default function PerfilPaciente({ onBack }) {
       <div style={{textAlign:'center',fontSize:'11px',color:'var(--stone)',marginTop:'1rem',fontFamily:'var(--font)'}}>
         Toca la foto de perfil para cambiarla
       </div>
+
+      <div style={{display:'flex',alignItems:'center',gap:'12px',marginTop:'1.5rem'}}>
+        <button onClick={onBack} style={{background:'none',border:'none',cursor:'pointer',color:'var(--stone)',fontFamily:'var(--font)',fontSize:'12px',display:'flex',alignItems:'center',gap:'4px'}}>
+          ← Regresar
+        </button>
+      </div>
     </div>
   );
 }
