@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
 import HistoriaClinica from './HistoriaClinica';
+import NotasSeguimiento from './NotasSeguimiento';
 
 /* ============================================================
    NFITNESS 360 — Cálculo del plan nutricional (SMAE)
@@ -98,6 +99,7 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   }));
   const [status, setStatus] = useState(patient.plan ? 'guardado' : 'nuevo');
   const [verHistoria, setVerHistoria] = useState(false);
+  const [verNotas, setVerNotas] = useState(false);
   const [exitModal, setExitModal] = useState(null); // { proceed } | null
 
   const setP = (k, v) => { setPp(p => ({ ...p, [k]: v })); setStatus('nuevo'); };
@@ -214,7 +216,14 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
             Ver historia clínica
           </button>
         )}
+        <button style={styles.verHBtn} onClick={() => setVerNotas(true)} title="Consultar las notas de seguimiento sin salir del cálculo">
+          Ver notas de seguimiento
+        </button>
       </header>
+
+      {verNotas && (
+        <NotasSeguimiento notas={patient.bitacora} nombre={patient.nombre} onClose={() => setVerNotas(false)} closeBtnStyle={styles.verHBtn} />
+      )}
 
       {verHistoria && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
