@@ -777,6 +777,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       <div>
         {err && <div style={S.err}>{err}</div>}
 
+        <button style={S.back} onClick={volver}>← Atrás</button>
+
         <div className="card">
           <div style={S.headRow}>
             <div className="pac-avatar">{initials(sel.nombre)}</div>
