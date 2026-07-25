@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { buildDeportivoHTML } from '../report/deportivoHTML';
 
 /* ============================================================
    NFITNESS 360 — Plan deportivo (alto rendimiento)
@@ -62,6 +63,8 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
   const [status, setStatus] = useState('cargando'); // cargando | listo | guardando | guardado | error
   const [msg, setMsg] = useState('');
   const [dragIdx, setDragIdx] = useState(''); // "pIdx:eIdx" de la estación con drag encima
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfLink, setPdfLink] = useState('');
   const cargadoRef = useRef(false);
   const dirtyRef = useRef(false);
 
@@ -171,6 +174,43 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
       setStatus('error');
       // El error más común aquí sería exceder el tamaño del documento por muchas imágenes.
       setMsg('No se pudo guardar: ' + (e && e.message ? e.message : 'error') + ' — si tienes muchas imágenes, quita algunas o usa fotos más ligeras.');
+    }
+  };
+
+  const generarPDF = async () => {
+    if (!paginas.length) { setMsg('Agrega al menos una página antes de generar el PDF.'); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setMsg('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    setPdfBusy(true); setPdfLink(''); setMsg('Guardando y generando el PDF…');
+    try {
+      // Guarda primero para no perder cambios.
+      await setDoc(doc(db, 'deportivo', patient.id), { competencia: comp, paginas, actualizado: Date.now() });
+      dirtyRef.current = false;
+
+      const html = buildDeportivoHTML({ comp, paginas });
+      const fechaTxt = new Date().toLocaleDateString('es-MX').replace(/\//g, '-');
+      const filename = 'Plan deportivo ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt + '.pdf';
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveDeportivo', patient: patient.nombre, correo: (patient.correo || ''), filename, html }),
+        redirect: 'follow',
+      });
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      if (data.ok && data.link) {
+        setPdfLink(data.link);
+        setMsg('PDF generado y guardado en Drive.');
+        // Registra el enlace en el paciente para tenerlo a la mano.
+        try {
+          const nuevo = { nombre: filename.replace(/\.pdf$/i, ''), fecha: new Date().toISOString().slice(0, 10), link: data.link };
+          await updateDoc(doc(db, 'pacientes', patient.id), { planesDeportivos: [...(patient.planesDeportivos || []), nuevo] });
+        } catch (_) { /* secundario */ }
+      } else {
+        setMsg('No se pudo generar el PDF: ' + (data.error || 'error del servidor.'));
+      }
+    } catch (e) {
+      setMsg('No se pudo generar el PDF: ' + (e && e.message ? e.message : 'error'));
+    } finally {
+      setPdfBusy(false);
     }
   };
 
@@ -378,6 +418,10 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
         <button style={S.saveBtn} onClick={guardar} disabled={status === 'guardando'}>
           {status === 'guardando' ? 'Guardando…' : 'Guardar plan deportivo'}
         </button>
+        <button style={S.pdfBtn} onClick={generarPDF} disabled={pdfBusy || status === 'guardando'}>
+          {pdfBusy ? 'Generando…' : 'Generar PDF'}
+        </button>
+        {pdfLink && <a href={pdfLink} target="_blank" rel="noreferrer" style={S.pdfLink}>Abrir PDF ↗</a>}
         {msg && <span style={{ fontSize: 12.5, color: status === 'error' ? 'var(--danger)' : 'var(--stone)' }}>{msg}</span>}
       </div>
 
@@ -423,6 +467,8 @@ const S = {
   addChip: { background: '#fff', border: '1px dashed var(--gold)', color: 'var(--gold)', borderRadius: 999, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', marginTop: 2, marginBottom: 6 },
   addBtn: { background: '#fff', border: '1px dashed var(--gold)', color: 'var(--gold)', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' },
   saveBtn: { background: 'var(--gold)', color: '#fff', border: 'none', padding: '11px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' },
+  pdfBtn: { background: '#fff', color: 'var(--gold)', border: '1px solid var(--gold)', padding: '11px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' },
+  pdfLink: { fontSize: 13, fontWeight: 700, color: 'var(--gold)', textDecoration: 'none' },
   iconBtn: { background: '#fff', border: '0.5px solid var(--border)', color: 'var(--dark)', borderRadius: 7, width: 28, height: 28, fontSize: 13, cursor: 'pointer', lineHeight: 1 },
   rm: { background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: '0 4px' },
   rmLine: { background: 'transparent', border: 'none', color: 'var(--danger)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', padding: 0, alignSelf: 'center' },
