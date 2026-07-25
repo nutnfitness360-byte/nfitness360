@@ -4,6 +4,7 @@ import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, quer
 import Plan from './Plan';
 import Menus from './Menus';
 import HistoriaClinica from './HistoriaClinica';
+import PlanDeportivo from './PlanDeportivo';
 import InBodyModal from './InBodyModal';
 import ImportarPacientes from './ImportarPacientes';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
@@ -773,6 +774,9 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     if (sub === 'menus') {
       return <Menus key={menuReabrir ? ('h-' + (menuReabrir.fecha || '') + (menuReabrir.nombre || '')) : 'actual'} patient={sel} onBack={volver} initialMenus={menuReabrir} onGuardChange={onRegisterExitGuard} />;
     }
+    if (sub === 'deportivo') {
+      return <PlanDeportivo patient={sel} onBack={volver} onGuardChange={onRegisterExitGuard} />;
+    }
     return (
       <div>
         {err && <div style={S.err}>{err}</div>}
@@ -1203,6 +1207,27 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                 {sel.plan && sel.plan.totales
                   ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Plan guardado: <b>{sel.plan.totales.kcal} kcal</b> · {fmtFecha(sel.plan.fecha)}</div>
                   : <div className="empty-state">Aún no hay cálculo de plan.</div>}
+              </div>
+            )}
+          </div>
+
+          {/* Plan deportivo (alto rendimiento) */}
+          <div className="card" style={panel === 'deportivo' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'deportivo' ? null : 'deportivo')}>
+              <span style={S.panelTitle}>Plan deportivo <span style={{ fontWeight: 400, color: 'var(--stone)', fontSize: 12 }}>(alto rendimiento)</span></span>
+              <span style={panel === 'deportivo' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'deportivo' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Marca al paciente como alto rendimiento para habilitar el plan de competencia (hidratación y alimentación antes, durante y después).</div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--dark)', cursor: 'pointer', marginBottom: 12 }}>
+                  <input type="checkbox" checked={!!sel.altoRendimiento}
+                    onChange={async e => { try { await updateDoc(doc(db, 'pacientes', sel.id), { altoRendimiento: e.target.checked }); } catch (er) { setErr('No se pudo actualizar: ' + er.message); } }} />
+                  Paciente de alto rendimiento
+                </label>
+                {sel.altoRendimiento
+                  ? <button style={S.smallBtn} onClick={() => irSub('deportivo')}>Abrir / editar plan deportivo</button>
+                  : <div className="empty-state">Actívalo para capturar el plan de competencia.</div>}
               </div>
             )}
           </div>
