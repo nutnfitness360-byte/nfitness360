@@ -29,6 +29,7 @@
 var ROOT_NAME = "Sistema Nfitness 360";
 var PACIENTES_NAME = "Pacientes";
 var PLANES_NAME = "Planes";
+var DEPORTIVO_NAME = "Plan deportivo";
 var ANALISIS_NAME = "Análisis";
 var HISTORIAL_NAME = "Historial Clínico";
 var INBODY_NAME = "InBody";
@@ -239,6 +240,32 @@ function doPost(e) {
 
     if (action === "setReactivacion") {
       return setReactivacion_(body);
+    }
+
+    if (action === "saveDeportivo") {
+      var fnameD = (body.filename || ("Plan_deportivo_" + patient + ".pdf")).toString();
+      if (fnameD.slice(-4).toLowerCase() !== ".pdf") fnameD += ".pdf";
+
+      var blobD;
+      if (body.html) {
+        blobD = Utilities.newBlob(body.html, "text/html", fnameD).getAs("application/pdf");
+        blobD.setName(fnameD);
+      } else if (body.pdfBase64) {
+        var b64d = body.pdfBase64;
+        var cid = b64d.indexOf("base64,");
+        if (cid > -1) b64d = b64d.substring(cid + 7);
+        blobD = Utilities.newBlob(Utilities.base64Decode(b64d), "application/pdf", fnameD);
+      } else {
+        throw new Error("Falta 'html' o 'pdfBase64'.");
+      }
+
+      var depFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, DEPORTIVO_NAME]);
+      var fileD = depFolder.createFile(blobD);
+      compartirConPaciente_(fileD, body.correo);
+
+      return json_({ ok: true, action: action, patient: patient,
+                     fileId: fileD.getId(), link: fileD.getUrl(),
+                     filename: fnameD, deportivoFolder: depFolder.getUrl() });
     }
 
     throw new Error("Acción no reconocida: " + action);
