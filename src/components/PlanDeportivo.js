@@ -139,6 +139,15 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
     } catch (e) { setMsg('No se pudo cargar la imagen.'); }
   };
 
+  const cargarImagenComida = async (pi, key, file) => {
+    if (!file || !/^image\//.test(file.type || '')) { setMsg('Ese archivo no es una imagen.'); return; }
+    try {
+      const dataUrl = await comprimirImagen(file);
+      setComida(pi, key, 'img', dataUrl);
+      setMsg('');
+    } catch (e) { setMsg('No se pudo cargar la imagen.'); }
+  };
+
   const setComida = (pi, key, campo, v) => {
     setPaginas(ps => ps.map((p, k) => {
       if (k !== pi) return p;
@@ -323,6 +332,27 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
                   <div style={S.subTitle2}>{label}</div>
                   <Field label="Indicaciones" full><textarea style={S.area} rows={2} value={(p.comidas && p.comidas[key] && p.comidas[key].ind) || ''} onChange={e => setComida(pi, key, 'ind', e.target.value)} placeholder="Rico en carbohidratos, baja proteína…" /></Field>
                   <Field label="Equivalencias" full><input style={S.input} value={(p.comidas && p.comidas[key] && p.comidas[key].eq) || ''} onChange={e => setComida(pi, key, 'eq', e.target.value)} placeholder="5 cereales / 2 proteínas / 1 fruta" /></Field>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+                    {(p.comidas && p.comidas[key] && p.comidas[key].img) ? (
+                      <div style={{ position: 'relative' }}>
+                        <img src={p.comidas[key].img} alt={label} style={S.thumb} />
+                        <button style={S.thumbX} title="Quitar imagen" onClick={() => setComida(pi, key, 'img', '')}>×</button>
+                      </div>
+                    ) : (
+                      <label
+                        style={{ ...S.drop, ...(dragIdx === 'c' + pi + ':' + key ? S.dropOver : {}) }}
+                        onDragOver={e => { e.preventDefault(); if (dragIdx !== 'c' + pi + ':' + key) setDragIdx('c' + pi + ':' + key); }}
+                        onDragLeave={() => setDragIdx('')}
+                        onDrop={e => { e.preventDefault(); setDragIdx(''); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; cargarImagenComida(pi, key, f); }}
+                      >
+                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => cargarImagenComida(pi, key, e.target.files && e.target.files[0])} />
+                        <span style={{ fontSize: 11.5, color: 'var(--stone)', textAlign: 'center', lineHeight: 1.4 }}>Arrastra o haz clic para cargar la foto del platillo</span>
+                      </label>
+                    )}
+                    <div style={{ flex: 1, minWidth: 160, fontSize: 11, color: 'var(--stone)', lineHeight: 1.5 }}>
+                      Opcional. Aparecerá en la burbuja de {label.toLowerCase()} del diagrama de carga.
+                    </div>
+                  </div>
                 </div>
               ))}
               <div style={S.grid}>
