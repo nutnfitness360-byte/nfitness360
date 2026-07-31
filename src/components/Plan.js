@@ -157,6 +157,7 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   const [status, setStatus] = useState(patient.plan ? 'guardado' : 'nuevo');
   const [verHistoria, setVerHistoria] = useState(false);
   const [verNotas, setVerNotas] = useState(false);
+  const [historial, setHistorial] = useState(() => Array.isArray(patient.planesHistorial) ? patient.planesHistorial : []);
   const [exitModal, setExitModal] = useState(null); // { proceed } | null
 
   const setP = (k, v) => { setPp(p => ({ ...p, [k]: v })); setStatus('nuevo'); };
@@ -230,8 +231,27 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
       totales: { kcal: r0(tot.kcal), prot: r0(tot.prot), lip: r0(tot.lip), hc: r0(tot.hc), distP: r1(distP), distL: r1(distL), distC: r1(distC) },
       fecha: new Date().toISOString().slice(0, 10),
     };
-    try { await updateDoc(doc(db, 'pacientes', patient.id), { plan }); setStatus('guardado'); return true; }
-    catch (e) { setStatus('error'); return false; }
+    const snap = { fecha: plan.fecha, kcal: plan.totales.kcal, eq: plan.eq, meta: plan.meta };
+    const nuevoHist = [...historial, snap].slice(-12);
+    try {
+      await updateDoc(doc(db, 'pacientes', patient.id), { plan, planesHistorial: nuevoHist });
+      setHistorial(nuevoHist);
+      setStatus('guardado');
+      return true;
+    } catch (e) { setStatus('error'); return false; }
+  };
+
+  // Reutiliza un cálculo anterior (para seguimientos donde el plan se conserva).
+  const usarPlanPrevio = (item) => {
+    if (!item) return;
+    if (Array.isArray(item.eq) && item.eq.length === GRUPOS.length) setEq(item.eq.map(String));
+    if (item.meta) {
+      setMeta({
+        pP: item.meta.pP, pL: item.meta.pL, pC: item.meta.pC, factor: item.meta.factor,
+        energia: item.meta.energia != null ? String(item.meta.energia) : '',
+      });
+    }
+    setStatus('nuevo');
   };
 
   // --- Aviso de cambios sin guardar al salir ---
@@ -343,6 +363,22 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
             </span>
             <span style={styles.gramTag}>Meta en gramos: <b>{r1(metaProtG)}</b> P · <b>{r1(metaLipG)}</b> L · <b>{r1(metaCarbG)}</b> HC</span>
           </div>
+
+          {historial.length > 0 && (
+            <div style={styles.histBox}>
+              <div style={styles.histTitle}>Planes anteriores (kcal)</div>
+              <div style={styles.histList}>
+                {historial.slice().reverse().map((h, i) => (
+                  <div key={(h.fecha || '') + '-' + i} style={styles.histItem}>
+                    <span style={styles.histFecha}>{h.fecha || '—'}</span>
+                    <span style={styles.histKcal}>{r0(num(h.kcal))} kcal</span>
+                    <button type="button" style={styles.histBtn} onClick={() => usarPlanPrevio(h)}>Usar</button>
+                  </div>
+                ))}
+              </div>
+              <div style={styles.histHint}>En un seguimiento puedes tomar un cálculo previo con "Usar" y ajustar solo lo necesario.</div>
+            </div>
+          )}
         </Section>
 
         {/* SECCIÓN C */}
@@ -534,6 +570,14 @@ const styles = {
   bmrLabel: { fontSize: 11.5, fontWeight: 600, color: T.inkSoft, textTransform: 'uppercase', letterSpacing: 0.4 },
   bmrValue: { fontSize: 24, fontWeight: 800, color: T.pine, marginTop: 4, letterSpacing: -0.5 },
   kcalU: { fontSize: 12, fontWeight: 600, color: T.inkSoft },
+  histBox: { marginTop: 14, padding: '12px 14px', background: '#fff', border: '0.5px solid ' + T.line, borderRadius: 12 },
+  histTitle: { fontSize: 12, fontWeight: 700, color: T.ink, marginBottom: 8, letterSpacing: 0.3 },
+  histList: { display: 'flex', flexDirection: 'column', gap: 6 },
+  histItem: { display: 'flex', alignItems: 'center', gap: 12 },
+  histFecha: { fontSize: 12, color: T.inkSoft, minWidth: 92 },
+  histKcal: { fontSize: 13, fontWeight: 700, color: T.ink, minWidth: 78 },
+  histBtn: { padding: '4px 12px', border: '0.5px solid ' + T.amber, background: '#fff', color: T.amber, borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: mono },
+  histHint: { fontSize: 11, color: T.inkSoft, marginTop: 8 },
   bmrSub: { fontSize: 11, color: T.inkSoft, marginTop: 2 },
   factorSel: { marginTop: 8, width: '100%', border: `1px solid ${T.line}`, borderRadius: 8, padding: '6px 8px', fontSize: 12.5, background: '#fff', fontFamily: mono, color: T.ink },
   warn: { marginTop: 12, fontSize: 12.5, color: T.danger, background: '#F7EAE5', borderRadius: 9, padding: '9px 12px' },
