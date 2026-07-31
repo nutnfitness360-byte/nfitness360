@@ -6,6 +6,24 @@ const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAEhCAYAAADs24qx
 const esc = (s) => String(s == null ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+// Las recomendaciones pueden venir con formato básico (negritas, subrayado, listas)
+// que la nutrióloga aplicó en el editor. Se limpia a una lista blanca de etiquetas
+// segura para el convertidor de Google. Si el texto no trae etiquetas, se escapa como antes.
+const ETIQUETAS_OK = /^(b|strong|i|em|u|ul|ol|li|br|p|div|span)$/i;
+function sanitizeRich(html) {
+  let t = String(html == null ? "" : html).replace(/\r?\n/g, " ");
+  t = t.replace(/<\/?(script|style)[^>]*>/gi, "");
+  t = t.replace(/<\/?([a-zA-Z0-9]+)[^>]*?>/g, function (m, tag) {
+    if (!ETIQUETAS_OK.test(tag)) return "";
+    return (m.charAt(1) === "/") ? ("</" + tag.toLowerCase() + ">") : ("<" + tag.toLowerCase() + ">");
+  });
+  return t;
+}
+function renderRich(v) {
+  const str = String(v == null ? "" : v);
+  return /<[a-zA-Z][^>]*>/.test(str) ? sanitizeRich(str) : esc(str);
+}
+
 // En el PDF del paciente se imprime solo la fecha; la hora se conserva en el registro
 // interno (r.fecha) para mantener el orden, pero no aporta valor en el reporte.
 const fmtFechaReco = (ms) => {
@@ -78,8 +96,8 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suple
   const items = recos.map((r) => {
     const conContenido = SECS.filter(([k]) => (r[k] || "").toString().trim());
     const bloques = conContenido.length
-      ? conContenido.map(([k, t]) => `<div class="rsec"><div class="rst">${esc(t)}</div><div class="rtext">${esc(r[k])}</div></div>`).join("")
-      : ((r.texto || "").toString().trim() ? `<div class="rtext">${esc(r.texto)}</div>` : "");
+      ? conContenido.map(([k, t]) => `<div class="rsec"><div class="rst">${esc(t)}</div><div class="rtext">${renderRich(r[k])}</div></div>`).join("")
+      : ((r.texto || "").toString().trim() ? `<div class="rtext">${renderRich(r.texto)}</div>` : "");
     const cuerpo = (bloques || "") + buildAnalisisBlock(r.analisis);
     return `
       <div class="reco">
@@ -106,6 +124,9 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suple
     .rsec:last-child { margin-bottom:0; }
     .rst { font-size:10px; letter-spacing:1px; color:#CDA788; font-weight:bold; text-transform:uppercase; margin-bottom:3px; }
     .rtext { font-size:13px; line-height:1.55; white-space:pre-wrap; color:#3A332C; }
+    .rtext ul, .rtext ol { margin:4px 0 4px 20px; padding:0; }
+    .rtext li { margin:2px 0; }
+    .rtext b, .rtext strong { font-weight:700; }
     .empty { font-size:13px; color:#A1968C; padding:20px 0; }
     .suptable { width:100%; border-collapse:collapse; margin-bottom:6px; }
     .suptable th { text-align:left; font-size:9.5px; letter-spacing:0.5px; text-transform:uppercase; color:#A1968C; padding:6px 8px; border-bottom:1.5px solid #CDA788; }
