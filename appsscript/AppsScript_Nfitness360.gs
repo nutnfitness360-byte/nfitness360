@@ -961,6 +961,15 @@ function recetarioMuestra_(cat, n) {
   return arr.slice(0, n).map(function (d) { return { nombre: d.n, componentes: d.c, prep: d.p }; });
 }
 
+// Quita frases redundantes tipo "consumir como colación" que la IA a veces agrega al cierre.
+function limpiarColacion_(str) {
+  if (!str) return str;
+  var t = String(str);
+  t = t.replace(/[\s.;,\-\u2013\u2014]*\b(?:para\s+)?cons(?:u|\u00fa)m(?:ir|ase|elo|ela|elos|elas|e)?\s+como\s+colaci(?:o|\u00f3)n\b\.?/gi, "");
+  t = t.replace(/\s{2,}/g, " ").replace(/[\s.;,]+$/, "").trim();
+  return t;
+}
+
 function generarMenusIA_(body) {
   var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!key) return json_({ ok: false, error: "Falta ANTHROPIC_API_KEY en las Propiedades del script." });
@@ -991,6 +1000,7 @@ function generarMenusIA_(body) {
     "no debe incluir ingredientes principales que el 'nombre' no mencione. Ejemplo: si el nombre dice 'con yogurt', " +
     "la preparación DEBE indicar cuánto yogurt y cómo se usa; si la preparación no lleva yogurt, entonces el nombre " +
     "tampoco debe decir 'con yogurt'. No dejes ingredientes anunciados en el nombre fuera de la preparación. " +
+    "NO agregues frases redundantes como 'consumir como colación' al cierre de las opciones: el nombre del tiempo ya indica que es colación. " +
     "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
   var datos = {
@@ -1051,7 +1061,14 @@ function generarMenusIA_(body) {
   var parsed;
   try { parsed = JSON.parse(text); } catch (e) { return json_({ ok: false, error: "La IA no devolvió JSON válido." }); }
 
-  return json_({ ok: true, tiempos: (parsed.tiempos || []) });
+  var tiemposLimpios = (parsed.tiempos || []).map(function (t) {
+    var ops = (t && t.opciones) ? t.opciones : [];
+    return { opciones: ops.map(function (o) {
+      return { nombre: limpiarColacion_(o && o.nombre), prep: limpiarColacion_(o && o.prep) };
+    }) };
+  });
+
+  return json_({ ok: true, tiempos: tiemposLimpios });
 }
 
 // ── IA (Capa 2): genera la LISTA DEL SÚPER a partir de los menús ──
