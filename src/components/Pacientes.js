@@ -8,6 +8,7 @@ import PlanDeportivo from './PlanDeportivo';
 import InBodyModal from './InBodyModal';
 import ImportarPacientes from './ImportarPacientes';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
+import RichArea from './RichArea';
 
 /* ===== utilidades ===== */
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -1378,8 +1379,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                       ))}
                       <button type="button" style={S.chipAdd} onClick={() => agregarChip(sec.key)} title="Guardar un enlace rápido nuevo para futuras recomendaciones">＋ Agregar</button>
                     </div>
-                    <textarea style={S.recoArea} rows={3} value={recoForm[sec.key]}
-                      onChange={e => setRecoForm(prev => ({ ...prev, [sec.key]: e.target.value }))}
+                    <RichArea value={recoForm[sec.key]}
+                      onChange={html => setRecoForm(prev => ({ ...prev, [sec.key]: html }))}
                       placeholder={sec.key === 'suplementos' ? 'Notas adicionales de suplementos (opcional)…' : `Recomendaciones de ${sec.titulo.toLowerCase()}…`} />
                   </div>
                 ))}
