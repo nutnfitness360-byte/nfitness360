@@ -141,26 +141,90 @@ export default function LoginPage() {
     err: { background: '#fbeae6', color: '#B0593F', fontSize: 11.5, padding: '9px 11px', borderRadius: 8, marginBottom: 12, lineHeight: 1.4 },
     back: { background: 'none', border: 'none', color: 'var(--stone)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 14, fontFamily: 'var(--font)' },
     ico: { fontSize: 16, verticalAlign: '-3px', marginRight: 7 },
+    // --- Pantalla de inicio (info + recuadros) ---
+    landingBox: { width: '100%', maxWidth: 760 },
+    grid2: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(258px, 1fr))', gap: 30, alignItems: 'center' },
+    lLogo: { height: 42, width: 'auto', objectFit: 'contain', marginBottom: 16 },
+    lHead: { color: 'var(--cream)', fontSize: 23, fontWeight: 700, lineHeight: 1.2, textAlign: 'left' },
+    lSub: { color: '#B7ABA2', fontSize: 12.5, lineHeight: 1.55, margin: '12px 0 20px', textAlign: 'left', maxWidth: 300 },
+    lStepsLbl: { color: 'var(--gold)', fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', marginBottom: 13, textAlign: 'left' },
+    lStep: { display: 'flex', gap: 11, alignItems: 'flex-start', marginBottom: 13, textAlign: 'left' },
+    lStepN: { minWidth: 22, height: 22, borderRadius: '50%', background: 'var(--gold)', color: 'var(--dark)', fontSize: 11, fontWeight: 700, lineHeight: '22px', textAlign: 'center' },
+    lStepT: { color: 'var(--cream)', fontSize: 12.5, lineHeight: 1.4, paddingTop: 1 },
+    rLbl: { color: '#8a7f76', fontSize: 10, fontWeight: 600, letterSpacing: '0.6px', marginBottom: 12, textTransform: 'uppercase', textAlign: 'left' },
+    cardPat: { background: 'rgba(205,167,136,0.10)', border: '1.5px solid var(--gold)', borderRadius: 16, padding: '18px 16px', position: 'relative', marginBottom: 14, cursor: 'pointer' },
+    cardNut: { background: 'rgba(255,255,255,0.03)', border: '1px solid #3a352f', borderRadius: 16, padding: '18px 16px', cursor: 'pointer' },
+    badge: { position: 'absolute', top: -9, left: 18, background: 'var(--gold)', color: 'var(--dark)', fontSize: 8, fontWeight: 700, letterSpacing: '0.5px', padding: '2px 9px', borderRadius: 8 },
+    cardRow: { display: 'flex', alignItems: 'center', gap: 13 },
+    cTitle: { fontSize: 15, fontWeight: 700 },
+    cDesc: { fontSize: 11, marginTop: 2 },
   };
 
-  // ===================== PANTALLA 1: dos recuadros =====================
+  // ===================== PANTALLA 1: info + dos recuadros =====================
+  const IconoPaciente = ({ color }) => (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" /></svg>
+  );
+  const IconoNutri = ({ color }) => (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.249-8.25-3.285Z" /></svg>
+  );
+  const Chevron = ({ color }) => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" style={{ marginLeft: 'auto', flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+  );
+
   if (vista === 'inicio') {
     return (
       <div style={S.wrap}>
-        <div style={S.box}>
-          {logoSrc ? <img src={logoSrc} alt="" style={S.logo} /> : null}
-          <div style={S.hola}>¿Cómo deseas ingresar?</div>
-          <div style={S.cards}>
-            <div style={S.card} onClick={() => abrir('nutri')}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.249-8.25-3.285Z" /></svg>
-              <div style={S.cardTitle}>Panel de nutrición</div>
-              <div style={S.cardDesc}>Acceso profesional</div>
+        <div style={S.landingBox}>
+          <div style={S.grid2}>
+
+            {/* Columna izquierda: mensaje + pasos */}
+            <div>
+              {logoSrc ? <img src={logoSrc} alt="" style={S.lLogo} /> : null}
+              <div style={S.lHead}>Agenda tu cita con Natalia</div>
+              <div style={S.lSub}>Este es tu portal para reservar tus consultas, confirmarlas y dar seguimiento a tu plan.</div>
+              <div style={S.lStepsLbl}>CÓMO AGENDAR</div>
+              <div style={S.lStep}>
+                <div style={S.lStepN}>1</div>
+                <div style={S.lStepT}>Entra al recuadro <b>Paciente</b> y crea tu cuenta o inicia sesión</div>
+              </div>
+              <div style={S.lStep}>
+                <div style={S.lStepN}>2</div>
+                <div style={S.lStepT}>Elige el día y la hora que prefieras en el calendario</div>
+              </div>
+              <div style={{ ...S.lStep, marginBottom: 0 }}>
+                <div style={S.lStepN}>3</div>
+                <div style={S.lStepT}>Recibe la confirmación de tu cita</div>
+              </div>
             </div>
-            <div style={S.card} onClick={() => abrir('paciente')}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" /></svg>
-              <div style={S.cardTitle}>Paciente</div>
-              <div style={S.cardDesc}>Tu portal personal</div>
+
+            {/* Columna derecha: los dos recuadros */}
+            <div>
+              <div style={S.rLbl}>¿Cómo deseas ingresar?</div>
+
+              <div style={S.cardPat} onClick={() => abrir('paciente')}>
+                <div style={S.badge}>EMPIEZA AQUÍ</div>
+                <div style={S.cardRow}>
+                  <IconoPaciente color="var(--gold)" />
+                  <div>
+                    <div style={{ ...S.cTitle, color: '#fff' }}>Paciente</div>
+                    <div style={{ ...S.cDesc, color: '#B7ABA2' }}>Agenda y sigue tus consultas</div>
+                  </div>
+                  <Chevron color="var(--gold)" />
+                </div>
+              </div>
+
+              <div style={S.cardNut} onClick={() => abrir('nutri')}>
+                <div style={S.cardRow}>
+                  <IconoNutri color="#7d7368" />
+                  <div>
+                    <div style={{ ...S.cTitle, color: '#C9BEB4' }}>Panel de nutrición</div>
+                    <div style={{ ...S.cDesc, color: '#8a7f76' }}>Acceso profesional</div>
+                  </div>
+                  <Chevron color="#5f574f" />
+                </div>
+              </div>
             </div>
+
           </div>
         </div>
       </div>
