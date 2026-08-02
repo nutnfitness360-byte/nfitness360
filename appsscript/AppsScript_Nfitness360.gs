@@ -1121,9 +1121,10 @@ function listaSuperIA_(body) {
     "Debe haber un elemento en 'listas' por cada opción recibida y en el mismo orden. " +
     "Incluye únicamente categorías que tengan al menos un insumo.\n\nDatos:\n" + JSON.stringify(datos);
 
+  // La lista de varias opciones puede ser larga; damos margen para que el JSON no se corte.
   var payload = {
     model: IA_MODEL,
-    max_tokens: IA_MAX_TOKENS,
+    max_tokens: 8000,
     system: sys,
     messages: [{ role: "user", content: instruccion }]
   };
@@ -1151,10 +1152,26 @@ function listaSuperIA_(body) {
   }
   text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
 
-  var parsed;
-  try { parsed = JSON.parse(text); } catch (e) { return json_({ ok: false, error: "La IA no devolvió JSON válido." }); }
+  // La IA cortó por longitud: avisamos claro en vez de fallar en silencio.
+  if (out && out.stop_reason === "max_tokens") {
+    return json_({ ok: false, error: "La lista se cortó por longitud (respuesta truncada). Genera menos opciones a la vez o vuelve a intentar." });
+  }
+
+  var parsed = parseJSONFlexible_(text);
+  if (!parsed) {
+    return json_({ ok: false, error: "La IA no devolvió JSON válido. Fin del texto recibido: …" + text.slice(-140) });
+  }
 
   return json_({ ok: true, listas: (parsed.listas || []) });
+}
+
+// Intenta leer JSON aunque venga con texto alrededor: primero directo, luego el bloque { … } más grande.
+function parseJSONFlexible_(text) {
+  if (!text) return null;
+  try { return JSON.parse(text); } catch (e) {}
+  var a = text.indexOf("{"), b = text.lastIndexOf("}");
+  if (a > -1 && b > a) { try { return JSON.parse(text.slice(a, b + 1)); } catch (e2) {} }
+  return null;
 }
 
 /* =====================================================================
