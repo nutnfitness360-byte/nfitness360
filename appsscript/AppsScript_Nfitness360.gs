@@ -1001,6 +1001,16 @@ function generarMenusIA_(body) {
     "la preparación DEBE indicar cuánto yogurt y cómo se usa; si la preparación no lleva yogurt, entonces el nombre " +
     "tampoco debe decir 'con yogurt'. No dejes ingredientes anunciados en el nombre fuera de la preparación. " +
     "NO agregues frases redundantes como 'consumir como colación' al cierre de las opciones: el nombre del tiempo ya indica que es colación. " +
+    "COHERENCIA CULINARIA (muy importante): cada platillo debe ser algo que una persona realmente prepararía y comería; "
+    "combina solo ingredientes que tengan sentido juntos segun la cocina mexicana y el sentido comun. "
+    "NUNCA mezcles en una misma preparacion ingredientes incompatibles. Un LICUADO, SMOOTHIE o BEBIDA solo admite "
+    "liquidos (agua, leche o bebida vegetal), fruta, avena, proteina en polvo, semillas o crema de frutos secos; "
+    "JAMAS lleva frijoles, leguminosas, verduras cocidas, carne, huevo, tortilla ni cereales salados. "
+    "Si los equivalentes de un tiempo incluyen grupos que no embonan en ese tipo de platillo (por ejemplo una leguminosa "
+    "en un tiempo con licuado), NO los metas dentro de esa preparacion: ubicalos en un acompanamiento APARTE y solido "
+    "(por ejemplo 'acompanar con 1/2 taza de frijoles' como plato al lado), o elige otro tipo de platillo que si integre "
+    "bien todos los grupos. Antes de devolver cada opcion, verifica que ningun ingrediente resulte extrano o desagradable "
+    "dentro de ese platillo; si algo no combina, corrigelo. Mezclar ingredientes que no combinan es un ERROR grave. "
     "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
   var datos = {
