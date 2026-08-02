@@ -3,6 +3,7 @@ import { db } from '../firebase/config';
 import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { buildReportHTML, generarPorcionesTexto, esPorciones } from '../report/reporteHTML';
 import HistoriaClinica from './HistoriaClinica';
+import { gridKeyDown } from '../utils/gridNav';
 
 /* ============================================================
    NFITNESS 360 — Menús por tiempo de comida
@@ -828,7 +829,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
 
         <div style={S.balSub}>Equivalencias por tiempo · editable</div>
         <div style={S.balWrap}>
-          <table style={{ ...S.balTable, minWidth: 600 }}>
+          <table style={{ ...S.balTable, minWidth: 600 }} data-gridnav>
             <thead>
               <tr>
                 <th style={{ ...S.balTh, textAlign: 'left' }}>Grupo</th>
@@ -838,7 +839,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
               </tr>
             </thead>
             <tbody>
-              {GRUPOS.map((_, g) => g).filter(g => (planEq && num(planEq[g]) > 0) || sumaPorGrupo(g) > 0).map(g => {
+              {GRUPOS.map((_, g) => g).filter(g => (planEq && num(planEq[g]) > 0) || sumaPorGrupo(g) > 0).map((g, rowIdx) => {
                 const okG = planEq ? Math.abs(sumaPorGrupo(g) - num(planEq[g])) < 0.01 : null;
                 return (
                 <tr key={'eqm' + g} style={okG === null ? undefined : (okG ? S.balRowOk : S.balRowBad)}>
@@ -846,6 +847,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                   {tiempos.map((t, idx) => (
                     <td key={idx} style={S.balTd}>
                       <input style={S.eqInput} inputMode="decimal" placeholder="—"
+                        data-row={rowIdx} data-col={idx} onKeyDown={gridKeyDown}
                         value={(t.eq[g] === '' || t.eq[g] === 0 || t.eq[g] === '0') ? '' : t.eq[g]}
                         onChange={e => setEqCell(idx, g, e.target.value)} />
                     </td>
