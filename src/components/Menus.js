@@ -572,15 +572,18 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     try {
       // Lista del súper: SOLO si se incluyen menús (en "Equivalencias" no se ejecuta la IA, para no gastar créditos).
       let listasReporte = null;
+      let listaReason = '';
       if (incluirMenus) {
         if (Array.isArray(listas) && listas.length) {
           listasReporte = listas; // ya generada antes; se reutiliza sin volver a llamar a la IA
+        } else if (!construirOpcionesLista().length) {
+          listaReason = 'no había platillos en los menús';
         } else {
           try {
             setRep('Generando la lista del súper con IA…');
             listasReporte = await pedirListasIA();
             setListas(listasReporte);
-          } catch (e) { listasReporte = null; /* si falla la lista, el reporte se genera igual, sin ella */ }
+          } catch (e) { listasReporte = null; listaReason = e.message; /* el reporte se genera igual, sin lista */ }
         }
       }
       setRep('Generando y subiendo el PDF a Drive…');
@@ -604,7 +607,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           await updateDoc(doc(db, 'pacientes', patient.id), { menusHistorial: hist });
         } catch (e) { /* el historial es secundario; no debe bloquear el guardado */ }
         const faltoLista = incluirMenus && (!listasReporte || !listasReporte.length);
-        setRep('Menús guardados y reporte subido a Drive (registrado en Planes) ✓' + (faltoLista ? ' — nota: no se incluyó la lista del súper (sin platillos o falló la IA).' : ''));
+        setRep('Menús guardados y reporte subido a Drive (registrado en Planes) ✓' + (faltoLista ? (' — nota: no se incluyó la lista del súper (' + (listaReason || 'motivo desconocido') + ').') : ''));
       } else {
         setRep('Menús guardados ✓, pero el PDF no se pudo subir: ' + (data.error || 'no se recibió enlace.'));
       }
