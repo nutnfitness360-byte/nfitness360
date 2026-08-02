@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
+import { gridKeyDown } from '../utils/gridNav';
 import { doc, updateDoc } from 'firebase/firestore';
 import HistoriaClinica from './HistoriaClinica';
 
@@ -384,7 +385,7 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
         {/* SECCIÓN C */}
         <Section n="C" title="Tabla de equivalentes" hint="Se calcula automáticamente a partir de la energía meta (B). Puedes ajustar el # Eq de cada grupo; el recálculo es en vivo.">
           <div style={styles.tableScroll}>
-            <table style={styles.table}>
+            <table style={styles.table} data-gridnav>
               <thead>
                 <tr>
                   <th style={{ ...styles.th, ...styles.thLeft }}>Grupo</th>
@@ -402,7 +403,7 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
                   return (
                     <tr key={i} style={activa ? styles.trOn : undefined}>
                       <td style={styles.tdLeft}>{g[0]}</td>
-                      <td style={styles.tdEq}><input style={styles.eqInput} value={eq[i]} inputMode="decimal" onChange={(e) => setEqi(i, e.target.value)} /></td>
+                      <td style={styles.tdEq}><input style={styles.eqInput} value={eq[i]} inputMode="decimal" data-row={i} data-col={0} onKeyDown={gridKeyDown} onChange={(e) => setEqi(i, e.target.value)} /></td>
                       <td style={styles.td}>{f.kcal ? r0(f.kcal) : '—'}</td>
                       <td style={styles.td}>{f.prot ? r1(f.prot) : '—'}</td>
                       <td style={styles.td}>{f.lip ? r1(f.lip) : '—'}</td>
