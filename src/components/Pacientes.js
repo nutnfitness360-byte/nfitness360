@@ -4,6 +4,7 @@ import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, quer
 import Plan from './Plan';
 import Menus from './Menus';
 import HistoriaClinica from './HistoriaClinica';
+import NotasSeguimiento from './Notasseguimiento';
 import PlanDeportivo from './PlanDeportivo';
 import InBodyModal from './InBodyModal';
 import ImportarPacientes from './ImportarPacientes';
@@ -115,6 +116,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [recoEditIdx, setRecoEditIdx] = useState(null);
   const [recoChips, setRecoChips] = useState({});
   const [verHistoria, setVerHistoria] = useState(false);
+  const [verNotas, setVerNotas] = useState(false);
   const recoFormRef = useRef(null);
   const recoLoadedForRef = useRef(null);
   const [bitacoraTexto, setBitacoraTexto] = useState('');
@@ -166,6 +168,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       : [{ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '' }]);
     setRecoEditIdx(null);
     setVerHistoria(false);
+    setVerNotas(false);
   }, [selId, pacientes]);
 
   const sel = pacientes.find(p => p.id === selId);
@@ -1314,9 +1317,15 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
               <div style={S.panelBody} ref={recoFormRef}>
                 <div style={S.note}>Cada recomendación se publica con fecha y hora; el paciente la verá en su sección "Recomendaciones". Usa los botones para agregar atajos a cada apartado.</div>
                 {sel.historia && (
-                  <button style={{ ...S.smallBtn, marginBottom: 12 }} onClick={() => setVerHistoria(true)} title="Consultar la historia clínica sin salir">
+                  <button style={{ ...S.smallBtn, marginBottom: 12, marginRight: 8 }} onClick={() => setVerHistoria(true)} title="Consultar la historia clínica sin salir">
                     Ver historia clínica
                   </button>
+                )}
+                <button style={{ ...S.smallBtn, marginBottom: 12 }} onClick={() => setVerNotas(true)} title="Consultar las notas de seguimiento sin salir">
+                  Ver notas de seguimiento
+                </button>
+                {verNotas && (
+                  <NotasSeguimiento notas={sel.bitacora} nombre={sel.nombre} onClose={() => setVerNotas(false)} closeBtnStyle={S.smallBtn} />
                 )}
                 {verHistoria && (
                   <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
