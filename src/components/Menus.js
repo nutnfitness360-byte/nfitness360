@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { buildReportHTML, generarPorcionesTexto, esPorciones } from '../report/reporteHTML';
+import { matchFotoKey, buscarFotos, fotoUrl, fotosDataMap } from '../utils/matchFoto';
 import HistoriaClinica from './HistoriaClinica';
 import { gridKeyDown } from '../utils/gridNav';
 
@@ -113,7 +114,13 @@ function compressImage(file, maxW = 620, quality = 0.5) {
   });
 }
 
-const nuevaOpcion = () => ({ nombre: '', prep: '' });
+const nuevaOpcion = () => ({ nombre: '', prep: '', fotoKey: '', fotoAuto: true });
+// Asegura que una opción tenga foto: si no la tiene (o está en "auto"), la empareja por su nombre.
+function conFotoAuto(o) {
+  const base = { nombre: '', prep: '', fotoAuto: true, ...o };
+  if (base.fotoAuto !== false && !base.fotoKey) base.fotoKey = matchFotoKey(base.nombre);
+  return base;
+}
 const opcionesArr = (n) => Array.from({ length: Math.max(1, n || 1) }, nuevaOpcion);
 function nuevoTiempo(def, eqRow, nOp = 3) {
   return { id: uid(), nombre: def?.nombre || 'Nuevo tiempo', hora: def?.hora || '12:00', eq: eqRow || Array(18).fill(0), opciones: opcionesArr(nOp), foto: '', indicacion: '' };
@@ -212,7 +219,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const savedNOp = savedMenus ? (savedMenus.nOpciones || (savedMenus.tiempos[0]?.opciones?.length) || 3) : 3;
 
   const [tiempos, setTiempos] = useState(() => {
-    if (savedMenus) return savedMenus.tiempos.map(t => ({ ...t, id: t.id || uid(), eq: Array.isArray(t.eq) ? t.eq : Array(18).fill(0), opciones: (t.opciones && t.opciones.length) ? t.opciones : opcionesArr(savedNOp) }));
+    if (savedMenus) return savedMenus.tiempos.map(t => ({ ...t, id: t.id || uid(), eq: Array.isArray(t.eq) ? t.eq : Array(18).fill(0), opciones: ((t.opciones && t.opciones.length) ? t.opciones : opcionesArr(savedNOp)).map(conFotoAuto) }));
     return []; // los menús nuevos se arman tras la ventana de configuración
   });
   const [nOpciones, setNOpciones] = useState(savedNOp);
@@ -288,6 +295,17 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   };
   const setEqCell = (idx, g, v) => setT(idx, { eq: tiempos[idx].eq.map((x, k) => k === g ? String(v).replace(',', '.') : x) });
   const setOpcion = (idx, oi, patch) => setT(idx, { opciones: tiempos[idx].opciones.map((o, k) => k === oi ? { ...o, ...patch } : o) });
+  // Cambia el nombre de una opción y, si su foto está en "auto", la vuelve a emparejar.
+  const setOpcionNombre = (idx, oi, val) => {
+    const o = (tiempos[idx].opciones[oi]) || {};
+    const patch = { nombre: val };
+    if (o.fotoAuto !== false) { patch.fotoKey = matchFotoKey(val); patch.fotoAuto = true; }
+    setOpcion(idx, oi, patch);
+  };
+  // Foto elegida a mano (deja de ser "auto").
+  const setOpcionFoto = (idx, oi, key) => setOpcion(idx, oi, { fotoKey: key || '', fotoAuto: false });
+  const [fotoPicker, setFotoPicker] = useState(null);   // { idx, oi } de la opción cuya foto se está eligiendo
+  const [fotoQuery, setFotoQuery] = useState('');
   const setPorciones = (idx, val) => {
     const t = tiempos[idx];
     const patch = { porciones: val };
@@ -401,7 +419,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           usados[ridx] = true;
           const r = aiList[ridx];
           if (!r || !Array.isArray(r.opciones)) return;
-          const ops = r.opciones.slice(0, nOpciones).map(o => ({ nombre: tituloOracion(o && o.nombre), prep: (o && o.prep) || '' }));
+          const ops = r.opciones.slice(0, nOpciones).map(o => conFotoAuto({ nombre: tituloOracion(o && o.nombre), prep: (o && o.prep) || '' }));
           while (ops.length < nOpciones) ops.push(nuevaOpcion());
           next[origIdx] = { ...next[origIdx], opciones: ops };
         });
@@ -442,7 +460,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           if (!r || !Array.isArray(r.opciones)) return;
           const orig = next[origIdx];
           const nOps = (orig.opciones || []).length || 1;
-          const ops = r.opciones.slice(0, nOps).map(o => ({ nombre: tituloOracion(o && o.nombre), prep: (o && o.prep) || '' }));
+          const ops = r.opciones.slice(0, nOps).map(o => conFotoAuto({ nombre: tituloOracion(o && o.nombre), prep: (o && o.prep) || '' }));
           while (ops.length < nOps) ops.push(nuevaOpcion());
           next[origIdx] = { ...orig, opciones: ops };
         });
@@ -479,7 +497,10 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       const nueva = data && data.ok && Array.isArray(data.tiempos) && data.tiempos[0] && Array.isArray(data.tiempos[0].opciones) ? data.tiempos[0].opciones[0] : null;
       if (!nueva) throw new Error((data && data.error) || 'No se recibió la opción.');
-      setOpcion(idx, oi, { nombre: tituloOracion(nueva.nombre), prep: nueva.prep || '' });
+      const prevOp = (tiempos[idx].opciones[oi]) || {};
+      const patchOp = { nombre: tituloOracion(nueva.nombre), prep: nueva.prep || '' };
+      if (prevOp.fotoAuto !== false) { patchOp.fotoKey = matchFotoKey(patchOp.nombre); patchOp.fotoAuto = true; }
+      setOpcion(idx, oi, patchOp);
       setRep('Opción ' + (oi + 1) + ' de ' + t.nombre + ' regenerada. Revísala antes de guardar.');
     } catch (e) {
       setRep('No se pudo generar la opción: ' + e.message);
@@ -599,7 +620,13 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         }
       }
       setRep('Generando y subiendo el PDF a Drive…');
-      const html = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos, incluirMenus, incluirEquivalencias, listas: listasReporte });
+      // Incrusta (base64) las fotos de cada opción para que aparezcan en el PDF.
+      let fotoData = {};
+      try {
+        const keysFotos = tiempos.flatMap(t => (t.opciones || []).map(o => o.fotoKey)).filter(Boolean);
+        fotoData = await fotosDataMap(keysFotos);
+      } catch (_) { fotoData = {}; }
+      const html = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos, incluirMenus, incluirEquivalencias, listas: listasReporte, fotoData });
       const fechaTxt = new Date().toLocaleDateString('es-MX').replace(/\//g, '-');
       const baseNombre = 'Plan nutricional ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt;
       const filename = baseNombre + '.pdf';
@@ -943,8 +970,20 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                       <span style={S.optTag}>Opción {oi + 1}</span>
                       <button style={S.optIaBtn} onClick={() => generarOpcionIA(idx, oi)} disabled={iaBusy || opBusy === (idx + ':' + oi)}>{opBusy === (idx + ':' + oi) ? 'Generando…' : 'IA ✦'}</button>
                     </div>
-                    <input style={S.optName} placeholder="Nombre del platillo" value={o.nombre} onChange={e => setOpcion(idx, oi, { nombre: e.target.value })} />
+                    <input style={S.optName} placeholder="Nombre del platillo" value={o.nombre} onChange={e => setOpcionNombre(idx, oi, e.target.value)} />
                     <textarea style={S.optPrep} rows={2} placeholder="Preparación y gramajes" value={o.prep} onChange={e => setOpcion(idx, oi, { prep: e.target.value })} />
+                    <div style={S.optFotoRow}>
+                      {o.fotoKey
+                        ? <img src={fotoUrl(o.fotoKey)} alt="" style={S.optFotoThumb} />
+                        : <div style={S.optFotoThumbEmpty}>Sin foto</div>}
+                      <div style={S.optFotoBtns}>
+                        <button style={S.optFotoBtn} onClick={() => { setFotoQuery(o.nombre || ''); setFotoPicker({ idx, oi }); }}>
+                          {o.fotoKey ? 'Cambiar foto' : 'Elegir foto'}
+                        </button>
+                        {o.fotoKey && <button style={S.optFotoClear} onClick={() => setOpcionFoto(idx, oi, '')}>Quitar</button>}
+                        {o.fotoKey && o.fotoAuto !== false && <span style={S.optFotoAuto}>automática</span>}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1011,12 +1050,43 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           </div>
         </div>
       )}
+      {fotoPicker && (
+        <div style={S.modalWrap} onClick={() => setFotoPicker(null)}>
+          <div style={{ ...S.modalCard, maxWidth: 640, maxHeight: '82vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div style={S.balTitle}>Elegir foto del platillo</div>
+            <input autoFocus style={{ ...S.optName, marginBottom: 10 }} placeholder="Buscar… ej. chilaquiles, salmón, avena" value={fotoQuery} onChange={e => setFotoQuery(e.target.value)} />
+            <div style={S.fpGrid}>
+              {buscarFotos(fotoQuery, 60).map(f => (
+                <button key={f.file} style={S.fpItem} onClick={() => { setOpcionFoto(fotoPicker.idx, fotoPicker.oi, f.file); setFotoPicker(null); }}>
+                  <img src={fotoUrl(f.file)} alt="" style={S.fpImg} />
+                  <span style={S.fpLabel}>{f.label}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+              <button style={S.volverBtn} onClick={() => setFotoPicker(null)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 const styles = {
   root: { fontFamily: mono, color: T.ink },
+  // Foto por opción
+  optFotoRow: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 },
+  optFotoThumb: { width: 46, height: 46, borderRadius: 8, objectFit: 'cover', border: '1px solid ' + T.line, flexShrink: 0 },
+  optFotoThumbEmpty: { width: 46, height: 46, borderRadius: 8, border: '1px dashed ' + T.line, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: T.inkSoft, flexShrink: 0, textAlign: 'center' },
+  optFotoBtns: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  optFotoBtn: { background: T.mint, border: '1px solid ' + T.line, borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 600, color: T.ink, cursor: 'pointer', fontFamily: mono },
+  optFotoClear: { background: 'transparent', border: 'none', color: T.danger, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: mono },
+  optFotoAuto: { fontSize: 9.5, color: T.sage, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' },
+  fpGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 8, overflowY: 'auto', padding: 2 },
+  fpItem: { border: '1px solid ' + T.line, borderRadius: 10, overflow: 'hidden', background: '#fff', cursor: 'pointer', padding: 0, textAlign: 'left', fontFamily: mono },
+  fpImg: { width: '100%', height: 84, objectFit: 'cover', display: 'block' },
+  fpLabel: { display: 'block', fontSize: 10.5, color: T.ink, padding: '5px 7px', lineHeight: 1.25 },
   back: { background: 'transparent', border: 'none', color: T.inkSoft, fontFamily: mono, fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 10 },
   titleRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
   eyebrow: { fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: T.amber, marginBottom: 4 },
