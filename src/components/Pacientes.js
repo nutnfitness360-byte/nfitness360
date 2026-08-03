@@ -10,6 +10,7 @@ import InBodyModal from './InBodyModal';
 import ImportarPacientes from './ImportarPacientes';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import RichArea from './RichArea';
+import { renderRich } from '../utils/richText';
 
 /* ===== utilidades ===== */
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -1430,9 +1431,9 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                             ? secs.map(s => (
                               <div key={s.titulo} style={{ marginTop: 7 }}>
                                 <div style={S.recoItemSecTitulo}>{s.titulo}</div>
-                                <div style={S.recoText}>{s.texto}</div>
+                                <div className="reco-rich" style={S.recoText} dangerouslySetInnerHTML={{ __html: renderRich(s.texto) }} />
                               </div>))
-                            : <div style={S.recoText}>{r.texto || ''}</div>}
+                            : <div className="reco-rich" style={S.recoText} dangerouslySetInnerHTML={{ __html: renderRich(r.texto || '') }} />}
                         </div>
                         <button style={S.smallBtn} onClick={() => editarReco(idx)} title="Editar esta recomendación">Editar</button>
                         <button style={S.smallBtn} onClick={() => generarPDFReco(r)} title="Generar PDF de esta recomendación">PDF</button>
