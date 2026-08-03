@@ -8,6 +8,7 @@ import PerfilPaciente from '../components/PerfilPaciente';
 import Agenda from '../components/Agenda';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import { renderRich } from '../utils/richText';
+import { parseDriveLink } from '../utils/drive';
 
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
 const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
@@ -142,6 +143,15 @@ export default function PacienteDashboard() {
   const [reagendando, setReagendando] = useState(null);
   const [pagoMsg, setPagoMsg] = useState('');
   const [recoPdfMsg, setRecoPdfMsg] = useState('');
+  const [visor, setVisor] = useState(null);   // { url, nombre } del documento abierto dentro de la app
+  const [visorMsg, setVisorMsg] = useState('');
+  // Abre cualquier archivo del paciente DENTRO de la app (visor con /preview), nunca en Drive.
+  const abrirArchivo = (link, nombre) => {
+    const p = parseDriveLink(link);
+    if (p.kind === 'folder') { setVisorMsg('Ese enlace es de una carpeta, no de un archivo. Pídele a tu nutrióloga el enlace del documento.'); return; }
+    if (!p.url) { setVisorMsg('No se pudo abrir el documento. Inténtalo de nuevo o avisa a tu nutrióloga.'); return; }
+    setVisor({ url: p.url, nombre: nombre || 'Documento' });
+  };
   const [secAbierta, setSecAbierta] = useState({ plan: true, isak: false, inbody: false, estudios: false });
   const toggleSec = (id) => setSecAbierta(s => ({ ...s, [id]: !s[id] }));
   const [estudioBusy, setEstudioBusy] = useState(false);
@@ -253,7 +263,7 @@ export default function PacienteDashboard() {
       let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (!d.ok || !d.link) throw new Error(d.error || 'No se recibió el enlace del PDF.');
       setRecoPdfMsg('');
-      window.open(d.link, '_blank', 'noopener');
+      abrirArchivo(d.link, 'Recomendación');
     } catch (e) {
       setRecoPdfMsg('No se pudo generar el PDF. Intenta de nuevo.');
     }
@@ -454,7 +464,7 @@ export default function PacienteDashboard() {
           <div className="cita-motivo">{r.fecha ? fmtFecha(r.fecha) : ''}</div>
         </div>
         {r.link
-          ? <a href={r.link} target="_blank" rel="noreferrer" style={{ background: 'var(--gold)', color: '#fff', textDecoration: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>Abrir</a>
+          ? <button onClick={() => abrirArchivo(r.link, r.nombre || etiqueta)} style={{ background: 'var(--gold)', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>Abrir</button>
           : <span style={{ fontSize: 11, color: 'var(--stone)' }}>Sin archivo</span>}
       </div>
     ));
@@ -468,6 +478,33 @@ export default function PacienteDashboard() {
             <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--dark)', marginBottom: 8 }}>Pago</div>
             <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--dark)', margin: 0 }}>{pagoMsg}</p>
             <button onClick={() => setPagoMsg('')} style={{ marginTop: 16, background: '#CDA788', color: '#211C17', border: 'none', borderRadius: 11, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font)' }}>Entendido</button>
+          </div>
+        </div>
+      )}
+      {visor && (
+        <div style={{ position: 'fixed', inset: 0, background: '#1a1612', zIndex: 2000, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: '#1a1612', borderBottom: '1px solid rgba(255,255,255,0.12)', flexShrink: 0 }}>
+            <span style={{ color: '#EEE4DA', fontFamily: 'var(--font)', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{visor.nombre}</span>
+            <button onClick={() => setVisor(null)}
+              style={{ background: 'var(--gold)', color: '#211C17', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+              ✕ Cerrar
+            </button>
+          </div>
+          <iframe
+            title={visor.nombre}
+            src={visor.url}
+            style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }}
+            sandbox="allow-scripts allow-same-origin"
+            allow="autoplay"
+          />
+        </div>
+      )}
+      {visorMsg && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 2100 }} onClick={() => setVisorMsg('')}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '24px 22px', maxWidth: 380, width: '100%', textAlign: 'center', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--dark)', marginBottom: 8 }}>Documento</div>
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--dark)', margin: 0 }}>{visorMsg}</p>
+            <button onClick={() => setVisorMsg('')} style={{ marginTop: 16, background: '#CDA788', color: '#211C17', border: 'none', borderRadius: 11, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font)' }}>Entendido</button>
           </div>
         </div>
       )}
@@ -621,7 +658,7 @@ export default function PacienteDashboard() {
                           <div className="cita-motivo">{p.fecha ? fmtFecha(p.fecha) : ''}</div>
                         </div>
                         {p.link
-                          ? <a href={p.link} target="_blank" rel="noreferrer" style={{ background: 'var(--gold)', color: '#fff', textDecoration: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap' }}>Abrir</a>
+                          ? <button onClick={() => abrirArchivo(p.link, p.nombre || 'Plan nutricional')} style={{ background: 'var(--gold)', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap' }}>Abrir</button>
                           : <span style={{ fontSize: '11px', color: 'var(--stone)' }}>Sin archivo</span>}
                       </div>
                     ))
