@@ -590,6 +590,12 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     try { await updateDoc(doc(db, 'pacientes', sel.id), { isak: arr }); } catch (e) { setErr(e.message); }
   };
 
+  const removeInbodyArchivo = async (i) => {
+    if (!window.confirm('¿Quitar este archivo de InBody de la lista?\n\nDesaparecerá también de la vista del paciente. (El archivo seguirá en Drive y la medición de las gráficas no se toca.)')) return;
+    const arr = (sel.inbodyArchivos || []).filter((_, k) => k !== i);
+    try { await updateDoc(doc(db, 'pacientes', sel.id), { inbodyArchivos: arr }); } catch (e) { setErr(e.message); }
+  };
+
   const subirEstudio = async () => {
     if (!estudioFile) { setErr('Selecciona el archivo del estudio (PDF o imagen).'); return; }
     const url = process.env.REACT_APP_APPSCRIPT_URL;
@@ -1018,6 +1024,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                             <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
                           </div>
                           {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                          <button style={S.rm} onClick={() => removeInbodyArchivo(idx)} title="Quitar">×</button>
                         </div>
                       ))}
                   </div>
