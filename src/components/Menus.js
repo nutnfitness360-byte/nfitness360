@@ -218,6 +218,10 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const [nOpciones, setNOpciones] = useState(savedNOp);
   const [status, setStatus] = useState(savedMenus ? 'guardado' : 'nuevo');
 
+  // Si hay borrador y el plan cambió su distribución de equivalentes desde que se guardó, preguntamos qué hacer.
+  const planCambio = !!(savedMenus && Array.isArray(savedMenus.planEq) && planEq && JSON.stringify(savedMenus.planEq) !== JSON.stringify(planEq));
+  const [showBorradorModal, setShowBorradorModal] = useState(planCambio);
+
   // Carga las imágenes guardadas (documento aparte) y las une a los tiempos por su id.
   useEffect(() => {
     let cancel = false;
@@ -274,6 +278,14 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const salirAhora = () => { const p = exitModal && exitModal.proceed; setExitModal(null); if (p) p(); };
   const guardarYSalir = async () => { const p = exitModal && exitModal.proceed; const ok = await guardarBorrador(); if (ok) { setExitModal(null); if (p) p(); } };
   const setT = (idx, patch) => { setTiempos(ts => ts.map((t, i) => i === idx ? { ...t, ...patch } : t)); touch(); };
+
+  // El popup del borrador: descartar lo guardado y reconfigurar el menú desde el plan actual.
+  const empezarDesdeCero = () => {
+    setShowBorradorModal(false);
+    setTiempos([]);
+    setStatus('nuevo');
+    setShowCfg(true);
+  };
   const setEqCell = (idx, g, v) => setT(idx, { eq: tiempos[idx].eq.map((x, k) => k === g ? String(v).replace(',', '.') : x) });
   const setOpcion = (idx, oi, patch) => setT(idx, { opciones: tiempos[idx].opciones.map((o, k) => k === oi ? { ...o, ...patch } : o) });
   const setPorciones = (idx, val) => {
@@ -537,7 +549,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const guardarBorrador = async () => {
     setStatus('guardando'); setRep('Guardando borrador…');
     try {
-      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos: tiemposSinFoto(), nOpciones } });
+      await updateDoc(doc(db, 'pacientes', patient.id), { 'plan.menus': { tiempos: tiemposSinFoto(), nOpciones, planEq: planEq || [] } });
     } catch (e) {
       setStatus('error'); setRep('No se pudo guardar el borrador: ' + e.message);
       return false;
@@ -971,6 +983,19 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           <button style={S.primaryBtn} className="nf-primary" onClick={() => setShowScope(true)} disabled={status === 'guardando'}>{status === 'guardando' ? 'Guardando…' : 'Guardar menús'}</button>
         </div>
       </div>
+
+      {showBorradorModal && (
+        <div style={S.modalWrap}>
+          <div style={{ ...S.modalCard, maxWidth: 440 }}>
+            <div style={S.exitTitle}>Tienes un borrador guardado</div>
+            <div style={S.exitText}>Cambiaste la distribución de equivalentes en el plan desde que guardaste este menú. ¿Quieres continuar con tu borrador o empezar de nuevo con el plan actual?</div>
+            <div style={S.exitBtns}>
+              <button style={S.volverBtn} onClick={empezarDesdeCero}>Empezar desde cero</button>
+              <button style={S.primaryBtn} className="nf-primary" onClick={() => setShowBorradorModal(false)}>Continuar con el borrador</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {exitModal && (
         <div style={S.modalWrap}>
