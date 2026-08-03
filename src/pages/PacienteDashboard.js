@@ -7,6 +7,7 @@ import Topbar from '../components/Topbar';
 import PerfilPaciente from '../components/PerfilPaciente';
 import Agenda from '../components/Agenda';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
+import { renderRich } from '../utils/richText';
 
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
 const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
@@ -688,9 +689,9 @@ export default function PacienteDashboard() {
                         ? secs.map(([k, t]) => (
                           <div key={k} style={{ marginTop: 7 }}>
                             <div style={{ fontSize: 10.5, color: 'var(--gold)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 2 }}>{t}</div>
-                            <div style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{r[k]}</div>
+                            <div className="reco-rich" style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: renderRich(r[k]) }} />
                           </div>))
-                        : <div style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{r.texto}</div>}
+                        : <div className="reco-rich" style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: renderRich(r.texto) }} />}
                     </div>
                     <button onClick={() => generarPDFReco(r)} title="Generar PDF de esta recomendación"
                       style={{ background: '#221C16', color: '#EEE4DA', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 12px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 }}>
