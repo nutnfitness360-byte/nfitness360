@@ -146,6 +146,10 @@ export default function PacienteDashboard() {
   const [estudioBusy, setEstudioBusy] = useState(false);
   const [estudioMsg, setEstudioMsg] = useState('');
   const estudioInputRef = useRef(null);
+  const [uploadBusy, setUploadBusy] = useState('');
+  const [uploadMsg, setUploadMsg] = useState({});
+  const isakInputRef = useRef(null);
+  const inbodyInputRef = useRef(null);
 
   // Al volver de Stripe: confirma el pago y agenda (o cancela si se abandonó el pago).
   useEffect(() => {
@@ -378,6 +382,59 @@ export default function PacienteDashboard() {
     if (estudioInputRef.current) estudioInputRef.current.value = '';
   };
 
+  // Subidor genérico para ISAK e InBody (mismo comportamiento que estudios, a su carpeta/arreglo).
+  const UPLOAD_CFG = {
+    isak:   { action: 'saveISAK',   campo: 'isak',           prefijo: 'ISAK' },
+    inbody: { action: 'leerInBody', campo: 'inbodyArchivos', prefijo: 'InBody' },
+  };
+  const subirArchivoExtra = async (file, tipo) => {
+    if (!file) return;
+    const cfg = UPLOAD_CFG[tipo];
+    if (!cfg) return;
+    const setMsg = (m) => setUploadMsg(s => ({ ...s, [tipo]: m }));
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setMsg('No está configurada la conexión para subir archivos.'); return; }
+    if (!expediente) { setMsg('Tu cuenta aún no está vinculada a un expediente.'); return; }
+    setUploadBusy(tipo); setMsg('Subiendo…');
+    try {
+      const b64 = await fileToBase64(file);
+      const fecha = new Date().toISOString().slice(0, 10);
+      const ext = (file.name.split('.').pop() || 'pdf').toLowerCase();
+      const filename = cfg.prefijo + '_' + (expediente.codigo || '') + '_' + fecha + '.' + ext;
+      const resp = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: cfg.action, patient: expediente.nombre || '', correo: (expediente.correo || user.email || ''), filename, mime: file.type || 'application/pdf', fileBase64: b64, pdfBase64: b64 }),
+        redirect: 'follow',
+      });
+      const data = await resp.json().catch(() => null);
+      if (!data || !data.ok || !data.link) throw new Error((data && data.error) || 'No se recibió el enlace del archivo.');
+      const arr = [...(expediente[cfg.campo] || []), { nombre: file.name || filename, fecha, link: data.link }];
+      await updateDoc(doc(db, 'pacientes', expediente.id), { [cfg.campo]: arr });
+      setMsg('Archivo cargado ✓');
+    } catch (e) { setMsg('No se pudo cargar: ' + e.message); }
+    setUploadBusy('');
+    const ref = tipo === 'isak' ? isakInputRef : inbodyInputRef;
+    if (ref.current) ref.current.value = '';
+  };
+
+  // Fila con botón de subida (misma apariencia que la de estudios).
+  const uploadUI = (tipo, label, aceptaImagen) => {
+    const ref = tipo === 'isak' ? isakInputRef : inbodyInputRef;
+    const busy = uploadBusy === tipo;
+    const msg = uploadMsg[tipo];
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+        <input ref={ref} type="file" accept={aceptaImagen ? 'application/pdf,image/*' : 'application/pdf'} style={{ display: 'none' }}
+          onChange={e => subirArchivoExtra(e.target.files && e.target.files[0], tipo)} />
+        <button onClick={() => ref.current && ref.current.click()} disabled={busy || !expediente}
+          style={{ background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: (busy || !expediente) ? 'default' : 'pointer', opacity: (busy || !expediente) ? 0.6 : 1, fontFamily: 'var(--font)' }}>
+          {busy ? 'Subiendo…' : label}
+        </button>
+        {msg ? <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>{msg}</span> : null}
+      </div>
+    );
+  };
+
   const secHeader = (id, titulo) => (
     <button onClick={() => toggleSec(id)}
       style={{ width: '100%', background: 'var(--dark)', color: '#fff', fontWeight: 700, fontSize: 14, padding: '10px 14px', borderRadius: 10, letterSpacing: 0.3, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'var(--font)' }}>
@@ -574,12 +631,12 @@ export default function PacienteDashboard() {
 
             <div style={{ marginBottom: 12 }}>
               {secHeader('isak', 'Reportes ISAK')}
-              {secAbierta.isak && <div style={{ marginTop: 14 }}>{listaArchivos(expediente && expediente.isak, 'Aún no tienes reportes ISAK.', 'Reporte ISAK')}</div>}
+              {secAbierta.isak && <div style={{ marginTop: 14 }}>{uploadUI('isak', '+ Subir reporte ISAK (PDF)', false)}{listaArchivos(expediente && expediente.isak, 'Aún no tienes reportes ISAK.', 'Reporte ISAK')}</div>}
             </div>
 
             <div style={{ marginBottom: 12 }}>
               {secHeader('inbody', 'InBody')}
-              {secAbierta.inbody && <div style={{ marginTop: 14 }}>{listaArchivos(expediente && expediente.inbody, 'Aún no tienes reportes InBody.', 'Reporte InBody')}</div>}
+              {secAbierta.inbody && <div style={{ marginTop: 14 }}>{uploadUI('inbody', '+ Subir InBody (PDF o imagen)', true)}{listaArchivos(expediente && expediente.inbodyArchivos, 'Aún no tienes reportes InBody.', 'Reporte InBody')}</div>}
             </div>
 
             <div>
