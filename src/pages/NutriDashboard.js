@@ -42,9 +42,12 @@ export default function NutriDashboard() {
   };
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
-  const [cfg, setCfg] = useState({ pendientes: [], precios: {}, servicios: [] });
+  const [cfg, setCfg] = useState({ pendientes: [], pendientesPago: [], precios: {}, servicios: [] });
   const [filtroRet, setFiltroRet] = useState(null);
   const [nuevoPend, setNuevoPend] = useState('');
+  const [nuevoPago, setNuevoPago] = useState('');
+  const [edit, setEdit] = useState(null); // { lista, id }
+  const [editTexto, setEditTexto] = useState('');
   const [editaPrecios, setEditaPrecios] = useState(false);
 
   const hoy = new Date();
@@ -63,12 +66,12 @@ export default function NutriDashboard() {
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
       const d = snap.exists() ? snap.data() : {};
-      setCfg({ pendientes: Array.isArray(d.pendientes) ? d.pendientes : [], precios: d.precios || {}, servicios: Array.isArray(d.servicios) ? d.servicios : [] });
+      setCfg({ pendientes: Array.isArray(d.pendientes) ? d.pendientes : [], pendientesPago: Array.isArray(d.pendientesPago) ? d.pendientesPago : [], precios: d.precios || {}, servicios: Array.isArray(d.servicios) ? d.servicios : [] });
     });
   }, []);
 
   const guardarCfg = async (patch) => {
-    const next = { pendientes: cfg.pendientes, precios: cfg.precios, servicios: cfg.servicios, ...patch };
+    const next = { pendientes: cfg.pendientes, pendientesPago: cfg.pendientesPago, precios: cfg.precios, servicios: cfg.servicios, ...patch };
     setCfg(next);
     try { await setDoc(doc(db, 'config', 'dashboard'), next, { merge: true }); } catch (e) { /* no bloquear UI */ }
   };
@@ -86,6 +89,47 @@ export default function NutriDashboard() {
   };
   const togglePend = (id) => guardarCfg({ pendientes: cfg.pendientes.map(p => p.id === id ? { ...p, hecho: !p.hecho } : p) });
   const delPend = (id) => guardarCfg({ pendientes: cfg.pendientes.filter(p => p.id !== id) });
+
+  // ---- Pendientes de pago (misma mecánica, lista aparte) ----
+  const addPago = () => {
+    const t = nuevoPago.trim();
+    if (!t) return;
+    guardarCfg({ pendientesPago: [...(cfg.pendientesPago || []), { id: uid(), texto: t, hecho: false }] });
+    setNuevoPago('');
+  };
+  const togglePago = (id) => guardarCfg({ pendientesPago: (cfg.pendientesPago || []).map(p => p.id === id ? { ...p, hecho: !p.hecho } : p) });
+  const delPago = (id) => guardarCfg({ pendientesPago: (cfg.pendientesPago || []).filter(p => p.id !== id) });
+
+  // ---- Edición en línea (para ambas listas) ----
+  const startEdit = (lista, p) => { setEdit({ lista, id: p.id }); setEditTexto(p.texto); };
+  const cancelEdit = () => setEdit(null);
+  const saveEdit = () => {
+    if (!edit) return;
+    const key = edit.lista === 'pago' ? 'pendientesPago' : 'pendientes';
+    const t = editTexto.trim();
+    const arr = (cfg[key] || []).map(p => p.id === edit.id ? { ...p, texto: t || p.texto } : p);
+    guardarCfg({ [key]: arr });
+    setEdit(null);
+  };
+
+  // Fila de pendiente reutilizable (con edición en línea).
+  const filaPend = (lista, p, onToggle, onDel) => {
+    const enEdicion = edit && edit.lista === lista && edit.id === p.id;
+    return (
+      <div key={p.id} style={D.pendRow}>
+        <button onClick={() => onToggle(p.id)} style={{ ...D.check, ...(p.hecho ? D.checkOn : {}) }}>{p.hecho ? '✓' : ''}</button>
+        {enEdicion
+          ? <input autoFocus style={D.pendEditIn} value={editTexto}
+              onChange={e => setEditTexto(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+              onBlur={saveEdit} />
+          : <span onClick={() => startEdit(lista, p)} title="Clic para editar"
+              style={{ flex: 1, fontSize: 13.5, color: 'var(--dark)', cursor: 'text', textDecoration: p.hecho ? 'line-through' : 'none', opacity: p.hecho ? 0.5 : 1 }}>{p.texto}</span>}
+        {!enEdicion && <button onClick={() => startEdit(lista, p)} style={D.pendEdit} title="Editar">✎</button>}
+        <button onClick={() => onDel(p.id)} style={D.pendDel} title="Eliminar">×</button>
+      </div>
+    );
+  };
 
   // ---- Financiero (mes actual) ----
   const citasMes = citas.filter(c => (c.fecha || '').slice(0, 7) === mesKey && c.estado !== 'cancelada');
@@ -212,13 +256,21 @@ export default function NutriDashboard() {
                 </div>
                 {cfg.pendientes.length === 0
                   ? <div className="empty-state">Sin pendientes. ¡Todo al día!</div>
-                  : cfg.pendientes.map(p => (
-                    <div key={p.id} style={D.pendRow}>
-                      <button onClick={() => togglePend(p.id)} style={{ ...D.check, ...(p.hecho ? D.checkOn : {}) }}>{p.hecho ? '✓' : ''}</button>
-                      <span style={{ flex: 1, fontSize: 13.5, color: 'var(--dark)', textDecoration: p.hecho ? 'line-through' : 'none', opacity: p.hecho ? 0.5 : 1 }}>{p.texto}</span>
-                      <button onClick={() => delPend(p.id)} style={D.pendDel} title="Eliminar">×</button>
-                    </div>
-                  ))}
+                  : cfg.pendientes.map(p => filaPend('pend', p, togglePend, delPend))}
+              </div>
+
+              {/* Pendientes de pago */}
+              <div className="card">
+                <div className="card-title">Pendientes de pago</div>
+                <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: -6, marginBottom: 12 }}>Nombra cada bullet con la persona que debe. Marca cuando ya pagó.</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <input style={D.pendInput} value={nuevoPago} onChange={e => setNuevoPago(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addPago(); }} placeholder="Nombre de quien debe…" />
+                  <button style={D.addBtn} onClick={addPago}>+</button>
+                </div>
+                {(!cfg.pendientesPago || cfg.pendientesPago.length === 0)
+                  ? <div className="empty-state">Sin pendientes de pago.</div>
+                  : cfg.pendientesPago.map(p => filaPend('pago', p, togglePago, delPago))}
               </div>
             </div>
 
@@ -349,6 +401,8 @@ const D = {
   check: { width: 22, height: 22, borderRadius: 6, border: '1.5px solid var(--gold)', background: '#fff', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 800, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 },
   checkOn: { background: 'var(--gold)' },
   pendDel: { background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 18, cursor: 'pointer', lineHeight: 1, flexShrink: 0 },
+  pendEditIn: { flex: 1, fontSize: 13.5, color: 'var(--dark)', fontFamily: 'Montserrat, sans-serif', border: '1px solid var(--gold)', borderRadius: 6, padding: '5px 7px', background: '#fff' },
+  pendEdit: { background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 14, cursor: 'pointer', lineHeight: 1, flexShrink: 0 },
   preciosBox: { background: 'var(--cream)', borderRadius: 10, padding: '12px 14px', marginBottom: 14 },
   precioRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' },
   precioInput: { width: 90, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, fontFamily: 'Montserrat, sans-serif', textAlign: 'right', background: '#fff', color: 'var(--dark)' },
