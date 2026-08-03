@@ -673,8 +673,9 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
         redirect: 'follow',
       });
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = null; }
-      if (data && data.ok && data.datos) {
-        const d = data.datos;
+      // El backend puede devolver los valores planos (data.peso…) o dentro de data.datos; aceptamos ambos.
+      const d = (data && data.ok) ? (data.datos || data) : null;
+      if (d && (parseFloat(d.peso) || parseFloat(d.grasa) || parseFloat(d.mme) || parseFloat(d.tmb))) {
         const nm = {
           fecha: (d.fecha && /^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) ? d.fecha : hoyISO(),
           peso: parseFloat(d.peso) || 0,
