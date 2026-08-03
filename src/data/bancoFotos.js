@@ -1,0 +1,1294 @@
+// Banco de fotos de platillos (128). Generado automáticamente.
+// Cada entrada: { file, label, keys }. Las imágenes viven en public/menu-images/.
+const BANCO_FOTOS = [
+ {
+  "file": "avena-con-fresa-y-nuez-04721cae.jpg",
+  "label": "Avena con fresa y nuez",
+  "keys": [
+   "avena",
+   "fresa",
+   "nuez"
+  ]
+ },
+ {
+  "file": "bowl-de-yogurt-con-platano-y-chia-05f2e290.jpg",
+  "label": "Bowl de yogurt con plátano y chía",
+  "keys": [
+   "yogurt",
+   "platano",
+   "chia"
+  ]
+ },
+ {
+  "file": "huevo-con-nopales-084395fa.jpg",
+  "label": "Huevo con nopales",
+  "keys": [
+   "huevo",
+   "huevos",
+   "nopal",
+   "nopales"
+  ]
+ },
+ {
+  "file": "huevos-revueltos-con-espinaca-y-jitomate-08b71ffb.jpg",
+  "label": "Huevos revueltos con espinaca y jitomate",
+  "keys": [
+   "huevo",
+   "huevos",
+   "espinaca",
+   "espinacas",
+   "jitomate",
+   "tomate"
+  ]
+ },
+ {
+  "file": "avo-toast-de-salmon-ahumado-0db82c23.jpg",
+  "label": "Avo toast de salmón ahumado",
+  "keys": [
+   "salmon",
+   "aguacate",
+   "avo",
+   "pepino",
+   "toast"
+  ]
+ },
+ {
+  "file": "pan-toast-con-mantequilla-1595f995.jpg",
+  "label": "Pan / toast con mantequilla",
+  "keys": [
+   "pan",
+   "toast",
+   "mantequilla",
+   "frances"
+  ]
+ },
+ {
+  "file": "bowl-completo-pollo-arroz-garbanzo-1603ac7a.jpg",
+  "label": "Bowl completo (pollo, arroz, garbanzo)",
+  "keys": [
+   "bowl",
+   "pollo",
+   "arroz",
+   "garbanzo",
+   "garbanzos"
+  ]
+ },
+ {
+  "file": "overnight-oats-con-kiwi-173a9a48.jpg",
+  "label": "Overnight oats con kiwi",
+  "keys": [
+   "overnight",
+   "avena",
+   "yogurt",
+   "kiwi"
+  ]
+ },
+ {
+  "file": "bowl-de-fruta-frutos-rojos-17a41bbe.jpg",
+  "label": "Bowl de fruta (frutos rojos)",
+  "keys": [
+   "fruta",
+   "fresa",
+   "arandano",
+   "arandanos",
+   "frambuesa",
+   "blueberries",
+   "berries",
+   "frutos"
+  ]
+ },
+ {
+  "file": "avo-toast-de-salmon-y-arugula-1a117728.jpg",
+  "label": "Avo toast de salmón y arúgula",
+  "keys": [
+   "salmon",
+   "aguacate",
+   "avo",
+   "arugula",
+   "toast"
+  ]
+ },
+ {
+  "file": "molletes-1b9f70aa.jpg",
+  "label": "Molletes",
+  "keys": [
+   "molletes",
+   "mollete"
+  ]
+ },
+ {
+  "file": "pepino-y-zanahoria-con-tajin-1ff9385c.jpg",
+  "label": "Pepino y zanahoria con Tajín",
+  "keys": [
+   "pepino",
+   "zanahoria",
+   "tajin",
+   "verdura",
+   "verduras"
+  ]
+ },
+ {
+  "file": "salmon-con-ensalada-207c54a6.jpg",
+  "label": "Salmón con ensalada",
+  "keys": [
+   "salmon",
+   "ensalada",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "filete-de-pescado-con-papas-y-ensalada-22078269.jpg",
+  "label": "Filete de pescado con papas y ensalada",
+  "keys": [
+   "pescado",
+   "filete",
+   "papa",
+   "papas",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "huevo-al-gusto-con-fruta-23ff0e72.jpg",
+  "label": "Huevo al gusto con fruta",
+  "keys": [
+   "huevo",
+   "huevos",
+   "fresa",
+   "aguacate",
+   "cafe"
+  ]
+ },
+ {
+  "file": "manzana-con-crema-de-cacahuate-24c21928.jpg",
+  "label": "Manzana con crema de cacahuate",
+  "keys": [
+   "manzana",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "palomitas-27d117e6.jpg",
+  "label": "Palomitas",
+  "keys": [
+   "palomitas",
+   "palomita"
+  ]
+ },
+ {
+  "file": "proteina-suplemento-batido-2bdff8b5.jpg",
+  "label": "Proteína / suplemento (batido)",
+  "keys": [
+   "proteina",
+   "suplemento",
+   "whey",
+   "batido"
+  ]
+ },
+ {
+  "file": "toast-caprese-2d793ff2.jpg",
+  "label": "Toast caprese",
+  "keys": [
+   "caprese",
+   "pan",
+   "toast",
+   "jitomate",
+   "queso",
+   "albahaca"
+  ]
+ },
+ {
+  "file": "avo-toast-de-salmon-con-huevo-2e12f3d8.jpg",
+  "label": "Avo toast de salmón con huevo",
+  "keys": [
+   "salmon",
+   "aguacate",
+   "avo",
+   "toast",
+   "huevo"
+  ]
+ },
+ {
+  "file": "ensalada-de-nopales-301b4a1f.jpg",
+  "label": "Ensalada de nopales",
+  "keys": [
+   "nopales",
+   "nopal",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "bowl-de-yogurt-con-mango-3055a6be.jpg",
+  "label": "Bowl de yogurt con mango",
+  "keys": [
+   "yogurt",
+   "mango",
+   "granola"
+  ]
+ },
+ {
+  "file": "bowl-de-acai-smoothie-bowl-3497145d.jpg",
+  "label": "Bowl de açaí / smoothie bowl",
+  "keys": [
+   "acai",
+   "bowl",
+   "smoothie",
+   "berries",
+   "granola",
+   "fresa"
+  ]
+ },
+ {
+  "file": "omelette-360a45c9.jpg",
+  "label": "Omelette",
+  "keys": [
+   "omelette",
+   "omelet",
+   "huevo",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "uvas-37624af9.jpg",
+  "label": "Uvas",
+  "keys": [
+   "uva",
+   "uvas",
+   "fruta"
+  ]
+ },
+ {
+  "file": "filete-de-pescado-con-papas-y-ensalada-3806b409.jpg",
+  "label": "Filete de pescado con papas y ensalada",
+  "keys": [
+   "pescado",
+   "filete",
+   "papa",
+   "papas",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "tacos-de-pescado-3a5e4f2f.jpg",
+  "label": "Tacos de pescado",
+  "keys": [
+   "tacos",
+   "taco",
+   "pescado"
+  ]
+ },
+ {
+  "file": "tostadas-de-tinga-de-pollo-3c40f42a.jpg",
+  "label": "Tostadas de tinga de pollo",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "tinga",
+   "pollo"
+  ]
+ },
+ {
+  "file": "yogurt-griego-con-granola-y-arandano-3e1d3bbc.jpg",
+  "label": "Yogurt griego con granola y arándano",
+  "keys": [
+   "yogurt",
+   "griego",
+   "granola",
+   "arandano",
+   "blueberry"
+  ]
+ },
+ {
+  "file": "waffle-con-platano-huevo-y-fresa-41819aee.jpg",
+  "label": "Waffle con plátano, huevo y fresa",
+  "keys": [
+   "waffle",
+   "waffles",
+   "platano",
+   "huevo",
+   "fresa"
+  ]
+ },
+ {
+  "file": "kiwi-con-chocolate-43c1b6a2.jpg",
+  "label": "Kiwi con chocolate",
+  "keys": [
+   "kiwi",
+   "chocolate",
+   "fruta"
+  ]
+ },
+ {
+  "file": "ensalada-de-garbanzo-4c2c258c.jpg",
+  "label": "Ensalada de garbanzo",
+  "keys": [
+   "ensalada",
+   "garbanzo",
+   "garbanzos",
+   "pepino",
+   "jitomate"
+  ]
+ },
+ {
+  "file": "omelette-520b8dfa.jpg",
+  "label": "Omelette",
+  "keys": [
+   "omelette",
+   "omelet",
+   "huevo",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "omelette-de-champinones-y-espinaca-544342b6.jpg",
+  "label": "Omelette de champiñones y espinaca",
+  "keys": [
+   "omelette",
+   "omelet",
+   "champinones",
+   "champiñones",
+   "espinaca",
+   "huevo"
+  ]
+ },
+ {
+  "file": "filete-de-pescado-con-arroz-y-ejotes-5b4c9841.jpg",
+  "label": "Filete de pescado con arroz y ejotes",
+  "keys": [
+   "pescado",
+   "filete",
+   "arroz",
+   "ejotes"
+  ]
+ },
+ {
+  "file": "bowl-de-pollo-con-quinoa-6156acab.jpg",
+  "label": "Bowl de pollo con quinoa",
+  "keys": [
+   "bowl",
+   "pollo",
+   "quinoa",
+   "aguacate",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "jicama-y-pepino-con-chile-61f0506e.jpg",
+  "label": "Jícama y pepino con chile",
+  "keys": [
+   "jicama",
+   "pepino",
+   "chile",
+   "tajin"
+  ]
+ },
+ {
+  "file": "avo-toast-con-cottage-y-salmon-656ee1b2.jpg",
+  "label": "Avo toast con cottage y salmón",
+  "keys": [
+   "salmon",
+   "aguacate",
+   "avo",
+   "toast",
+   "cottage"
+  ]
+ },
+ {
+  "file": "rice-cake-con-crema-de-cacahuate-664ee46f.jpg",
+  "label": "Rice cake con crema de cacahuate",
+  "keys": [
+   "rice",
+   "cake",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "kiwi-674284fc.jpg",
+  "label": "Kiwi",
+  "keys": [
+   "kiwi",
+   "fruta"
+  ]
+ },
+ {
+  "file": "bowl-de-camaron-con-quinoa-6986415c.jpg",
+  "label": "Bowl de camarón con quinoa",
+  "keys": [
+   "camaron",
+   "camarones",
+   "quinoa",
+   "ensalada",
+   "bowl"
+  ]
+ },
+ {
+  "file": "yogurt-con-manzana-y-nuez-6a9f95f8.jpg",
+  "label": "Yogurt con manzana y nuez",
+  "keys": [
+   "yogurt",
+   "manzana",
+   "nuez",
+   "canela"
+  ]
+ },
+ {
+  "file": "ensalada-de-pollo-6aa80631.jpg",
+  "label": "Ensalada de pollo",
+  "keys": [
+   "ensalada",
+   "pollo",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "toast-con-crema-de-cacahuate-y-manzana-6ed2628b.jpg",
+  "label": "Toast con crema de cacahuate y manzana",
+  "keys": [
+   "toast",
+   "pan",
+   "cacahuate",
+   "manzana",
+   "crema"
+  ]
+ },
+ {
+  "file": "mango-con-pepino-y-limon-6f49693e.jpg",
+  "label": "Mango con pepino y limón",
+  "keys": [
+   "mango",
+   "pepino",
+   "limon",
+   "fruta"
+  ]
+ },
+ {
+  "file": "mango-7013ca6b.jpg",
+  "label": "Mango",
+  "keys": [
+   "mango",
+   "fruta"
+  ]
+ },
+ {
+  "file": "pan-frances-con-fresa-7244512c.jpg",
+  "label": "Pan francés con fresa",
+  "keys": [
+   "pan",
+   "frances",
+   "fresa",
+   "toast"
+  ]
+ },
+ {
+  "file": "yogurt-con-fresa-y-nuez-7390a2cd.jpg",
+  "label": "Yogurt con fresa y nuez",
+  "keys": [
+   "yogurt",
+   "fresa",
+   "nuez"
+  ]
+ },
+ {
+  "file": "hot-cakes-con-fresa-7668a681.jpg",
+  "label": "Hot cakes con fresa",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "fresa"
+  ]
+ },
+ {
+  "file": "bowl-de-yogurt-con-granola-y-frutos-rojos-7779682d.jpg",
+  "label": "Bowl de yogurt con granola y frutos rojos",
+  "keys": [
+   "yogurt",
+   "granola",
+   "fresa",
+   "arandano",
+   "blueberry",
+   "berries"
+  ]
+ },
+ {
+  "file": "huevo-a-la-mexicana-con-rajas-77c81707.jpg",
+  "label": "Huevo a la mexicana / con rajas",
+  "keys": [
+   "huevo",
+   "huevos",
+   "rajas",
+   "mexicana",
+   "poblano"
+  ]
+ },
+ {
+  "file": "kiwi-con-chocolate-797d0b5c.jpg",
+  "label": "Kiwi con chocolate",
+  "keys": [
+   "kiwi",
+   "chocolate",
+   "fruta"
+  ]
+ },
+ {
+  "file": "ensalada-de-atun-7a05a06b.jpg",
+  "label": "Ensalada de atún",
+  "keys": [
+   "ensalada",
+   "atun",
+   "pepino",
+   "jitomate"
+  ]
+ },
+ {
+  "file": "hot-cakes-con-fresa-7b7feeca.jpg",
+  "label": "Hot cakes con fresa",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "fresa",
+   "yogurt"
+  ]
+ },
+ {
+  "file": "toast-de-pavo-con-aguacate-7cea73fc.jpg",
+  "label": "Toast de pavo con aguacate",
+  "keys": [
+   "toast",
+   "pan",
+   "pavo",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "smoothie-de-fresa-8101a29a.jpg",
+  "label": "Smoothie de fresa",
+  "keys": [
+   "smoothie",
+   "fresa",
+   "batido"
+  ]
+ },
+ {
+  "file": "ensalada-de-atun-sellado-81a825c1.jpg",
+  "label": "Ensalada de atún sellado",
+  "keys": [
+   "ensalada",
+   "atun",
+   "sellado",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "filete-de-pescado-con-papas-y-ensalada-81b9422d.jpg",
+  "label": "Filete de pescado con papas y ensalada",
+  "keys": [
+   "pescado",
+   "filete",
+   "papa",
+   "papas",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "cottage-con-fresa-y-pistache-81d2d87b.jpg",
+  "label": "Cottage con fresa y pistache",
+  "keys": [
+   "cottage",
+   "fresa",
+   "pistache",
+   "yogurt"
+  ]
+ },
+ {
+  "file": "sandwich-de-aguacate-8514af82.jpg",
+  "label": "Sándwich de aguacate",
+  "keys": [
+   "sandwich",
+   "aguacate",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "bowl-de-yogurt-con-kiwi-y-chia-8aac4dfa.jpg",
+  "label": "Bowl de yogurt con kiwi y chía",
+  "keys": [
+   "yogurt",
+   "kiwi",
+   "chia"
+  ]
+ },
+ {
+  "file": "gorditas-de-huevo-8d613926.jpg",
+  "label": "Gorditas de huevo",
+  "keys": [
+   "gorditas",
+   "gordita",
+   "huevo",
+   "arepa"
+  ]
+ },
+ {
+  "file": "toast-de-crema-de-cacahuate-con-mermelada-y-platano-8ec685ac.jpg",
+  "label": "Toast de crema de cacahuate con mermelada y plátano",
+  "keys": [
+   "toast",
+   "pan",
+   "cacahuate",
+   "mermelada",
+   "platano"
+  ]
+ },
+ {
+  "file": "green-smoothie-jugo-verde-92408e20.jpg",
+  "label": "Green smoothie / jugo verde",
+  "keys": [
+   "green",
+   "smoothie",
+   "jugo",
+   "verde"
+  ]
+ },
+ {
+  "file": "avo-toast-de-salmon-con-queso-crema-93df3bba.jpg",
+  "label": "Avo toast de salmón con queso crema",
+  "keys": [
+   "salmon",
+   "aguacate",
+   "avo",
+   "toast",
+   "queso"
+  ]
+ },
+ {
+  "file": "enfrijoladas-93ed7b15.jpg",
+  "label": "Enfrijoladas",
+  "keys": [
+   "enfrijoladas",
+   "enchiladas",
+   "frijol"
+  ]
+ },
+ {
+  "file": "tostadas-de-verduras-con-panela-99f874c1.jpg",
+  "label": "Tostadas de verduras con panela",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "panela",
+   "verduras",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "overnight-oats-con-fresa-9a603d06.jpg",
+  "label": "Overnight oats con fresa",
+  "keys": [
+   "overnight",
+   "avena",
+   "fresa",
+   "granola"
+  ]
+ },
+ {
+  "file": "omelette-de-espinaca-9ac57f00.jpg",
+  "label": "Omelette de espinaca",
+  "keys": [
+   "omelette",
+   "omelet",
+   "espinaca",
+   "huevo",
+   "jitomate"
+  ]
+ },
+ {
+  "file": "chia-pudding-con-platano-9b9d28a0.jpg",
+  "label": "Chía pudding con plátano",
+  "keys": [
+   "chia",
+   "pudding",
+   "platano",
+   "granola"
+  ]
+ },
+ {
+  "file": "quesadillas-de-pollo-9bd87548.jpg",
+  "label": "Quesadillas de pollo",
+  "keys": [
+   "quesadillas",
+   "quesadilla",
+   "pollo"
+  ]
+ },
+ {
+  "file": "huevos-a-la-mexicana-9c1677c4.jpg",
+  "label": "Huevos a la mexicana",
+  "keys": [
+   "huevo",
+   "huevos",
+   "mexicana"
+  ]
+ },
+ {
+  "file": "avena-con-manzana-y-canela-9c9fa35a.jpg",
+  "label": "Avena con manzana y canela",
+  "keys": [
+   "avena",
+   "manzana",
+   "canela"
+  ]
+ },
+ {
+  "file": "huevo-con-nopales-y-frijoles-9ef72a40.jpg",
+  "label": "Huevo con nopales y frijoles",
+  "keys": [
+   "huevo",
+   "huevos",
+   "nopal",
+   "nopales",
+   "frijol"
+  ]
+ },
+ {
+  "file": "sandwich-de-pavo-con-aguacate-a4a21b69.jpg",
+  "label": "Sándwich de pavo con aguacate",
+  "keys": [
+   "sandwich",
+   "pavo",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "tostadas-de-bistec-con-nopales-a79eebc5.jpg",
+  "label": "Tostadas de bistec con nopales",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "bistec",
+   "nopales",
+   "carne"
+  ]
+ },
+ {
+  "file": "pollo-con-verduras-y-arroz-a906bffe.jpg",
+  "label": "Pollo con verduras y arroz",
+  "keys": [
+   "pollo",
+   "verduras",
+   "arroz",
+   "salteado"
+  ]
+ },
+ {
+  "file": "huevos-rancheros-a9667de8.jpg",
+  "label": "Huevos rancheros",
+  "keys": [
+   "huevos",
+   "huevo",
+   "rancheros"
+  ]
+ },
+ {
+  "file": "cottage-con-durazno-y-granola-abf997b1.jpg",
+  "label": "Cottage con durazno y granola",
+  "keys": [
+   "cottage",
+   "durazno",
+   "granola"
+  ]
+ },
+ {
+  "file": "smoothie-de-platano-ad24e82c.jpg",
+  "label": "Smoothie de plátano",
+  "keys": [
+   "smoothie",
+   "platano",
+   "batido"
+  ]
+ },
+ {
+  "file": "smoothie-de-papaya-af52a9aa.jpg",
+  "label": "Smoothie de papaya",
+  "keys": [
+   "smoothie",
+   "papaya",
+   "batido"
+  ]
+ },
+ {
+  "file": "pera-af849f1b.jpg",
+  "label": "Pera",
+  "keys": [
+   "pera",
+   "fruta"
+  ]
+ },
+ {
+  "file": "wrap-de-pavo-b0a9a5c7.jpg",
+  "label": "Wrap de pavo",
+  "keys": [
+   "wrap",
+   "pavo",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "omelette-de-atun-b11429d5.jpg",
+  "label": "Omelette de atún",
+  "keys": [
+   "omelette",
+   "omelet",
+   "atun",
+   "huevo"
+  ]
+ },
+ {
+  "file": "mango-b118acad.jpg",
+  "label": "Mango",
+  "keys": [
+   "mango",
+   "fruta"
+  ]
+ },
+ {
+  "file": "tostadas-de-atun-con-guacamole-b397194d.jpg",
+  "label": "Tostadas de atún con guacamole",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "atun",
+   "guacamole"
+  ]
+ },
+ {
+  "file": "rice-cake-con-crema-de-cacahuate-b5070045.jpg",
+  "label": "Rice cake con crema de cacahuate",
+  "keys": [
+   "rice",
+   "cake",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "omelette-de-espinaca-y-jitomate-b715de38.jpg",
+  "label": "Omelette de espinaca y jitomate",
+  "keys": [
+   "omelette",
+   "omelet",
+   "espinaca",
+   "huevo",
+   "jitomate",
+   "frittata"
+  ]
+ },
+ {
+  "file": "hot-cakes-con-arandano-b80ca901.jpg",
+  "label": "Hot cakes con arándano",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "arandano",
+   "blueberry"
+  ]
+ },
+ {
+  "file": "huevo-con-jamon-y-avo-toast-b9a88647.jpg",
+  "label": "Huevo con jamón y avo toast",
+  "keys": [
+   "huevo",
+   "huevos",
+   "jamon",
+   "avo",
+   "toast",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "toast-de-atun-b9a91a9b.jpg",
+  "label": "Toast de atún",
+  "keys": [
+   "toast",
+   "atun",
+   "ceviche",
+   "tostada"
+  ]
+ },
+ {
+  "file": "sandwich-de-crema-de-cacahuate-y-platano-bd60cddf.jpg",
+  "label": "Sándwich de crema de cacahuate y plátano",
+  "keys": [
+   "sandwich",
+   "cacahuate",
+   "platano",
+   "crema"
+  ]
+ },
+ {
+  "file": "hot-cakes-bf854f36.jpg",
+  "label": "Hot cakes",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes"
+  ]
+ },
+ {
+  "file": "smoothie-de-pina-c1a08c97.jpg",
+  "label": "Smoothie de piña",
+  "keys": [
+   "smoothie",
+   "pina",
+   "coco",
+   "batido"
+  ]
+ },
+ {
+  "file": "proteina-suplemento-batido-c266d718.jpg",
+  "label": "Proteína / suplemento (batido)",
+  "keys": [
+   "proteina",
+   "suplemento",
+   "whey",
+   "batido"
+  ]
+ },
+ {
+  "file": "avena-con-platano-y-canela-c3abdd78.jpg",
+  "label": "Avena con plátano y canela",
+  "keys": [
+   "avena",
+   "platano",
+   "canela"
+  ]
+ },
+ {
+  "file": "yogurt-con-mango-y-nuez-c4f24fb1.jpg",
+  "label": "Yogurt con mango y nuez",
+  "keys": [
+   "yogurt",
+   "mango",
+   "nuez",
+   "cashew"
+  ]
+ },
+ {
+  "file": "sandwich-de-pavo-con-aguacate-c661b447.jpg",
+  "label": "Sándwich de pavo con aguacate",
+  "keys": [
+   "sandwich",
+   "pavo",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "batido-de-proteina-chocolate-c81d2be4.jpg",
+  "label": "Batido de proteína (chocolate)",
+  "keys": [
+   "proteina",
+   "batido",
+   "chocolate",
+   "smoothie"
+  ]
+ },
+ {
+  "file": "bowl-de-yogurt-con-granola-y-frutos-rojos-cd77f20f.jpg",
+  "label": "Bowl de yogurt con granola y frutos rojos",
+  "keys": [
+   "yogurt",
+   "granola",
+   "fresa",
+   "arandano",
+   "berries"
+  ]
+ },
+ {
+  "file": "wrap-de-verduras-con-hummus-cfe76798.jpg",
+  "label": "Wrap de verduras con hummus",
+  "keys": [
+   "wrap",
+   "verduras",
+   "hummus",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "bowl-de-quinoa-con-garbanzo-d09489a5.jpg",
+  "label": "Bowl de quinoa con garbanzo",
+  "keys": [
+   "bowl",
+   "quinoa",
+   "garbanzo",
+   "aguacate",
+   "verduras"
+  ]
+ },
+ {
+  "file": "avo-toast-d15de246.jpg",
+  "label": "Avo toast",
+  "keys": [
+   "avo",
+   "toast",
+   "aguacate",
+   "pan"
+  ]
+ },
+ {
+  "file": "arroz-blanco-d1ad870e.jpg",
+  "label": "Arroz blanco",
+  "keys": [
+   "arroz",
+   "blanco"
+  ]
+ },
+ {
+  "file": "hot-cakes-de-espinaca-verdes-d2e17161.jpg",
+  "label": "Hot cakes de espinaca (verdes)",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "espinaca",
+   "verde"
+  ]
+ },
+ {
+  "file": "papas-cambray-d35ee765.jpg",
+  "label": "Papas cambray",
+  "keys": [
+   "papa",
+   "papas",
+   "cambray"
+  ]
+ },
+ {
+  "file": "manzana-verde-d48e8015.jpg",
+  "label": "Manzana verde",
+  "keys": [
+   "manzana",
+   "verde",
+   "fruta"
+  ]
+ },
+ {
+  "file": "yogurt-con-fresa-y-nuez-d494b64f.jpg",
+  "label": "Yogurt con fresa y nuez",
+  "keys": [
+   "yogurt",
+   "fresa",
+   "nuez"
+  ]
+ },
+ {
+  "file": "hot-cakes-de-avena-con-platano-d58f23e3.jpg",
+  "label": "Hot cakes de avena con plátano",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "avena",
+   "platano"
+  ]
+ },
+ {
+  "file": "palomitas-d80d5a96.jpg",
+  "label": "Palomitas",
+  "keys": [
+   "palomitas",
+   "palomita"
+  ]
+ },
+ {
+  "file": "rollitos-de-jamon-dbbc05e9.jpg",
+  "label": "Rollitos de jamón",
+  "keys": [
+   "rollitos",
+   "jamon",
+   "rollo",
+   "pavo"
+  ]
+ },
+ {
+  "file": "manzana-con-crema-de-cacahuate-e4a7a0ff.jpg",
+  "label": "Manzana con crema de cacahuate",
+  "keys": [
+   "manzana",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "rice-cake-con-cottage-e6671aec.jpg",
+  "label": "Rice cake con cottage",
+  "keys": [
+   "rice",
+   "cake",
+   "cottage"
+  ]
+ },
+ {
+  "file": "bowl-de-pollo-con-arroz-y-brocoli-e898f45e.jpg",
+  "label": "Bowl de pollo con arroz y brócoli",
+  "keys": [
+   "bowl",
+   "pollo",
+   "arroz",
+   "brocoli"
+  ]
+ },
+ {
+  "file": "toast-con-crema-de-cacahuate-ec6eb1e1.jpg",
+  "label": "Toast con crema de cacahuate",
+  "keys": [
+   "toast",
+   "pan",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "toast-con-mermelada-f027ec04.jpg",
+  "label": "Toast con mermelada",
+  "keys": [
+   "toast",
+   "pan",
+   "mermelada"
+  ]
+ },
+ {
+  "file": "hot-cakes-de-platano-f37ede98.jpg",
+  "label": "Hot cakes de plátano",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "platano"
+  ]
+ },
+ {
+  "file": "hot-cakes-con-huevo-y-fresa-f637f683.jpg",
+  "label": "Hot cakes con huevo y fresa",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "huevo",
+   "fresa"
+  ]
+ },
+ {
+  "file": "sandwich-de-crema-de-cacahuate-f699f1b0.jpg",
+  "label": "Sándwich de crema de cacahuate",
+  "keys": [
+   "sandwich",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "toast-de-huevo-con-pico-de-gallo-f69ef2e4.jpg",
+  "label": "Toast de huevo con pico de gallo",
+  "keys": [
+   "toast",
+   "pan",
+   "huevo",
+   "aguacate",
+   "pico"
+  ]
+ },
+ {
+  "file": "panela-asada-con-nopales-f8411658.jpg",
+  "label": "Panela asada con nopales",
+  "keys": [
+   "panela",
+   "nopales",
+   "queso",
+   "aguacate",
+   "asada"
+  ]
+ },
+ {
+  "file": "tostadas-de-panela-con-frijol-f8c9d66e.jpg",
+  "label": "Tostadas de panela con frijol",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "panela",
+   "frijol",
+   "queso"
+  ]
+ },
+ {
+  "file": "sandwich-de-crema-de-cacahuate-f9f4eadc.jpg",
+  "label": "Sándwich de crema de cacahuate",
+  "keys": [
+   "sandwich",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "avena-con-fresa-faa6ce8b.jpg",
+  "label": "Avena con fresa",
+  "keys": [
+   "avena",
+   "fresa"
+  ]
+ },
+ {
+  "file": "tostadas-de-atun-con-aguacate-fb0698d4.jpg",
+  "label": "Tostadas de atún con aguacate",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "atun",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "smoothie-de-frutos-rojos-fd5b3a26.jpg",
+  "label": "Smoothie de frutos rojos",
+  "keys": [
+   "smoothie",
+   "frutos",
+   "berries",
+   "arandano",
+   "fresa",
+   "batido"
+  ]
+ },
+ {
+  "file": "toast-de-hummus-y-aguacate-fe83fefb.jpg",
+  "label": "Toast de hummus y aguacate",
+  "keys": [
+   "toast",
+   "pan",
+   "hummus",
+   "aguacate",
+   "jitomate"
+  ]
+ },
+ {
+  "file": "smoothie-de-pina-ff859ae5.jpg",
+  "label": "Smoothie de piña",
+  "keys": [
+   "smoothie",
+   "pina",
+   "coco",
+   "batido"
+  ]
+ }
+];
+
+export default BANCO_FOTOS;
