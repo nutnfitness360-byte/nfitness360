@@ -93,7 +93,8 @@ function porcionLineHTML(line) {
   return `<b>${esc(line)}</b>`;
 }
 
-function mealRow(t, nCols) {
+function mealRow(t, nCols, fotoData) {
+  fotoData = fotoData || {};
   const circle = t.foto
     ? `<div class="circle"><img src="${t.foto}" alt=""/></div>`
     : `<div class="circle ph">${PLATE}</div>`;
@@ -111,17 +112,20 @@ function mealRow(t, nCols) {
   const n = (nCols && nCols > 0) ? nCols : Math.max(1, (t.opciones || []).length);
   const ops = [];
   for (let k = 0; k < n; k++) ops.push((t.opciones || [])[k] || { nombre: '', prep: '' });
-  const cols = ops.map((o, k) => `
+  const cols = ops.map((o, k) => {
+    const foto = (o && o.fotoKey && fotoData[o.fotoKey]) ? `<img class="ophoto" src="${fotoData[o.fotoKey]}" alt=""/>` : '';
+    return `
     <div class="ocol"><div class="ohead">Opción ${k + 1}</div>
-      <div class="obox"><div class="dn">${esc(o.nombre) || '—'}</div><div class="od">${esc(o.prep)}</div></div>
-    </div>`).join('');
+      <div class="obox">${foto}<div class="dn">${esc(o.nombre) || '—'}</div><div class="od">${esc(o.prep)}</div></div>
+    </div>`;
+  }).join('');
   return `<div class="rw">
     <div class="mcell">${circle}<div class="mname">${esc(t.nombre)}</div><div class="mtime">${esc(t.hora)}</div></div>
     <div class="opts">${cols}</div>
   </div>`;
 }
 
-export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus = true, incluirEquivalencias = true, listas = null }) {
+export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus = true, incluirEquivalencias = true, listas = null, fotoData = {} }) {
   plan = plan || {};
   tiempos = Array.isArray(tiempos) ? tiempos : [];
   const planEq = Array.isArray(plan.eq) ? plan.eq.map(num) : Array(18).fill(0);
@@ -142,7 +146,7 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
   });
 
   // páginas de menú: 3 tiempos por página
-  const filas = tiempos.map(t => mealRow(t, nCols));
+  const filas = tiempos.map(t => mealRow(t, nCols, fotoData));
   const menuPages = [];
   for (let i = 0; i < filas.length; i += 3) {
     const chunk = filas.slice(i, i + 3).join('');
@@ -230,6 +234,7 @@ ${FONT_CSS}
 .ohead{background:${TAUPE2};color:#fff;font-size:10px;letter-spacing:2px;font-weight:700;text-transform:uppercase;text-align:center;padding:5px;}
 .obox{background:#fff;border:1px solid ${LINE};border-top:none;padding:9px 11px;flex:1;}
 .dn{font-weight:800;color:${TAUPE};font-size:12px;margin-bottom:4px;} .od{font-size:10.5px;color:${INK};line-height:1.5;}
+.ophoto{width:100%;height:78px;object-fit:cover;border-radius:7px;margin-bottom:6px;display:block;}
 .pcbox{flex:1;display:flex;flex-direction:column;}
 .pchead{background:${TAUPE2};color:#fff;font-size:10px;letter-spacing:2px;font-weight:700;text-transform:uppercase;text-align:center;padding:6px;}
 .pcbody{background:#fff;border:1px solid ${LINE};border-top:none;padding:13px 16px;flex:1;}
