@@ -228,6 +228,8 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
     if (sumaPct !== 100) { setStatus('error'); return false; }
     setStatus('guardando');
     const plan = {
+      // Conservamos el borrador de menús (plan.menus) para que editar el plan no lo borre.
+      ...(patient.plan && patient.plan.menus ? { menus: patient.plan.menus } : {}),
       eq: eq.map(num), meta: { energia: num(meta.energia), pP, pL, pC, factor },
       totales: { kcal: r0(tot.kcal), prot: r0(tot.prot), lip: r0(tot.lip), hc: r0(tot.hc), distP: r1(distP), distL: r1(distL), distC: r1(distC) },
       fecha: new Date().toISOString().slice(0, 10),
