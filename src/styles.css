@@ -318,6 +318,12 @@ body {
   .panel-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
+/* Texto con formato de las recomendaciones (renderizado como HTML seguro) */
+.reco-rich ul, .reco-rich ol { margin: 4px 0; padding-left: 20px; }
+.reco-rich li { margin: 2px 0; }
+.reco-rich p, .reco-rich div { margin: 0; }
+.reco-rich b, .reco-rich strong { font-weight: 700; }
+
 /* Plan items */
 .plan-item { display: flex; align-items: center; gap: 12px; padding: 0.875rem 0; border-bottom: 0.5px solid var(--border); }
 .plan-item:last-child { border-bottom: none; }
