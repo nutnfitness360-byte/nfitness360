@@ -52,14 +52,17 @@ function comprimirLogo(file) {
 }
 
 export default function Configuracion() {
-  const { logo, colors } = useBranding();
+  const { logo, colors, portada } = useBranding();
   const [colorsLocal, setColorsLocal] = useState(colors);
+  // Textos de portada (pantalla de inicio) por instancia.
+  const [portadaLocal, setPortadaLocal] = useState({ titulo: '', subtitulo: '' });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [drag, setDrag] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => { setColorsLocal(colors); }, [colors]);
+  useEffect(() => { setPortadaLocal({ titulo: (portada && portada.titulo) || '', subtitulo: (portada && portada.subtitulo) || '' }); }, [portada]);
 
   // --- Horarios de atención ---
   const [horario, setHorario] = useState(HORARIO_DEFAULT);
@@ -254,6 +257,28 @@ export default function Configuracion() {
           </div>
         </div>
       )}
+      {/* PORTADA (pantalla de inicio) */}
+      <div style={{ marginTop: 26 }}>
+        <div style={B.label}>Portada (pantalla de inicio)</div>
+        <div style={{ fontSize: 12, color: 'var(--stone)', marginBottom: 10, lineHeight: 1.5 }}>
+          Título y subtítulo que ve el visitante al entrar. Si lo dejas vacío, se usa el texto por defecto del sistema.
+        </div>
+        <input
+          style={{ width: '100%', boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 9, padding: 10, fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', marginBottom: 10 }}
+          value={portadaLocal.titulo}
+          onChange={e => setPortadaLocal(p => ({ ...p, titulo: e.target.value }))}
+          placeholder="Título (ej. Agenda tu cita)" />
+        <textarea
+          style={{ width: '100%', boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 9, padding: 10, fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', minHeight: 60, resize: 'vertical', marginBottom: 10 }}
+          value={portadaLocal.subtitulo}
+          onChange={e => setPortadaLocal(p => ({ ...p, subtitulo: e.target.value }))}
+          placeholder="Subtítulo (ej. Reserva tus consultas, confírmalas y da seguimiento a tu plan.)" />
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button style={B.primary} onClick={() => guardar({ portada: { titulo: portadaLocal.titulo.trim(), subtitulo: portadaLocal.subtitulo.trim() } })} disabled={busy}>Guardar portada</button>
+          <button style={B.ghost} onClick={() => { setPortadaLocal({ titulo: '', subtitulo: '' }); guardar({ portada: { titulo: '', subtitulo: '' } }); }} disabled={busy}>Usar texto por defecto</button>
+        </div>
+      </div>
+
       {msg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{msg}</span> : null}
       </div>
 
