@@ -75,6 +75,8 @@ function doPost(e) {
       var planes = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, PLANES_NAME]);
       var file = planes.createFile(blob);
       var compartidoPlan = compartirConPaciente_(file, body.correo);
+      // Entrega al paciente por correo con el PDF adjunto (sin enlace de Drive).
+      enviarPdfPaciente_(body.correo, patient, "plan", blob);
       // Programa el seguimiento a 15 días (anota fecha del plan en la bitácora).
       registrarSeguimiento15_(patient, body.correo);
       // NOTA DE PRIVACIDAD: por defecto el archivo NO se hace público.
@@ -107,6 +109,7 @@ function doPost(e) {
       var recFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, RECOMENDACIONES_NAME]);
       var fileR = recFolder.createFile(blobR);
       compartirConPaciente_(fileR, body.correo);
+      enviarPdfPaciente_(body.correo, patient, "recomendaciones", blobR);
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileR.getId(), link: fileR.getUrl(),
@@ -125,6 +128,7 @@ function doPost(e) {
       var analisisFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, ANALISIS_NAME]);
       var fileA = analisisFolder.createFile(blobA);
       compartirConPaciente_(fileA, body.correo);
+      enviarPdfPaciente_(body.correo, patient, "analisis", blobA);
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileA.getId(), link: fileA.getUrl(),
@@ -151,6 +155,7 @@ function doPost(e) {
       var histFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, HISTORIAL_NAME]);
       var fileH = histFolder.createFile(blobH);
       compartirConPaciente_(fileH, body.correo);
+      enviarPdfPaciente_(body.correo, patient, "historial", blobH);
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileH.getId(), link: fileH.getUrl(),
@@ -169,6 +174,7 @@ function doPost(e) {
       var inbodyFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, INBODY_NAME]);
       var fileIB = inbodyFolder.createFile(blobIB);
       compartirConPaciente_(fileIB, body.correo);
+      enviarPdfPaciente_(body.correo, patient, "inbody", blobIB);
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileIB.getId(), link: fileIB.getUrl(),
@@ -187,6 +193,7 @@ function doPost(e) {
       var isakFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, ISAK_NAME]);
       var fileIS = isakFolder.createFile(blobIS);
       compartirConPaciente_(fileIS, body.correo);
+      enviarPdfPaciente_(body.correo, patient, "isak", blobIS);
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileIS.getId(), link: fileIS.getUrl(),
@@ -262,6 +269,7 @@ function doPost(e) {
       var depFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, DEPORTIVO_NAME]);
       var fileD = depFolder.createFile(blobD);
       compartirConPaciente_(fileD, body.correo);
+      enviarPdfPaciente_(body.correo, patient, "deportivo", blobD);
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileD.getId(), link: fileD.getUrl(),
@@ -394,10 +402,75 @@ function verificarPagoStripe_(body) {
 function compartirConPaciente_(file, correo) {
   var ok = false;
   try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); ok = true; } catch (e) {}
-  // Si su correo es de Google, además lo agregamos como lector (le aparece en "Compartido conmigo").
-  var c = (correo || "").toString().trim().toLowerCase();
-  if (c && c.indexOf("@") > -1) { try { file.addViewer(c); } catch (e) {} }
+  // NOTA (2026-08): ya NO usamos file.addViewer(correo). Esa línea disparaba la
+  // notificación automática de Google Drive ("se compartió un archivo contigo")
+  // con el enlace de Drive, que era el correo que le llegaba al paciente.
+  // Ahora el paciente recibe su documento como PDF ADJUNTO en un correo con la
+  // marca del negocio (ver enviarPdfPaciente_). El enlace ANYONE_WITH_LINK se
+  // conserva únicamente para el visor interno de la app (portal MI CUENTA).
   return ok;
+}
+
+/* =====================================================================
+ *  ENTREGA AL PACIENTE POR CORREO (PDF adjunto, sin Drive)
+ *  Se llama en cada acción de guardado (savePlan, saveRecomendaciones, etc.)
+ *  justo después de crear y compartir el archivo. Manda un correo con la
+ *  marca de Nfitness 360 y el PDF adjunto. Nunca rompe el guardado si falla.
+ * ===================================================================== */
+function enviarPdfPaciente_(correo, nombre, tipo, blob) {
+  var c = (correo || "").toString().trim();
+  if (!c || c.indexOf("@") < 0) return false;   // sin correo válido, no se envía
+  if (!blob) return false;
+  try {
+    var info = docInfoPaciente_(tipo);
+    MailApp.sendEmail({
+      to: c,
+      subject: info.asunto + " | " + NEGOCIO,
+      htmlBody: correoDocumento_(nombre || "Paciente", info.intro),
+      name: NUTRIOLOGA + " · " + NEGOCIO,
+      attachments: [blob]
+    });
+    return true;
+  } catch (e) { return false; }   // el correo es secundario; no debe romper el guardado
+}
+
+// Texto (asunto + frase de apertura) según el tipo de documento.
+// 'intro' ya trae la concordancia correcta (listo/lista/listos/listas).
+function docInfoPaciente_(tipo) {
+  switch (tipo) {
+    case "plan":            return { asunto: "Tu plan nutricional ya está listo",
+                                     intro: "tu <strong>plan nutricional</strong> ya está listo" };
+    case "recomendaciones": return { asunto: "Tus recomendaciones ya están listas",
+                                     intro: "tus <strong>recomendaciones</strong> ya están listas" };
+    case "analisis":        return { asunto: "Tu análisis ya está listo",
+                                     intro: "tu <strong>análisis</strong> ya está listo" };
+    case "historial":       return { asunto: "Tu historial clínico ya está listo",
+                                     intro: "tu <strong>historial clínico</strong> ya está listo" };
+    case "inbody":          return { asunto: "Tu análisis de composición corporal ya está listo",
+                                     intro: "tu <strong>análisis de composición corporal (InBody)</strong> ya está listo" };
+    case "isak":            return { asunto: "Tu medición corporal ya está lista",
+                                     intro: "tu <strong>medición corporal (ISAK)</strong> ya está lista" };
+    case "deportivo":       return { asunto: "Tu plan deportivo ya está listo",
+                                     intro: "tu <strong>plan deportivo</strong> ya está listo" };
+    default:                return { asunto: "Tu documento ya está listo",
+                                     intro: "tu <strong>documento</strong> ya está listo" };
+  }
+}
+
+// Plantilla del correo de entrega de documento (reutiliza el diseño de marca).
+function correoDocumento_(nombre, intro) {
+  var cuerpo =
+    "<p style='font-size:14px;'>Estimado(a) <strong>" + escapar_(nombre) + "</strong>:</p>" +
+    "<p style='font-size:13px;line-height:1.6;'>Es un gusto saludarte. Nos da mucho gusto compartirte que " + intro + ". " +
+      "<strong>El archivo viene adjunto a este mismo correo, en formato PDF</strong>; puedes abrirlo, guardarlo o imprimirlo cuando gustes.</p>" +
+    "<p style='font-size:13px;line-height:1.6;'>Te recomendamos revisarlo con calma. Si tienes cualquier duda sobre su contenido, con gusto te apoyamos.</p>" +
+    seccion_("¿Cómo lo abro?",
+      "<p style='margin:6px 0 0;font-size:13px;line-height:1.6;'>Solo abre el archivo <strong>PDF adjunto</strong> que aparece en este correo. " +
+      "No necesitas instalar ninguna aplicación ni entrar a ningún enlace.</p>") +
+    "<p style='margin:18px 0 0;font-size:13px;line-height:1.6;'>Si tienes alguna duda, con gusto te atenderemos a través de " +
+      CORREO_CONT + " o WhatsApp " + TEL_WA + ".</p>" +
+    "<p style='margin:12px 0 0;font-size:13px;line-height:1.6;'>¡Gracias por confiar en nosotros! Será un gusto seguir acompañándote en tu proceso.</p>";
+  return wrapEmail_(cuerpo);
 }
 
 /* =====================================================================
