@@ -34,8 +34,14 @@ const POSIBLE_SIN_CUENTA = ['auth/user-not-found', 'auth/invalid-credential', 'a
 
 export default function LoginPage() {
   const [vista, setVista] = useState('inicio');     // inicio | acceso | email | crear | denegado
-  const { logo } = useBranding();
+  const { logo, portada } = useBranding();
   const logoSrc = (logo === undefined) ? '/logo.png' : logo;
+  // Textos de portada: si la instancia los define en su config/branding, se usan;
+  // si no, se conserva el texto por defecto (instancia de Natalia intacta).
+  const PORTADA_TITULO_DEFAULT = 'Agenda tu cita con Natalia';
+  const PORTADA_SUBTITULO_DEFAULT = 'Este es tu portal para reservar tus consultas, confirmarlas y dar seguimiento a tu plan.';
+  const portadaTitulo = (portada && portada.titulo && String(portada.titulo).trim()) || PORTADA_TITULO_DEFAULT;
+  const portadaSubtitulo = (portada && portada.subtitulo && String(portada.subtitulo).trim()) || PORTADA_SUBTITULO_DEFAULT;
   const [puerta, setPuerta] = useState('paciente'); // nutri | paciente
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -180,8 +186,8 @@ export default function LoginPage() {
             {/* Columna izquierda: mensaje + pasos */}
             <div>
               {logoSrc ? <img src={logoSrc} alt="" style={S.lLogo} /> : null}
-              <div style={S.lHead}>Agenda tu cita con Natalia</div>
-              <div style={S.lSub}>Este es tu portal para reservar tus consultas, confirmarlas y dar seguimiento a tu plan.</div>
+              <div style={S.lHead}>{portadaTitulo}</div>
+              <div style={S.lSub}>{portadaSubtitulo}</div>
               <div style={S.lStepsLbl}>CÓMO AGENDAR</div>
               <div style={S.lStep}>
                 <div style={S.lStepN}>1</div>
