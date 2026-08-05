@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
-import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { useBranding, aplicarColores } from '../context/BrandingContext';
 import Topbar from '../components/Topbar';
@@ -9,7 +9,7 @@ import Agenda from '../components/Agenda';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import { renderRich } from '../utils/richText';
 import { parseDriveLink } from '../utils/drive';
-import { resumenSaldo, venceDeLote, familiaLabel } from '../utils/creditos';
+import { resumenSaldo, venceDeLote, familiaLabel, nuevoLote, PAQUETES_DEFAULT } from '../utils/creditos';
 
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
 const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
@@ -140,6 +140,9 @@ export default function PacienteDashboard() {
   const [citas, setCitas] = useState([]);
   const [expediente, setExpediente] = useState(null);
   const [creditos, setCreditos] = useState({ lotes: [], usos: [] });
+  const [paquetesCfg, setPaquetesCfg] = useState(PAQUETES_DEFAULT);
+  const [compraMsg, setCompraMsg] = useState('');
+  const [compraBusy, setCompraBusy] = useState('');
   const [modalCita, setModalCita] = useState(null);
   const [confirmarCancel, setConfirmarCancel] = useState(false);
   const [reagendando, setReagendando] = useState(null);
@@ -168,13 +171,51 @@ export default function PacienteDashboard() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pago = params.get('pago');
-    if (!pago) return;
+    const compra = params.get('compra');
+    if (!pago && !compra) return;
     const citaId = params.get('cita');
     const session = params.get('session');
     const url = process.env.REACT_APP_APPSCRIPT_URL;
     const limpiarUrl = () => window.history.replaceState({}, '', window.location.pathname);
     (async () => {
       try {
+        if (compra === 'paquete') {
+          const paqueteId = params.get('paquete');
+          const correoC = (user?.email || '').toLowerCase();
+          if (paqueteId && session && url && correoC) {
+            const rv = await fetch(url, {
+              method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'verificarPagoStripe', sessionId: session }), redirect: 'follow',
+            });
+            let dv; try { dv = JSON.parse(await rv.text()); } catch (_) { dv = null; }
+            if (dv && dv.ok && dv.pagado) {
+              let pkgs = PAQUETES_DEFAULT;
+              try { const cs = await getDoc(doc(db, 'config', 'dashboard')); const cd = cs.exists() ? cs.data() : {}; if (Array.isArray(cd.paquetes) && cd.paquetes.length) pkgs = cd.paquetes; } catch (e) {}
+              const pkg = pkgs.find(p => p.id === paqueteId);
+              if (pkg) {
+                const cc = await getDoc(doc(db, 'creditosConsultas', correoC));
+                const cur = cc.exists() ? { lotes: [], usos: [], ...cc.data() } : { lotes: [], usos: [] };
+                // Idempotencia: no acreditar dos veces la misma sesión de pago (p. ej. si recarga la página).
+                if (!(cur.lotes || []).some(l => l.stripeSession === session)) {
+                  const lote = { ...nuevoLote({ familia: pkg.familia, consultas: pkg.consultas, monto: pkg.precio, vigenciaMeses: pkg.vigenciaMeses, origen: 'stripe', paqueteId: pkg.id, paqueteNombre: pkg.nombre }), stripeSession: session };
+                  await setDoc(doc(db, 'creditosConsultas', correoC), { correo: correoC, lotes: [...(cur.lotes || []), lote], usos: cur.usos || [] }, { merge: true });
+                }
+                setPagoMsg('¡Pago confirmado! Se agregaron ' + pkg.consultas + ' consultas a tu saldo. Ya puedes agendarlas.');
+              } else {
+                setPagoMsg('Tu pago se recibió, pero no encontramos el paquete. Avísale a la nutrióloga para acreditarlo.');
+              }
+            } else {
+              setPagoMsg('Recibimos tu regreso del pago, pero aún no podemos confirmar el cobro. Si el cargo se realizó, tu saldo se reflejará en breve.');
+            }
+          }
+          limpiarUrl();
+          return;
+        }
+        if (compra === 'cancelada') {
+          setPagoMsg('La compra del paquete no se completó. Puedes intentarlo de nuevo cuando quieras.');
+          limpiarUrl();
+          return;
+        }
         if (pago === 'ok' && citaId && session && url) {
           const res = await fetch(url, {
             method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -225,6 +266,12 @@ export default function PacienteDashboard() {
     }, () => setCreditos({ lotes: [], usos: [] }));
   }, [user]);
 
+  // Paquetes disponibles para comprar (desde la configuración).
+  useEffect(() => onSnapshot(doc(db, 'config', 'dashboard'), snap => {
+    const d = (snap && snap.data()) || {};
+    setPaquetesCfg(Array.isArray(d.paquetes) && d.paquetes.length ? d.paquetes : PAQUETES_DEFAULT);
+  }, () => {}), []);
+
   // Aplica la preferencia de colores del paciente (capa por encima de la marca) en toda su vista.
   useEffect(() => {
     const personal = (expediente && expediente.coloresPersonales) || null;
@@ -257,6 +304,27 @@ export default function PacienteDashboard() {
   const nombre = user?.displayName?.split(' ')[0] || 'bienvenida';
   const saldoResumen = resumenSaldo(creditos, new Date().toISOString());
   const tieneSaldo = (saldoResumen.normal.lotes.length + saldoResumen.deportiva.lotes.length) > 0;
+
+  const comprarPaquete = async (pkg) => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    const correo = (user?.email || '').toLowerCase();
+    if (!url || !correo) { setCompraMsg('No se pudo iniciar la compra. Intenta más tarde.'); return; }
+    if (!(pkg.precio > 0)) { setCompraMsg('Este paquete no tiene precio configurado.'); return; }
+    setCompraBusy(pkg.id); setCompraMsg('');
+    try {
+      const base = window.location.origin;
+      const successUrl = base + '/?compra=paquete&paquete=' + encodeURIComponent(pkg.id) + '&session={CHECKOUT_SESSION_ID}';
+      const cancelUrl = base + '/?compra=cancelada';
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'crearCheckoutStripe', montoCentavos: Math.round(pkg.precio * 100), descripcion: 'Paquete ' + pkg.nombre, correo, citaId: 'pkg_' + pkg.id + '_' + Date.now(), successUrl, cancelUrl }), redirect: 'follow',
+      });
+      let dp; try { dp = JSON.parse(await res.text()); } catch (_) { dp = null; }
+      if (dp && dp.ok && dp.url) { window.location.href = dp.url; return; }
+      setCompraMsg('No se pudo iniciar el pago: ' + ((dp && dp.error) || 'intenta de nuevo.'));
+    } catch (e) { setCompraMsg('No se pudo iniciar el pago. Intenta de nuevo.'); }
+    setCompraBusy('');
+  };
 
   const generarPDFReco = async (reco) => {
     const url = process.env.REACT_APP_APPSCRIPT_URL;
@@ -584,6 +652,27 @@ export default function PacienteDashboard() {
                     ) : null
                   ))}
                 </div>
+              </div>
+            )}
+
+            {paquetesCfg.length > 0 && (
+              <div className="card">
+                <div className="card-title">Comprar paquete de consultas</div>
+                <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>Paga en línea y tus consultas se agregan al instante. La vigencia empieza a correr desde tu primera consulta.</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
+                  {paquetesCfg.map(pk => (
+                    <div key={pk.id} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dark)' }}>{pk.nombre}</div>
+                      <div style={{ fontSize: 12, color: 'var(--stone)' }}>{pk.consultas} consultas · {familiaLabel(pk.familia)} · vigencia {pk.vigenciaMeses} meses</div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--dark)' }}>${pk.precio}</div>
+                      <button onClick={() => comprarPaquete(pk)} disabled={compraBusy === pk.id}
+                        style={{ marginTop: 4, background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 9, padding: '9px 12px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        {compraBusy === pk.id ? 'Redirigiendo…' : 'Comprar'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {compraMsg && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 10 }}>{compraMsg}</div>}
               </div>
             )}
 
