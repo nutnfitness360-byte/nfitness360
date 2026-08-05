@@ -664,7 +664,7 @@ export default function PacienteDashboard() {
                     <div key={pk.id} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dark)' }}>{pk.nombre}</div>
                       <div style={{ fontSize: 12, color: 'var(--stone)' }}>{pk.consultas} consultas · {familiaLabel(pk.familia)} · vigencia {pk.vigenciaMeses} meses</div>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--dark)' }}>${pk.precio}</div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--dark)' }}>{'$' + Number(pk.precio || 0).toLocaleString('es-MX')}</div>
                       <button onClick={() => comprarPaquete(pk)} disabled={compraBusy === pk.id}
                         style={{ marginTop: 4, background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 9, padding: '9px 12px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                         {compraBusy === pk.id ? 'Redirigiendo…' : 'Comprar'}
