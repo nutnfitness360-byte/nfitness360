@@ -1649,7 +1649,7 @@ function SaldoConsultas({ patient }) {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <select value={sel} onChange={e => setSel(e.target.value)} style={{ ...styles.inp, flex: '1 1 180px' }}>
             <option value="">Personalizado…</option>
-            {paquetes.map(p => <option key={p.id} value={p.id}>{p.nombre} — ${p.precio} ({familiaLabel(p.familia)}, {p.vigenciaMeses}m)</option>)}
+            {paquetes.map(p => <option key={p.id} value={p.id}>{p.nombre} — {'$' + Number(p.precio || 0).toLocaleString('es-MX')} ({familiaLabel(p.familia)}, {p.vigenciaMeses}m)</option>)}
           </select>
           {!pkg && (
             <>
@@ -1669,7 +1669,7 @@ function SaldoConsultas({ patient }) {
           </select>
           <button style={styles.saveBtn} onClick={abonar} disabled={busy}>{busy ? 'Abonando…' : 'Abonar'}</button>
         </div>
-        {pkg && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{pkg.consultas} consultas · {familiaLabel(pkg.familia)} · ${pkg.precio} · vigencia {pkg.vigenciaMeses} meses desde la 1ª consulta.</div>}
+        {pkg && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{pkg.consultas} consultas · {familiaLabel(pkg.familia)} · {'$' + Number(pkg.precio || 0).toLocaleString('es-MX')} · vigencia {pkg.vigenciaMeses} meses desde la 1ª consulta.</div>}
         {st && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{st}</div>}
       </div>
     </div>
