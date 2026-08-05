@@ -100,7 +100,7 @@ function baseSeed() {
   return {
     datos: {
       nombre: "", pacienteNo: "", fecha: "", fechaNacimiento: "", edad: "", sexo: "Femenino",
-      peso: "", talla: "", correo: "", telefono: "", ocupacion: "", objetivo: "",
+      peso: "", talla: "", correo: "", telefono: "", ocupacion: "", objetivo: "", notasNutri: "",
     },
     padecimientos: { lista: [], medicamentos: "" },
     bioquimica: {
@@ -719,6 +719,11 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
                   placeholder="Especifica el objetivo de la consulta"
                   onChange={(e) => setField("datos", "objetivo", e.target.value)} />
               )}
+            </Field>
+            <Field label="Notas de la nutrióloga" full>
+              <textarea style={styles.textarea} rows={4} value={data.datos.notasNutri || ""}
+                placeholder="Notas libres sobre el paciente (uso interno; no afecta la segmentación por objetivo)…"
+                onChange={(e) => setField("datos", "notasNutri", e.target.value)} />
             </Field>
           </Grid>
           <p style={styles.note}>
