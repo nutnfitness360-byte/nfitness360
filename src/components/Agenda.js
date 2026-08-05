@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, query, onSnapshot, addDoc, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, updateDoc, setDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import { familiaDeServicio, saldoDisponible, consumirCredito } from '../utils/creditos';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DIAS = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
@@ -176,6 +177,8 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const [horario, setHorario] = useState(HORARIO_DEFAULT);
   const [excepciones, setExcepciones] = useState({});
   const [mMetodoPago, setMMetodoPago] = useState('efectivo');
+  const [saldoCred, setSaldoCred] = useState({ lotes: [], usos: [] });
+  const [mUsarPaquete, setMUsarPaquete] = useState(true);
 
   useEffect(() => {
     // Se cargan TODAS las citas para calcular la disponibilidad real (slots ocupados).
@@ -200,6 +203,15 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
     }, () => {});
   }, []);
 
+  // Saldo de consultas (paquetes) del paciente en cuestión: el propio (paciente) o el elegido (nutrióloga).
+  useEffect(() => {
+    const correo = (isNutri ? mPacienteEmail : (user.email || '')).toLowerCase();
+    if (!correo) { setSaldoCred({ lotes: [], usos: [] }); return undefined; }
+    return onSnapshot(doc(db, 'creditosConsultas', correo), snap => {
+      setSaldoCred(snap.exists() ? { lotes: [], usos: [], ...snap.data() } : { lotes: [], usos: [] });
+    }, () => setSaldoCred({ lotes: [], usos: [] }));
+  }, [isNutri, mPacienteEmail, user]);
+
   // Si el día seleccionado quedó en un día sin atención (según el horario configurado), salta al siguiente hábil.
   useEffect(() => {
     if (bloqueado(selDate, horario, excepciones)) {
@@ -222,11 +234,15 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
 
   const servSel = servicios.find(s => s.id === mTipo) || null;
   const slots = generarSlots(selDate, servSel ? servSel.dur : 0, ocupadasDia, horario, excepciones, servSel ? !!servSel.online : null);
+  const reagActivo = !!(reagendarDe || reagendarLocal);
+  const familiaSel = familiaDeServicio(servSel);
+  const saldoFamilia = (servSel && !reagActivo) ? saldoDisponible(saldoCred, familiaSel, new Date().toISOString()) : 0;
+  const usarPaqueteActivo = saldoFamilia > 0 && mUsarPaquete && !reagActivo;
 
   const abrirModal = () => {
     setMPaciente(''); setMPacienteEmail(''); setMTipo(null);
     setMObjetivo(OBJETIVOS[0]); setMObjetivoOtro(''); setMHora(null); setMNotas('');
-    setMMetodoPago('efectivo');
+    setMMetodoPago('efectivo'); setMUsarPaquete(true);
     setShowSug(false); setShowModal(true);
   };
   const cerrarModal = () => setShowModal(false);
@@ -244,9 +260,14 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
     const correo = (isNutri ? mPacienteEmail : user.email || '').toLowerCase();
     const pacienteNombre = isNutri ? mPaciente.trim() : (user.displayName || user.email.split('@')[0]);
     const reagOrigen = reagendarDe || reagendarLocal;
-    // Pago en línea (Stripe) cuando: lo agenda el paciente, no es reagendado, y es online (obligatorio) o eligió "Pagar en línea".
-    const usaStripe = !isNutri && !reagOrigen && (servSel.online || mMetodoPago === 'stripe');
-    const metodo = isNutri ? 'consultorio' : (reagOrigen ? 'reagendado' : (servSel.online ? 'stripe' : mMetodoPago));
+    const nowISO = new Date().toISOString();
+    const familia = familiaDeServicio(servSel);
+    const saldoFam = !reagOrigen ? saldoDisponible(saldoCred, familia, nowISO) : 0;
+    // Usar crédito de paquete: hay saldo de la familia, se eligió usarlo, y no es reagendado.
+    const usarPaquete = saldoFam > 0 && mUsarPaquete && !reagOrigen;
+    // Pago en línea (Stripe) cuando: lo agenda el paciente, NO usa paquete, no es reagendado, y es online (obligatorio) o eligió "Pagar en línea".
+    const usaStripe = !usarPaquete && !isNutri && !reagOrigen && (servSel.online || mMetodoPago === 'stripe');
+    const metodo = usarPaquete ? 'paquete' : (isNutri ? 'consultorio' : (reagOrigen ? 'reagendado' : (servSel.online ? 'stripe' : mMetodoPago)));
     const precio = precios[servSel.nombre] || 0;
     if (usaStripe && !(precio > 0)) { alert('Esta consulta aún no tiene precio configurado. Avísale a la nutrióloga para poder cobrar en línea.'); return; }
     setSaving(true);
@@ -264,12 +285,22 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
         notas: mNotas,
         estado: usaStripe ? 'pendiente_pago' : 'confirmada',
         metodoPago: metodo,
-        estadoPago: 'pendiente',
-        monto: precio || null,
+        estadoPago: usarPaquete ? 'pagado' : 'pendiente',
+        monto: usarPaquete ? null : (precio || null),
         pacienteEmail: correo,
         pacienteNombre: pacienteNombre,
         creadoEn: Timestamp.now(),
       });
+      // Descontar 1 consulta del saldo de paquete (si aplica). Si algo falla, la cita ya quedó confirmada.
+      if (usarPaquete) {
+        try {
+          const res = consumirCredito(saldoCred, familia, nowISO, ref.id);
+          if (res) {
+            await setDoc(doc(db, 'creditosConsultas', correo), { correo, lotes: res.cred.lotes, usos: res.cred.usos }, { merge: true });
+            try { await updateDoc(doc(db, 'citas', ref.id), { loteId: res.loteId }); } catch (e) {}
+          }
+        } catch (e) { /* el saldo es secundario; la cita ya quedó */ }
+      }
       // Pago en línea (Stripe): crea la sesión y redirige; la cita se confirma al volver (en el inicio del paciente).
       if (usaStripe) {
         const urlAS = process.env.REACT_APP_APPSCRIPT_URL;
@@ -523,7 +554,19 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
               <textarea value={mNotas} onChange={e=>setMNotas(e.target.value)} placeholder={isNutri ? 'Observaciones…' : 'Cuéntanos tu objetivo…'} />
             </div>
 
-            {!isNutri && servSel && (
+            {!reagActivo && servSel && saldoFamilia > 0 && (
+              <div className="fg">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', border: '1px solid var(--gold)', borderRadius: 12, background: 'rgba(205,167,136,0.14)', cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal' }}>
+                  <input type="checkbox" checked={mUsarPaquete} onChange={e => setMUsarPaquete(e.target.checked)} style={{ width: 16, height: 16, minWidth: 16, flex: '0 0 auto', margin: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)', lineHeight: 1.35 }}>
+                    Usar 1 consulta del paquete{familiaSel === 'deportiva' ? ' deportivo' : ''} — {saldoFamilia} disponible{saldoFamilia > 1 ? 's' : ''}
+                    <span style={{ display: 'block', fontSize: 11.5, fontWeight: 500, color: 'var(--stone)' }}>No se cobra: se descuenta del saldo.</span>
+                  </span>
+                </label>
+              </div>
+            )}
+
+            {!isNutri && servSel && !usarPaqueteActivo && (
               <div className="fg"><label>Forma de pago</label>
                 {servSel.online ? (
                   <div className="empty-state" style={{ textAlign: 'center' }}>Esta consulta es en línea: el pago se realiza por Stripe al confirmar la cita.</div>
@@ -548,7 +591,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
             <div className="btn-row">
               <button className="btn-cancel" onClick={cerrarModal}>Cancelar</button>
               <button className="btn-save" onClick={guardar} disabled={saving || !servSel || !mHora || (isNutri && !mPacienteEmail)}>
-                {saving ? 'Guardando...' : (isNutri ? 'Guardar cita' : (((servSel && servSel.online) || mMetodoPago === 'stripe') ? 'Pagar y agendar' : 'Confirmar cita'))}
+                {saving ? 'Guardando...' : (usarPaqueteActivo ? 'Agendar con paquete' : (isNutri ? 'Guardar cita' : (((servSel && servSel.online) || mMetodoPago === 'stripe') ? 'Pagar y agendar' : 'Confirmar cita')))}
               </button>
             </div>
           </div>

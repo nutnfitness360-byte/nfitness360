@@ -3,6 +3,7 @@ import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { HORARIO_DEFAULT, MODALIDADES, franjasDe, SERVICIOS_DEFAULT } from './Agenda';
 import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
+import { PAQUETES_DEFAULT, FAMILIAS } from '../utils/creditos';
 
 // Bloqueo de marca por instancia (definido aquí para no depender de otro archivo):
 // si REACT_APP_BRANDING_LOCKED === 'true', no se muestra el editor de colores.
@@ -52,17 +53,14 @@ function comprimirLogo(file) {
 }
 
 export default function Configuracion() {
-  const { logo, colors, portada } = useBranding();
+  const { logo, colors } = useBranding();
   const [colorsLocal, setColorsLocal] = useState(colors);
-  // Textos de portada (pantalla de inicio) por instancia.
-  const [portadaLocal, setPortadaLocal] = useState({ titulo: '', subtitulo: '' });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [drag, setDrag] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => { setColorsLocal(colors); }, [colors]);
-  useEffect(() => { setPortadaLocal({ titulo: (portada && portada.titulo) || '', subtitulo: (portada && portada.subtitulo) || '' }); }, [portada]);
 
   // --- Horarios de atención ---
   const [horario, setHorario] = useState(HORARIO_DEFAULT);
@@ -78,6 +76,10 @@ export default function Configuracion() {
   const [reactivacion, setReactivacion] = useState({ activo: false, dias: 45 });
   const [reactBusy, setReactBusy] = useState(false);
   const [reactMsg, setReactMsg] = useState('');
+  const [paquetes, setPaquetes] = useState(PAQUETES_DEFAULT);
+  const [nuevoPkg, setNuevoPkg] = useState({ nombre: '', familia: 'normal', consultas: '', precio: '', vigenciaMeses: '' });
+  const [pkgBusy, setPkgBusy] = useState(false);
+  const [pkgMsg, setPkgMsg] = useState('');
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
       const d = (snap && snap.data()) || {};
@@ -86,6 +88,7 @@ export default function Configuracion() {
       setPrecios(d.precios || {});
       setServicios(Array.isArray(d.servicios) && d.servicios.length ? d.servicios : SERVICIOS_DEFAULT);
       setReactivacion({ activo: !!(d.reactivacion && d.reactivacion.activo), dias: (d.reactivacion && d.reactivacion.dias) || 45 });
+      setPaquetes(Array.isArray(d.paquetes) && d.paquetes.length ? d.paquetes : PAQUETES_DEFAULT);
     }, () => {});
   }, []);
   const guardarReactivacion = async () => {
@@ -132,6 +135,33 @@ export default function Configuracion() {
       setPrecioMsg('Servicios y precios guardados.');
     } catch (e) { setPrecioMsg('No se pudo guardar: ' + e.message); }
     setPrecioBusy(false);
+  };
+
+  const agregarPaquete = () => {
+    const nombre = (nuevoPkg.nombre || '').trim();
+    if (!nombre) { setPkgMsg('Escribe un nombre para el paquete.'); return; }
+    const consultas = parseInt(nuevoPkg.consultas, 10) || 0;
+    if (consultas < 1) { setPkgMsg('El paquete debe tener al menos 1 consulta.'); return; }
+    let id = slug(nombre); if (paquetes.some(p => p.id === id)) id = id + '_' + Math.random().toString(36).slice(2, 6);
+    setPaquetes(prev => [...prev, {
+      id, nombre,
+      familia: nuevoPkg.familia === 'deportiva' ? 'deportiva' : 'normal',
+      consultas,
+      precio: parseFloat(nuevoPkg.precio) || 0,
+      vigenciaMeses: parseInt(nuevoPkg.vigenciaMeses, 10) || 6,
+    }]);
+    setNuevoPkg({ nombre: '', familia: 'normal', consultas: '', precio: '', vigenciaMeses: '' });
+    setPkgMsg('');
+  };
+  const quitarPaquete = (id) => setPaquetes(prev => prev.filter(p => p.id !== id));
+  const editarPaquete = (id, patch) => setPaquetes(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+  const guardarPaquetes = async () => {
+    setPkgBusy(true); setPkgMsg('');
+    try {
+      await setDoc(doc(db, 'config', 'dashboard'), { paquetes }, { merge: true });
+      setPkgMsg('Paquetes guardados.');
+    } catch (e) { setPkgMsg('No se pudo guardar: ' + e.message); }
+    setPkgBusy(false);
   };
 
   const setDia = (dow, patch) => setHorario(h => ({ ...h, [dow]: { ...(h[dow] || HORARIO_DEFAULT[dow]), ...patch } }));
@@ -257,28 +287,6 @@ export default function Configuracion() {
           </div>
         </div>
       )}
-      {/* PORTADA (pantalla de inicio) */}
-      <div style={{ marginTop: 26 }}>
-        <div style={B.label}>Portada (pantalla de inicio)</div>
-        <div style={{ fontSize: 12, color: 'var(--stone)', marginBottom: 10, lineHeight: 1.5 }}>
-          Título y subtítulo que ve el visitante al entrar. Si lo dejas vacío, se usa el texto por defecto del sistema.
-        </div>
-        <input
-          style={{ width: '100%', boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 9, padding: 10, fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', marginBottom: 10 }}
-          value={portadaLocal.titulo}
-          onChange={e => setPortadaLocal(p => ({ ...p, titulo: e.target.value }))}
-          placeholder="Título (ej. Agenda tu cita)" />
-        <textarea
-          style={{ width: '100%', boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 9, padding: 10, fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', minHeight: 60, resize: 'vertical', marginBottom: 10 }}
-          value={portadaLocal.subtitulo}
-          onChange={e => setPortadaLocal(p => ({ ...p, subtitulo: e.target.value }))}
-          placeholder="Subtítulo (ej. Reserva tus consultas, confírmalas y da seguimiento a tu plan.)" />
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button style={B.primary} onClick={() => guardar({ portada: { titulo: portadaLocal.titulo.trim(), subtitulo: portadaLocal.subtitulo.trim() } })} disabled={busy}>Guardar portada</button>
-          <button style={B.ghost} onClick={() => { setPortadaLocal({ titulo: '', subtitulo: '' }); guardar({ portada: { titulo: '', subtitulo: '' } }); }} disabled={busy}>Usar texto por defecto</button>
-        </div>
-      </div>
-
       {msg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{msg}</span> : null}
       </div>
 
@@ -461,6 +469,78 @@ export default function Configuracion() {
           </button>
         </div>
         {precioMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{precioMsg}</span> : null}
+      </div>
+
+      <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
+        <div className="card-title">Paquetes de consultas</div>
+        <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>
+          Define los paquetes que un paciente puede tener como saldo de consultas. La <b>familia</b> separa el saldo:
+          los créditos deportivos solo se gastan en consultas deportivas. La <b>vigencia</b> se cuenta a partir de la primera consulta usada del paquete.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {paquetes.map(p => (
+            <div key={p.id} style={P.row}>
+              <input value={p.nombre} placeholder="Nombre"
+                onChange={e => editarPaquete(p.id, { nombre: e.target.value })}
+                style={{ flex: '1 1 150px', padding: '7px 9px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+              <select value={p.familia === 'deportiva' ? 'deportiva' : 'normal'}
+                onChange={e => editarPaquete(p.id, { familia: e.target.value })}
+                style={{ padding: '7px 8px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, fontFamily: 'var(--font)', background: '#fff' }}>
+                {FAMILIAS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+              <label style={P.field}>
+                <input inputMode="numeric" value={p.consultas || ''} placeholder="0"
+                  onChange={e => editarPaquete(p.id, { consultas: parseInt(e.target.value, 10) || 0 })} style={P.num} />
+                <span style={P.unit}>consultas</span>
+              </label>
+              <label style={P.field}>
+                <span style={P.unit}>$</span>
+                <input inputMode="numeric" value={p.precio || ''} placeholder="0"
+                  onChange={e => editarPaquete(p.id, { precio: parseFloat(e.target.value) || 0 })} style={P.num} />
+              </label>
+              <label style={P.field}>
+                <input inputMode="numeric" value={p.vigenciaMeses || ''} placeholder="6"
+                  onChange={e => editarPaquete(p.id, { vigenciaMeses: parseInt(e.target.value, 10) || 0 })} style={{ ...P.num, width: 48 }} />
+                <span style={P.unit}>meses vig.</span>
+              </label>
+              <button title="Quitar paquete" style={P.del} onClick={() => quitarPaquete(p.id)}>✕</button>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ ...P.row, marginTop: 12, background: 'var(--cream)' }}>
+          <input placeholder="Nuevo paquete" value={nuevoPkg.nombre}
+            onChange={e => setNuevoPkg(v => ({ ...v, nombre: e.target.value }))}
+            style={{ flex: '1 1 150px', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+          <select value={nuevoPkg.familia} onChange={e => setNuevoPkg(v => ({ ...v, familia: e.target.value }))}
+            style={{ padding: '7px 8px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, fontFamily: 'var(--font)', background: '#fff' }}>
+            {FAMILIAS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+          </select>
+          <label style={P.field}>
+            <input inputMode="numeric" placeholder="0" value={nuevoPkg.consultas}
+              onChange={e => setNuevoPkg(v => ({ ...v, consultas: e.target.value }))} style={P.num} />
+            <span style={P.unit}>consultas</span>
+          </label>
+          <label style={P.field}>
+            <span style={P.unit}>$</span>
+            <input inputMode="numeric" placeholder="0" value={nuevoPkg.precio}
+              onChange={e => setNuevoPkg(v => ({ ...v, precio: e.target.value }))} style={P.num} />
+          </label>
+          <label style={P.field}>
+            <input inputMode="numeric" placeholder="6" value={nuevoPkg.vigenciaMeses}
+              onChange={e => setNuevoPkg(v => ({ ...v, vigenciaMeses: e.target.value }))} style={{ ...P.num, width: 48 }} />
+            <span style={P.unit}>meses vig.</span>
+          </label>
+          <button style={B.ghost} onClick={agregarPaquete}>Agregar</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 16 }}>
+          <button style={B.primary} onClick={guardarPaquetes} disabled={pkgBusy}>
+            {pkgBusy ? 'Guardando…' : 'Guardar paquetes'}
+          </button>
+        </div>
+        {pkgMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{pkgMsg}</span> : null}
       </div>
 
       <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>

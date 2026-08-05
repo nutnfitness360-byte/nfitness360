@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, query, orderBy } from 'firebase/firestore';
+import { PAQUETES_DEFAULT, FAMILIAS, familiaLabel, resumenSaldo, venceDeLote, nuevoLote } from '../utils/creditos';
 import Plan from './Plan';
 import Menus from './Menus';
 import HistoriaClinica from './HistoriaClinica';
@@ -845,6 +846,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
         </div>
 
         <CorreoVinculo patient={sel} key={'cv-' + sel.id} />
+        <SaldoConsultas patient={sel} key={'saldo-' + sel.id} />
 
         <div className="card">
           <div style={S.titleRow}>
@@ -1561,6 +1563,118 @@ function Info({ l, v }) {
   return <div style={styles.infoCell}><div style={styles.infoLbl}>{l}</div><div style={styles.infoVal}>{v}</div></div>;
 }
 
+function SaldoConsultas({ patient }) {
+  const correo = (patient.correo || '').trim().toLowerCase();
+  const [cred, setCred] = useState({ lotes: [], usos: [] });
+  const [paquetes, setPaquetes] = useState(PAQUETES_DEFAULT);
+  const [sel, setSel] = useState('');
+  const [origen, setOrigen] = useState('efectivo');
+  const [custom, setCustom] = useState({ familia: 'normal', consultas: '', monto: '', vigenciaMeses: '' });
+  const [st, setSt] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!correo) return undefined;
+    return onSnapshot(doc(db, 'creditosConsultas', correo), snap => {
+      setCred(snap.exists() ? { lotes: [], usos: [], ...snap.data() } : { lotes: [], usos: [] });
+    }, () => {});
+  }, [correo]);
+  useEffect(() => onSnapshot(doc(db, 'config', 'dashboard'), snap => {
+    const d = (snap && snap.data()) || {};
+    setPaquetes(Array.isArray(d.paquetes) && d.paquetes.length ? d.paquetes : PAQUETES_DEFAULT);
+  }, () => {}), []);
+
+  if (!correo) {
+    return (
+      <div className="card">
+        <div className="card-title">Saldo de consultas (paquetes)</div>
+        <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5 }}>
+          Para llevar el saldo de consultas primero vincula el correo del paciente (tarjeta de arriba). El saldo se guarda por correo.
+        </div>
+      </div>
+    );
+  }
+
+  const now = new Date().toISOString();
+  const resumen = resumenSaldo(cred, now);
+  const pkg = paquetes.find(p => p.id === sel) || null;
+  const fmt = (iso) => { if (!iso) return '—'; return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }); };
+
+  const abonar = async () => {
+    const familia = pkg ? pkg.familia : custom.familia;
+    const consultas = pkg ? pkg.consultas : (parseInt(custom.consultas, 10) || 0);
+    const monto = pkg ? pkg.precio : (custom.monto === '' ? null : (parseFloat(custom.monto) || 0));
+    const vigenciaMeses = pkg ? pkg.vigenciaMeses : (parseInt(custom.vigenciaMeses, 10) || 6);
+    if (!consultas || consultas < 1) { setSt('Indica cuántas consultas abonar.'); return; }
+    setBusy(true); setSt('');
+    try {
+      const lote = nuevoLote({ familia, consultas, monto, vigenciaMeses, origen, paqueteId: pkg ? pkg.id : null, paqueteNombre: pkg ? pkg.nombre : null });
+      const next = { correo, lotes: [...(cred.lotes || []), lote], usos: cred.usos || [] };
+      await setDoc(doc(db, 'creditosConsultas', correo), next, { merge: true });
+      setSt('Abonado ✓'); setSel(''); setCustom({ familia: 'normal', consultas: '', monto: '', vigenciaMeses: '' });
+    } catch (e) { setSt('Error: ' + e.message); }
+    setBusy(false);
+  };
+  const quitarLote = async (loteId) => {
+    if (typeof window !== 'undefined' && !window.confirm('¿Quitar este lote de consultas del saldo del paciente?')) return;
+    try {
+      const next = { correo, lotes: (cred.lotes || []).filter(l => l.id !== loteId), usos: cred.usos || [] };
+      await setDoc(doc(db, 'creditosConsultas', correo), next, { merge: true });
+    } catch (e) { setSt('Error: ' + e.message); }
+  };
+
+  return (
+    <div className="card">
+      <div className="card-title">Saldo de consultas (paquetes)</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 12 }}>
+        {['normal', 'deportiva'].map(f => (
+          <div key={f} style={{ background: 'var(--cream)', borderRadius: 12, padding: '12px 14px' }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)' }}>{familiaLabel(f)}</div>
+            <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--dark)', lineHeight: 1.1 }}>{resumen[f].disponible}<span style={{ fontSize: 12, fontWeight: 600, color: 'var(--stone)' }}> disponibles</span></div>
+            {resumen[f].lotes.length === 0 && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 4 }}>Sin lotes.</div>}
+            {resumen[f].lotes.map(l => (
+              <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, fontSize: 12, color: 'var(--dark)', marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                <span><b>{l.restantes}/{l.consultas}</b> · {l.paqueteNombre || 'manual'} · {l.origen || 'manual'}<br />
+                  <span style={{ color: 'var(--stone)' }}>{l.primeraConsultaFecha ? ('vence ' + fmt(venceDeLote(l))) : 'sin usar (no vence aún)'}</span>
+                </span>
+                <button title="Quitar lote" onClick={() => quitarLote(l.id)} style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 13, flexShrink: 0 }}>✕</button>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: 'var(--cream)', borderRadius: 12, padding: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)', marginBottom: 8 }}>Abonar consultas</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select value={sel} onChange={e => setSel(e.target.value)} style={{ ...styles.inp, flex: '1 1 180px' }}>
+            <option value="">Personalizado…</option>
+            {paquetes.map(p => <option key={p.id} value={p.id}>{p.nombre} — ${p.precio} ({familiaLabel(p.familia)}, {p.vigenciaMeses}m)</option>)}
+          </select>
+          {!pkg && (
+            <>
+              <select value={custom.familia} onChange={e => setCustom(c => ({ ...c, familia: e.target.value }))} style={{ ...styles.inp, width: 130 }}>
+                {FAMILIAS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+              <input inputMode="numeric" placeholder="# consultas" value={custom.consultas} onChange={e => setCustom(c => ({ ...c, consultas: e.target.value }))} style={{ ...styles.inp, width: 110 }} />
+              <input inputMode="numeric" placeholder="$ monto" value={custom.monto} onChange={e => setCustom(c => ({ ...c, monto: e.target.value }))} style={{ ...styles.inp, width: 100 }} />
+              <input inputMode="numeric" placeholder="meses vig." value={custom.vigenciaMeses} onChange={e => setCustom(c => ({ ...c, vigenciaMeses: e.target.value }))} style={{ ...styles.inp, width: 100 }} />
+            </>
+          )}
+          <select value={origen} onChange={e => setOrigen(e.target.value)} style={{ ...styles.inp, width: 150 }}>
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="cortesia">Cortesía</option>
+          </select>
+          <button style={styles.saveBtn} onClick={abonar} disabled={busy}>{busy ? 'Abonando…' : 'Abonar'}</button>
+        </div>
+        {pkg && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{pkg.consultas} consultas · {familiaLabel(pkg.familia)} · ${pkg.precio} · vigencia {pkg.vigenciaMeses} meses desde la 1ª consulta.</div>}
+        {st && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{st}</div>}
+      </div>
+    </div>
+  );
+}
 function CorreoVinculo({ patient }) {
   const [v, setV] = useState(patient.correo || '');
   const [st, setSt] = useState('');
