@@ -9,6 +9,7 @@ import Agenda from '../components/Agenda';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import { renderRich } from '../utils/richText';
 import { parseDriveLink } from '../utils/drive';
+import { resumenSaldo, venceDeLote, familiaLabel } from '../utils/creditos';
 
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
 const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
@@ -138,6 +139,7 @@ export default function PacienteDashboard() {
   const [tab, setTab] = useState('inicio');
   const [citas, setCitas] = useState([]);
   const [expediente, setExpediente] = useState(null);
+  const [creditos, setCreditos] = useState({ lotes: [], usos: [] });
   const [modalCita, setModalCita] = useState(null);
   const [confirmarCancel, setConfirmarCancel] = useState(false);
   const [reagendando, setReagendando] = useState(null);
@@ -214,6 +216,15 @@ export default function PacienteDashboard() {
     return onSnapshot(q, snap => setCitas(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.fecha.localeCompare(b.fecha))));
   }, [user]);
 
+  // Saldo de consultas (paquetes) del paciente, por su correo de sesión.
+  useEffect(() => {
+    const correo = (user?.email || '').toLowerCase();
+    if (!correo) return undefined;
+    return onSnapshot(doc(db, 'creditosConsultas', correo), snap => {
+      setCreditos(snap.exists() ? { lotes: [], usos: [], ...snap.data() } : { lotes: [], usos: [] });
+    }, () => setCreditos({ lotes: [], usos: [] }));
+  }, [user]);
+
   // Aplica la preferencia de colores del paciente (capa por encima de la marca) en toda su vista.
   useEffect(() => {
     const personal = (expediente && expediente.coloresPersonales) || null;
@@ -244,6 +255,8 @@ export default function PacienteDashboard() {
   const yaPaso = (c) => { const dt = new Date(c.fecha + 'T' + (c.hora || '23:59') + ':00'); return !isNaN(dt.getTime()) && dt.getTime() < ahoraMs; };
   const proxima = citas.find(c => c.fecha >= hoyKey && c.estado !== 'cancelada' && !yaPaso(c));
   const nombre = user?.displayName?.split(' ')[0] || 'bienvenida';
+  const saldoResumen = resumenSaldo(creditos, new Date().toISOString());
+  const tieneSaldo = (saldoResumen.normal.lotes.length + saldoResumen.deportiva.lotes.length) > 0;
 
   const generarPDFReco = async (reco) => {
     const url = process.env.REACT_APP_APPSCRIPT_URL;
@@ -551,6 +564,28 @@ export default function PacienteDashboard() {
                 <div className="empty-state">No tienes citas próximas</div>
               )}
             </div>
+
+            {tieneSaldo && (
+              <div className="card">
+                <div className="card-title">Tus consultas de paquete</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                  {['normal', 'deportiva'].map(f => (
+                    saldoResumen[f].lotes.length ? (
+                      <div key={f} style={{ background: 'var(--cream)', borderRadius: 12, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)' }}>{familiaLabel(f)}</div>
+                        <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--dark)', lineHeight: 1.1 }}>{saldoResumen[f].disponible}<span style={{ fontSize: 12, fontWeight: 600, color: 'var(--stone)' }}> disponible{saldoResumen[f].disponible === 1 ? '' : 's'}</span></div>
+                        {(() => {
+                          const venc = saldoResumen[f].lotes.map(l => venceDeLote(l)).filter(Boolean).sort();
+                          return venc.length
+                            ? <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 2 }}>Próximo vencimiento: {new Date(venc[0]).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                            : <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 2 }}>Vence a partir de tu 1ª consulta.</div>;
+                        })()}
+                      </div>
+                    ) : null
+                  ))}
+                </div>
+              </div>
+            )}
 
             <h2 style={D.section}>Tu progreso</h2>
             <div style={D.grid}>
