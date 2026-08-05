@@ -124,6 +124,14 @@ function mealRow(t, nCols, fotoData) {
         <div class="obox obox1">${foto}<div class="otxt"><div class="dn">${esc(o.nombre) || '—'}</div><div class="od">${esc(o.prep)}</div></div></div>
       </div>`;
     }
+    // Dos opciones: cada columna se subdivide — 1/3 foto a la izquierda, 2/3 texto.
+    if (n === 2) {
+      const foto2 = tieneFoto ? `<img class="ophoto2" src="${src}" alt=""/>` : '';
+      return `
+      <div class="ocol"><div class="ohead">Opción ${k + 1}</div>
+        <div class="obox obox2">${foto2}<div class="otxt2"><div class="dn">${esc(o.nombre) || '—'}</div><div class="od">${esc(o.prep)}</div></div></div>
+      </div>`;
+    }
     const foto = tieneFoto ? `<img class="ophoto" src="${src}" alt=""/>` : '';
     return `
     <div class="ocol"><div class="ohead">Opción ${k + 1}</div>
@@ -249,6 +257,9 @@ ${FONT_CSS}
 .obox1{display:flex;gap:12px;align-items:flex-start;}
 .ophoto1{width:210px;height:132px;flex-shrink:0;object-fit:cover;border-radius:7px;display:block;}
 .obox1 .otxt{flex:1;min-width:0;}
+.obox2{display:flex;gap:10px;align-items:flex-start;}
+.ophoto2{flex:1 1 0;min-width:0;height:104px;object-fit:cover;border-radius:7px;display:block;}
+.obox2 .otxt2{flex:2 1 0;min-width:0;}
 .pcbox{flex:1;display:flex;flex-direction:column;}
 .pchead{background:${TAUPE2};color:#fff;font-size:10px;letter-spacing:2px;font-weight:700;text-transform:uppercase;text-align:center;padding:6px;}
 .pcbody{background:#fff;border:1px solid ${LINE};border-top:none;padding:13px 16px;flex:1;}
