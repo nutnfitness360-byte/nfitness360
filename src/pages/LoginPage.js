@@ -42,8 +42,10 @@ export default function LoginPage() {
   // cada sitio muestra lo que le toca, sin base de datos de por medio.
   const host = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
   const esSistemaNutricio = host.indexOf('sistemanutricio') !== -1;
-  const portadaTitulo = esSistemaNutricio ? 'Bienvenido a Sistema Nutricio Mx' : 'Agenda tu cita con Natalia';
-  const portadaSubtitulo = 'Este es tu portal para reservar tus consultas, confirmarlas y dar seguimiento a tu plan.';
+  const portadaTitulo = esSistemaNutricio ? 'Bienvenido a Aretia' : 'Agenda tu cita con Natalia';
+  const portadaSubtitulo = esSistemaNutricio
+    ? 'Del plan al resultado: reserva tus consultas, confírmalas y da seguimiento a tu plan.'
+    : 'Este es tu portal para reservar tus consultas, confirmarlas y dar seguimiento a tu plan.';
   const [puerta, setPuerta] = useState('paciente'); // nutri | paciente
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
