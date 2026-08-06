@@ -4,6 +4,7 @@ import { db } from '../firebase/config';
 import { HORARIO_DEFAULT, MODALIDADES, franjasDe, SERVICIOS_DEFAULT } from './Agenda';
 import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
 import { PAQUETES_DEFAULT, FAMILIAS } from '../utils/creditos';
+import { CFDI_DEFAULT, CLAVES_UNIDAD, OPCIONES_IVA, REGIMENES_FISCALES } from '../data/catalogosCFDI';
 
 // Bloqueo de marca por instancia (definido aquí para no depender de otro archivo):
 // si REACT_APP_BRANDING_LOCKED === 'true', no se muestra el editor de colores.
@@ -80,6 +81,9 @@ export default function Configuracion() {
   const [nuevoPkg, setNuevoPkg] = useState({ nombre: '', familia: 'normal', consultas: '', precio: '', vigenciaMeses: '' });
   const [pkgBusy, setPkgBusy] = useState(false);
   const [pkgMsg, setPkgMsg] = useState('');
+  const [cfdi, setCfdi] = useState(CFDI_DEFAULT);
+  const [cfdiBusy, setCfdiBusy] = useState(false);
+  const [cfdiMsg, setCfdiMsg] = useState('');
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
       const d = (snap && snap.data()) || {};
@@ -89,6 +93,7 @@ export default function Configuracion() {
       setServicios(Array.isArray(d.servicios) && d.servicios.length ? d.servicios : SERVICIOS_DEFAULT);
       setReactivacion({ activo: !!(d.reactivacion && d.reactivacion.activo), dias: (d.reactivacion && d.reactivacion.dias) || 45 });
       setPaquetes(Array.isArray(d.paquetes) && d.paquetes.length ? d.paquetes : PAQUETES_DEFAULT);
+      setCfdi({ ...CFDI_DEFAULT, ...(d.cfdi || {}) });
     }, () => {});
   }, []);
   const guardarReactivacion = async () => {
@@ -162,6 +167,15 @@ export default function Configuracion() {
       setPkgMsg('Paquetes guardados.');
     } catch (e) { setPkgMsg('No se pudo guardar: ' + e.message); }
     setPkgBusy(false);
+  };
+  const setCfdiCampo = (k, v) => setCfdi(c => ({ ...c, [k]: v }));
+  const guardarCfdi = async () => {
+    setCfdiBusy(true); setCfdiMsg('');
+    try {
+      await setDoc(doc(db, 'config', 'dashboard'), { cfdi }, { merge: true });
+      setCfdiMsg('Datos de facturación guardados.');
+    } catch (e) { setCfdiMsg('No se pudo guardar: ' + e.message); }
+    setCfdiBusy(false);
   };
 
   const setDia = (dow, patch) => setHorario(h => ({ ...h, [dow]: { ...(h[dow] || HORARIO_DEFAULT[dow]), ...patch } }));
@@ -541,6 +555,76 @@ export default function Configuracion() {
           </button>
         </div>
         {pkgMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{pkgMsg}</span> : null}
+      </div>
+
+      <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
+        <div className="card-title">Facturación (CFDI)</div>
+        <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>
+          Valores por defecto del concepto para las facturas de consultas. Confírmalos con tu contador (clave del SAT, unidad e IVA). El timbrado se conecta con tu proveedor (FEL) en el siguiente paso.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', maxWidth: 640 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <span style={B.label}>Clave producto/servicio (SAT)</span>
+            <input value={cfdi.claveProdServ} onChange={e => setCfdiCampo('claveProdServ', e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
+              inputMode="numeric" placeholder="85121800" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <span style={B.label}>Clave de unidad</span>
+            <select value={cfdi.claveUnidad} onChange={e => setCfdiCampo('claveUnidad', e.target.value)}
+              style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)', background: '#fff' }}>
+              {CLAVES_UNIDAD.map(u => <option key={u.clave} value={u.clave}>{u.nombre}</option>)}
+            </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, gridColumn: '1 / -1' }}>
+            <span style={B.label}>Descripción del concepto</span>
+            <input value={cfdi.descripcion} onChange={e => setCfdiCampo('descripcion', e.target.value)}
+              placeholder="Consulta de nutrición" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <span style={B.label}>IVA</span>
+            <select value={cfdi.iva} onChange={e => setCfdiCampo('iva', e.target.value)}
+              style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)', background: '#fff' }}>
+              {OPCIONES_IVA.map(o => <option key={o.clave} value={o.clave}>{o.nombre}</option>)}
+            </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, gridColumn: '1 / -1' }}>
+            <span style={B.label}>Régimen fiscal del emisor (Natalia)</span>
+            <select value={cfdi.regimenEmisor} onChange={e => setCfdiCampo('regimenEmisor', e.target.value)}
+              style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)', background: '#fff' }}>
+              <option value="">Selecciona…</option>
+              {REGIMENES_FISCALES.map(r => <option key={r.clave} value={r.clave}>{r.nombre}</option>)}
+            </select>
+          </label>
+        </div>
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)', maxWidth: 640 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, fontWeight: 600, color: 'var(--dark)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!cfdi.retencionAplica} onChange={e => setCfdiCampo('retencionAplica', e.target.checked)} />
+            Aplicar retenciones (ISR / IVA) por defecto
+          </label>
+          <p style={{ fontSize: 12, color: 'var(--stone)', margin: '6px 0 12px', lineHeight: 1.5 }}>
+            Normalmente solo aplican cuando el receptor es persona moral. Al facturar podrás activarlas o ajustarlas por paciente. Confirma las tasas con tu contador.
+          </p>
+          {cfdi.retencionAplica && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span style={B.label}>ISR retenido (%)</span>
+                <input value={cfdi.retIsr} onChange={e => setCfdiCampo('retIsr', e.target.value.replace(/[^0-9.]/g, ''))}
+                  inputMode="decimal" placeholder="10" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span style={B.label}>IVA retenido (%)</span>
+                <input value={cfdi.retIva} onChange={e => setCfdiCampo('retIva', e.target.value.replace(/[^0-9.]/g, ''))}
+                  inputMode="decimal" placeholder="10.6667" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+              </label>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 16 }}>
+          <button style={B.primary} onClick={guardarCfdi} disabled={cfdiBusy}>
+            {cfdiBusy ? 'Guardando…' : 'Guardar facturación'}
+          </button>
+        </div>
+        {cfdiMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{cfdiMsg}</span> : null}
       </div>
 
       <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
