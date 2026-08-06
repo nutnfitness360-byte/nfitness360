@@ -13,6 +13,8 @@ const TAUPE = '#8E837B', TAUPE2 = '#978C87', TAN = '#CDA788', CREAM = '#EEE4DA',
 export const NUTRI_NOMBRE = 'MSc. Natalia E. Flores Bonilla';
 export const NUTRI_CEDULA = 'Céd. Prof. 12278012';
 export const NUTRI_CORREO = 'natalia.db@live.com';
+// Línea 2 de la firma (cédula + correo). La importa deportivoHTML.js.
+export const NUTRI_LINEA2 = `${NUTRI_CEDULA} · ${NUTRI_CORREO}`;
 const CORNER_BLOCK = `<div class="corner"><img src="${LOGO}"/><div class="signature">${NUTRI_NOMBRE}<br/>${NUTRI_CEDULA} · ${NUTRI_CORREO}</div></div>`;
 
 const GSHORT = ['Cereales', 'Cereales c/grasa', 'Leguminosas', 'Verdura', 'Fruta', 'P. animal MB', 'P. animal B', 'P. animal M', 'P. animal A', 'Leche desc.', 'Leche semi', 'Leche entera', 'Leche c/az.', 'Grasas', 'Grasas c/prot', 'Azúcares', 'Az. c/grasa', 'Libres'];
