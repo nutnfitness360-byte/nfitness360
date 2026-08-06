@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, query, orderBy } from 'firebase/firestore';
 import { PAQUETES_DEFAULT, FAMILIAS, familiaLabel, resumenSaldo, venceDeLote, nuevoLote } from '../utils/creditos';
-import { REGIMENES_FISCALES, USOS_CFDI } from '../data/catalogosCFDI';
 import Plan from './Plan';
 import Menus from './Menus';
 import HistoriaClinica from './HistoriaClinica';
@@ -848,7 +847,6 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
 
         <CorreoVinculo patient={sel} key={'cv-' + sel.id} />
         <SaldoConsultas patient={sel} key={'saldo-' + sel.id} />
-        <DatosFiscales patient={sel} key={'fiscal-' + sel.id} />
 
         <div className="card">
           <div style={S.titleRow}>
@@ -1674,55 +1672,6 @@ function SaldoConsultas({ patient }) {
         {pkg && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{pkg.consultas} consultas · {familiaLabel(pkg.familia)} · {'$' + Number(pkg.precio || 0).toLocaleString('es-MX')} · vigencia {pkg.vigenciaMeses} meses desde la 1ª consulta.</div>}
         {st && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{st}</div>}
       </div>
-    </div>
-  );
-}
-function DatosFiscales({ patient }) {
-  const [f, setF] = useState(() => ({ rfc: '', razonSocial: '', regimen: '', usoCFDI: 'G03', cp: '', correo: '', ...(patient.fiscal || {}) }));
-  const [st, setSt] = useState('');
-  const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
-  const save = async () => {
-    setSt('Guardando…');
-    try {
-      const fiscal = {
-        rfc: (f.rfc || '').trim().toUpperCase(),
-        razonSocial: (f.razonSocial || '').trim(),
-        regimen: f.regimen || '',
-        usoCFDI: f.usoCFDI || '',
-        cp: (f.cp || '').trim(),
-        correo: (f.correo || '').trim().toLowerCase(),
-      };
-      await updateDoc(doc(db, 'pacientes', patient.id), { fiscal });
-      setSt('Datos fiscales guardados ✓');
-    } catch (e) { setSt('Error: ' + e.message); }
-  };
-  return (
-    <div className="card">
-      <div className="card-title">Datos fiscales (facturación)</div>
-      <div style={{ fontSize: 12, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>
-        Se usan para generar la factura (CFDI) cuando el paciente la solicite. Deben coincidir con su Constancia de Situación Fiscal del SAT.
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        <label style={styles.field}><span style={styles.fieldLbl}>RFC</span>
-          <input style={styles.inp} value={f.rfc} onChange={e => set('rfc', e.target.value.toUpperCase())} placeholder="XAXX010101000" /></label>
-        <label style={styles.field}><span style={styles.fieldLbl}>Código postal (fiscal)</span>
-          <input style={styles.inp} value={f.cp} onChange={e => set('cp', e.target.value.replace(/[^0-9]/g, '').slice(0, 5))} placeholder="00000" inputMode="numeric" /></label>
-        <label style={{ ...styles.field, gridColumn: '1 / -1' }}><span style={styles.fieldLbl}>Razón social / Nombre (como en el SAT)</span>
-          <input style={styles.inp} value={f.razonSocial} onChange={e => set('razonSocial', e.target.value)} placeholder="Nombre o razón social, sin régimen societario" /></label>
-        <label style={styles.field}><span style={styles.fieldLbl}>Régimen fiscal</span>
-          <select style={styles.inp} value={f.regimen} onChange={e => set('regimen', e.target.value)}>
-            <option value="">Selecciona…</option>
-            {REGIMENES_FISCALES.map(r => <option key={r.clave} value={r.clave}>{r.nombre}</option>)}
-          </select></label>
-        <label style={styles.field}><span style={styles.fieldLbl}>Uso del CFDI</span>
-          <select style={styles.inp} value={f.usoCFDI} onChange={e => set('usoCFDI', e.target.value)}>
-            {USOS_CFDI.map(u => <option key={u.clave} value={u.clave}>{u.nombre}</option>)}
-          </select></label>
-        <label style={{ ...styles.field, gridColumn: '1 / -1' }}><span style={styles.fieldLbl}>Correo para la factura (opcional)</span>
-          <input style={styles.inp} value={f.correo} onChange={e => set('correo', e.target.value)} placeholder={patient.correo || 'correo@ejemplo.com'} /></label>
-      </div>
-      <div style={{ marginTop: 12 }}><button style={styles.saveBtn} onClick={save}>Guardar datos fiscales</button></div>
-      {st && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{st}</div>}
     </div>
   );
 }
