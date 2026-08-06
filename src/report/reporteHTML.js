@@ -74,8 +74,6 @@ const ICONS = {
   Legumbres: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 7.5c2.4 0 4.2 1.6 4.2 3.8S16.4 15.3 14 15.3c-2.6 0-4.4-1.7-4.4-3.9S11.4 7.5 14 7.5Z"/><path d="M8.5 9.5C6.7 9.5 5.3 10.7 5.3 12.3S6.7 15 8.5 15c.9 0 1.6-.4 2.2-1"/></svg>',
 };
 
-const PLATE = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4.4"/></svg>';
-
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 const r0 = (n) => Math.round(n);
@@ -95,9 +93,6 @@ function porcionLineHTML(line) {
 
 function mealRow(t, nCols, fotoData) {
   fotoData = fotoData || {};
-  const circle = t.foto
-    ? `<div class="circle"><img src="${t.foto}" alt=""/></div>`
-    : `<div class="circle ph">${PLATE}</div>`;
   if (esPorciones(t)) {
     const txt = (t.porcionesTexto && t.porcionesTexto.trim()) ? t.porcionesTexto : generarPorcionesTexto(t.eq);
     const cuerpo = txt.split('\n').filter(l => l.trim()).map(l => `<div class="pcline">${porcionLineHTML(l)}</div>`).join('');
