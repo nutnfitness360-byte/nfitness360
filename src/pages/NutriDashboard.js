@@ -42,10 +42,11 @@ export default function NutriDashboard() {
   };
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
-  const [cfg, setCfg] = useState({ pendientes: [], pendientesPago: [], precios: {}, servicios: [] });
+  const [cfg, setCfg] = useState({ pendientes: [], pendientesPago: [], pendientesPlan: [], precios: {}, servicios: [] });
   const [filtroRet, setFiltroRet] = useState(null);
   const [nuevoPend, setNuevoPend] = useState('');
   const [nuevoPago, setNuevoPago] = useState('');
+  const [nuevoPlan, setNuevoPlan] = useState('');
   const [edit, setEdit] = useState(null); // { lista, id }
   const [editTexto, setEditTexto] = useState('');
   const [editaPrecios, setEditaPrecios] = useState(false);
@@ -66,12 +67,12 @@ export default function NutriDashboard() {
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
       const d = snap.exists() ? snap.data() : {};
-      setCfg({ pendientes: Array.isArray(d.pendientes) ? d.pendientes : [], pendientesPago: Array.isArray(d.pendientesPago) ? d.pendientesPago : [], precios: d.precios || {}, servicios: Array.isArray(d.servicios) ? d.servicios : [] });
+      setCfg({ pendientes: Array.isArray(d.pendientes) ? d.pendientes : [], pendientesPago: Array.isArray(d.pendientesPago) ? d.pendientesPago : [], pendientesPlan: Array.isArray(d.pendientesPlan) ? d.pendientesPlan : [], precios: d.precios || {}, servicios: Array.isArray(d.servicios) ? d.servicios : [] });
     });
   }, []);
 
   const guardarCfg = async (patch) => {
-    const next = { pendientes: cfg.pendientes, pendientesPago: cfg.pendientesPago, precios: cfg.precios, servicios: cfg.servicios, ...patch };
+    const next = { pendientes: cfg.pendientes, pendientesPago: cfg.pendientesPago, pendientesPlan: cfg.pendientesPlan, precios: cfg.precios, servicios: cfg.servicios, ...patch };
     setCfg(next);
     try { await setDoc(doc(db, 'config', 'dashboard'), next, { merge: true }); } catch (e) { /* no bloquear UI */ }
   };
@@ -100,12 +101,22 @@ export default function NutriDashboard() {
   const togglePago = (id) => guardarCfg({ pendientesPago: (cfg.pendientesPago || []).map(p => p.id === id ? { ...p, hecho: !p.hecho } : p) });
   const delPago = (id) => guardarCfg({ pendientesPago: (cfg.pendientesPago || []).filter(p => p.id !== id) });
 
+  // ---- Planes pendientes (misma mecánica, lista aparte) ----
+  const addPlan = () => {
+    const t = nuevoPlan.trim();
+    if (!t) return;
+    guardarCfg({ pendientesPlan: [...(cfg.pendientesPlan || []), { id: uid(), texto: t, hecho: false }] });
+    setNuevoPlan('');
+  };
+  const togglePlan = (id) => guardarCfg({ pendientesPlan: (cfg.pendientesPlan || []).map(p => p.id === id ? { ...p, hecho: !p.hecho } : p) });
+  const delPlan = (id) => guardarCfg({ pendientesPlan: (cfg.pendientesPlan || []).filter(p => p.id !== id) });
+
   // ---- Edición en línea (para ambas listas) ----
   const startEdit = (lista, p) => { setEdit({ lista, id: p.id }); setEditTexto(p.texto); };
   const cancelEdit = () => setEdit(null);
   const saveEdit = () => {
     if (!edit) return;
-    const key = edit.lista === 'pago' ? 'pendientesPago' : 'pendientes';
+    const key = edit.lista === 'pago' ? 'pendientesPago' : (edit.lista === 'plan' ? 'pendientesPlan' : 'pendientes');
     const t = editTexto.trim();
     const arr = (cfg[key] || []).map(p => p.id === edit.id ? { ...p, texto: t || p.texto } : p);
     guardarCfg({ [key]: arr });
@@ -228,7 +239,7 @@ export default function NutriDashboard() {
       <div className="content">
         {tab === 'inicio' && (
           <>
-            <h1 style={D.saludo}>¡Hola, {primerNombre(user?.displayName) || (typeof window !== 'undefined' && window.location && window.location.hostname.indexOf('sistemanutricio') !== -1 ? 'Aretia' : 'Natalia')}!</h1>
+            <h1 style={D.saludo}>¡Hola, {primerNombre(user?.displayName) || 'Natalia'}!</h1>
 
             <div className="stats">
               <div className="stat"><div className="stat-num">{totalPac}</div><div className="stat-lbl">Pacientes</div></div>
@@ -271,6 +282,20 @@ export default function NutriDashboard() {
                 {(!cfg.pendientesPago || cfg.pendientesPago.length === 0)
                   ? <div className="empty-state">Sin pendientes de pago.</div>
                   : cfg.pendientesPago.map(p => filaPend('pago', p, togglePago, delPago))}
+              </div>
+
+              {/* Planes pendientes */}
+              <div className="card">
+                <div className="card-title">Planes pendientes</div>
+                <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: -6, marginBottom: 12 }}>Planes por elaborar o entregar. Marca cuando ya esté listo.</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <input style={D.pendInput} value={nuevoPlan} onChange={e => setNuevoPlan(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addPlan(); }} placeholder="Escribe un plan por hacer y Enter…" />
+                  <button style={D.addBtn} onClick={addPlan}>+</button>
+                </div>
+                {(!cfg.pendientesPlan || cfg.pendientesPlan.length === 0)
+                  ? <div className="empty-state">Sin planes pendientes.</div>
+                  : cfg.pendientesPlan.map(p => filaPend('plan', p, togglePlan, delPlan))}
               </div>
             </div>
 
@@ -374,9 +399,9 @@ export default function NutriDashboard() {
           <div className="card">
             <div className="card-title">Mi perfil</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-              <div className="pac-avatar">{initials(user?.displayName || (typeof window !== 'undefined' && window.location && window.location.hostname.indexOf('sistemanutricio') !== -1 ? 'Aretia' : 'Natalia Flores'))}</div>
+              <div className="pac-avatar">{initials(user?.displayName || 'Natalia Flores')}</div>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)' }}>{user?.displayName || (typeof window !== 'undefined' && window.location && window.location.hostname.indexOf('sistemanutricio') !== -1 ? 'Aretia' : 'Lic. N. Natalia Flores')}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)' }}>{user?.displayName || 'Lic. N. Natalia Flores'}</div>
                 <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 2 }}>{user?.email}</div>
               </div>
             </div>
