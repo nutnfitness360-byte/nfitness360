@@ -189,7 +189,7 @@ export default function LoginPage() {
 
             {/* Columna izquierda: mensaje + pasos */}
             <div>
-              {logoSrc ? <img src={logoSrc} alt="" style={S.lLogo} /> : null}
+              {logoSrc ? <img src={logoSrc} alt="" style={{ ...S.lLogo, height: esSistemaNutricio ? 88 : S.lLogo.height }} /> : null}
               <div style={S.lHead}>{portadaTitulo}</div>
               <div style={S.lSub}>{portadaSubtitulo}</div>
               <div style={S.lStepsLbl}>CÓMO AGENDAR</div>
