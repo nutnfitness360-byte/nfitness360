@@ -549,7 +549,9 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
         const filename = "Historial Clínico Nutricio " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
         await fetch(url, {
           method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "saveHistorial", patient: nombre, correo: (data.datos.correo || ""), filename, pdfBase64 }), redirect: "follow",
+          // La historia clínica es un documento INTERNO: no se envía al paciente por correo.
+        // (Se manda correo vacío a propósito; enviarPdfPaciente_ no envía si no hay correo.)
+        body: JSON.stringify({ action: "saveHistorial", patient: nombre, correo: "", filename, pdfBase64 }), redirect: "follow",
         });
       } catch (e) { /* el PDF es secundario; la historia ya quedó guardada */ }
     }
@@ -572,7 +574,9 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
       const filename = "Historial Clínico Nutricio " + nombre + " " + new Date().toLocaleDateString("es-MX").replace(/\//g, "-") + ".pdf";
       const res = await fetch(url, {
         method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "saveHistorial", patient: nombre, correo: (data.datos.correo || ""), filename, pdfBase64 }), redirect: "follow",
+        // La historia clínica es un documento INTERNO: no se envía al paciente por correo.
+        // (Se manda correo vacío a propósito; enviarPdfPaciente_ no envía si no hay correo.)
+        body: JSON.stringify({ action: "saveHistorial", patient: nombre, correo: "", filename, pdfBase64 }), redirect: "follow",
       });
       let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false }; }
       if (d.ok && d.link) setPdfStatus("PDF guardado en Drive ✓");
