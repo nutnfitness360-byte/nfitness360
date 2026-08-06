@@ -1,5 +1,11 @@
 import { esc, renderRich } from '../utils/richText';
 
+// Firma del pie por instancia (por dominio): Aretia genérica (sin cédula); Natalia conserva la suya.
+const ES_ARETIA_R = (typeof window !== 'undefined' && window.location && window.location.hostname.indexOf('sistemanutricio') !== -1);
+const FIRMA_NOMBRE = ES_ARETIA_R ? 'Aretia' : 'MSc. Natalia E. Flores Bonilla';
+const FIRMA_LINEA2 = ES_ARETIA_R ? 'Del plan al resultado' : 'Céd. Prof. 12278012 · natalia.db@live.com';
+const FIRMA_WEB = ES_ARETIA_R ? 'aretia.mx' : 'nfitness360.com';
+
 // PDF de Recomendaciones (HTML -> Google lo convierte a PDF en Apps Script).
 // Formato vertical, fondo BLANCO, identidad de marca NF360 (logo real + acento dorado).
 
@@ -137,8 +143,8 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suple
       ${buildSupTable(suplementacion)}
       ${items || vacio}
       <div class="ftr">
-        <div class="fnut">MSc. Natalia E. Flores Bonilla<br/>Céd. Prof. 12278012 · natalia.db@live.com</div>
-        <div class="fweb">nfitness360.com</div>
+        <div class="fnut">${FIRMA_NOMBRE}<br/>${FIRMA_LINEA2}</div>
+        <div class="fweb">${FIRMA_WEB}</div>
       </div>
     </div>
   </body></html>`;
