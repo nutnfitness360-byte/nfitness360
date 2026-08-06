@@ -10,6 +10,7 @@ import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import { renderRich } from '../utils/richText';
 import { parseDriveLink } from '../utils/drive';
 import { resumenSaldo, venceDeLote, familiaLabel, nuevoLote, PAQUETES_DEFAULT } from '../utils/creditos';
+import { REGIMENES_FISCALES, USOS_CFDI } from '../data/catalogosCFDI';
 
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
 const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
@@ -133,6 +134,85 @@ function AparienciaPaciente({ expediente, brandColors }) {
   );
 }
 
+function DatosFacturacion({ email }) {
+  const correo = (email || '').toLowerCase();
+  const [f, setF] = useState({ rfc: '', razonSocial: '', regimen: '', usoCFDI: 'G03', cp: '', correoFactura: '' });
+  const [st, setSt] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!correo) return undefined;
+    return onSnapshot(doc(db, 'datosFiscales', correo), snap => {
+      if (snap.exists()) setF(prev => ({ ...prev, ...snap.data() }));
+    }, () => {});
+  }, [correo]);
+  const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
+  const inp = { border: '0.5px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', width: '100%', boxSizing: 'border-box' };
+  const lbl = { fontSize: 9.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4, display: 'block' };
+  const guardar = async () => {
+    const datos = {
+      correo,
+      rfc: (f.rfc || '').trim().toUpperCase(),
+      razonSocial: (f.razonSocial || '').trim(),
+      regimen: f.regimen || '',
+      usoCFDI: f.usoCFDI || '',
+      cp: (f.cp || '').trim(),
+      correoFactura: (f.correoFactura || '').trim().toLowerCase(),
+    };
+    await setDoc(doc(db, 'datosFiscales', correo), datos, { merge: true });
+    return datos;
+  };
+  const soloGuardar = async () => {
+    setBusy(true); setSt('');
+    try { await guardar(); setSt('Datos guardados ✓'); } catch (e) { setSt('No se pudieron guardar: ' + e.message); }
+    setBusy(false);
+  };
+  const facturar = async () => {
+    if (!(f.rfc || '').trim() || !(f.razonSocial || '').trim() || !f.regimen || !(f.cp || '').trim()) {
+      setSt('Completa RFC, nombre/razón social, régimen y código postal para poder facturar.'); return;
+    }
+    setBusy(true); setSt('');
+    try {
+      await guardar();
+      // (Fase 2) aquí se llamará al timbrado con FEL. Por ahora se confirma la solicitud.
+      setSt('¡Listo! Tus datos quedaron guardados. La generación automática de tu factura se activará muy pronto — estamos conectando el timbrado con el SAT.');
+    } catch (e) { setSt('No se pudo procesar: ' + e.message); }
+    setBusy(false);
+  };
+  return (
+    <div className="card">
+      <div className="card-title">Datos de facturación (CFDI)</div>
+      <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>
+        Captura tus datos fiscales (deben coincidir con tu Constancia de Situación Fiscal del SAT) y presiona <b>Facturar</b> para generar tu factura.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+        <label><span style={lbl}>RFC</span><input style={inp} value={f.rfc} onChange={e => set('rfc', e.target.value.toUpperCase())} placeholder="XAXX010101000" /></label>
+        <label><span style={lbl}>Código postal (fiscal)</span><input style={inp} value={f.cp} onChange={e => set('cp', e.target.value.replace(/[^0-9]/g, '').slice(0, 5))} placeholder="00000" inputMode="numeric" /></label>
+        <label style={{ gridColumn: '1 / -1' }}><span style={lbl}>Razón social / Nombre (como en el SAT)</span><input style={inp} value={f.razonSocial} onChange={e => set('razonSocial', e.target.value)} placeholder="Nombre o razón social, sin régimen societario" /></label>
+        <label><span style={lbl}>Régimen fiscal</span>
+          <select style={inp} value={f.regimen} onChange={e => set('regimen', e.target.value)}>
+            <option value="">Selecciona…</option>
+            {REGIMENES_FISCALES.map(r => <option key={r.clave} value={r.clave}>{r.nombre}</option>)}
+          </select></label>
+        <label><span style={lbl}>Uso del CFDI</span>
+          <select style={inp} value={f.usoCFDI} onChange={e => set('usoCFDI', e.target.value)}>
+            {USOS_CFDI.map(u => <option key={u.clave} value={u.clave}>{u.nombre}</option>)}
+          </select></label>
+        <label style={{ gridColumn: '1 / -1' }}><span style={lbl}>Correo para la factura (opcional)</span><input style={inp} value={f.correoFactura} onChange={e => set('correoFactura', e.target.value)} placeholder={correo || 'correo@ejemplo.com'} /></label>
+      </div>
+      <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+        <button onClick={facturar} disabled={busy}
+          style={{ background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 9, padding: '10px 20px', fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+          {busy ? 'Procesando…' : 'Facturar'}
+        </button>
+        <button onClick={soloGuardar} disabled={busy}
+          style={{ background: '#fff', color: 'var(--dark)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 18px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+          Guardar datos
+        </button>
+      </div>
+      {st && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 10, lineHeight: 1.5 }}>{st}</div>}
+    </div>
+  );
+}
 export default function PacienteDashboard() {
   const { user } = useAuth();
   const { colors } = useBranding();
@@ -675,6 +755,8 @@ export default function PacienteDashboard() {
                 {compraMsg && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 10 }}>{compraMsg}</div>}
               </div>
             )}
+
+            <DatosFacturacion email={user.email} />
 
             <h2 style={D.section}>Tu progreso</h2>
             <div style={D.grid}>
