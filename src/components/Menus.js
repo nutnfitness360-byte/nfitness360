@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
-import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, setDoc, collection, onSnapshot } from 'firebase/firestore';
 import { buildReportHTML, generarPorcionesTexto, esPorciones } from '../report/reporteHTML';
-import { matchFotoKey, buscarFotos, fotoUrl, fotosDataMap } from '../utils/matchFoto';
+import { matchFotoKey, buscarFotos, fotoUrl, fotosDataMap, setBancoCustom, keysDeNombre, slugPlatillo } from '../utils/matchFoto';
 import HistoriaClinica from './HistoriaClinica';
 import { gridKeyDown } from '../utils/gridNav';
 
@@ -306,6 +306,39 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const setOpcionFoto = (idx, oi, key) => setOpcion(idx, oi, { fotoKey: key || '', fotoAuto: false });
   const [fotoPicker, setFotoPicker] = useState(null);   // { idx, oi } de la opción cuya foto se está eligiendo
   const [fotoQuery, setFotoQuery] = useState('');
+  const [bancoCustom, setBancoCustomState] = useState([]);
+  const [subiendoBanco, setSubiendoBanco] = useState(false);
+  const [dragBanco, setDragBanco] = useState(false);
+  // Banco de fotos DINÁMICO (fotos que sube la nutrióloga), guardado en Firestore.
+  useEffect(() => onSnapshot(collection(db, 'bancoFotos'), snap => {
+    const arr = snap.docs.map(d => d.data());
+    setBancoCustom(arr);        // registro para el emparejador y fotoUrl
+    setBancoCustomState(arr);   // provoca re-render
+  }, () => {}), []);
+  // Sube una foto nueva, la guarda en la biblioteca con el nombre del platillo y la asigna a la opción.
+  const subirFotoBanco = async (idx, oi, file) => {
+    if (!file || !(file.type || '').startsWith('image/')) return;
+    const o = (tiempos[idx] && tiempos[idx].opciones[oi]) || {};
+    const nombre = (o.nombre || '').trim();
+    if (!nombre) { alert('Escribe primero el nombre del platillo: la foto se guarda en la biblioteca con ese nombre.'); return; }
+    setSubiendoBanco(true);
+    try {
+      const dataUri = await compressImage(file);
+      const slug = slugPlatillo(nombre);
+      const entrada = { slug, label: nombre, keys: keysDeNombre(nombre), dataUri, creadoEn: new Date().toISOString() };
+      await setDoc(doc(db, 'bancoFotos', slug), entrada, { merge: true });
+      const nuevo = [...bancoCustom.filter(x => x.slug !== slug), entrada];
+      setBancoCustom(nuevo); setBancoCustomState(nuevo);   // la miniatura aparece de inmediato
+      setOpcionFoto(idx, oi, 'custom:' + slug);
+      setFotoPicker(null);
+    } catch (e) {
+      alert('No se pudo subir la foto: ' + (e.code || e.message) + '. Prueba con otra imagen (JPG o PNG).');
+    } finally {
+      setSubiendoBanco(false);
+    }
+  };
+  const onSubirBanco = (idx, oi, e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; subirFotoBanco(idx, oi, f); };
+  const onDropBanco = (idx, oi, e) => { e.preventDefault(); setDragBanco(false); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; subirFotoBanco(idx, oi, f); };
   const setPorciones = (idx, val) => {
     const t = tiempos[idx];
     const patch = { porciones: val };
@@ -980,6 +1013,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                         <button style={S.optFotoBtn} onClick={() => { setFotoQuery(o.nombre || ''); setFotoPicker({ idx, oi }); }}>
                           {o.fotoKey ? 'Cambiar foto' : 'Elegir foto'}
                         </button>
+                        <button style={S.optFotoBtn} onClick={() => { setFotoQuery(''); setFotoPicker({ idx, oi }); }}>Subir foto</button>
                         {o.fotoKey && <button style={S.optFotoClear} onClick={() => setOpcionFoto(idx, oi, '')}>Quitar</button>}
                         {o.fotoKey && o.fotoAuto !== false && <span style={S.optFotoAuto}>automática</span>}
                       </div>
@@ -1050,10 +1084,30 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           </div>
         </div>
       )}
-      {fotoPicker && (
+      {fotoPicker && (() => {
+        const _opt = (tiempos[fotoPicker.idx] && tiempos[fotoPicker.idx].opciones[fotoPicker.oi]) || {};
+        const _nombre = (_opt.nombre || '').trim();
+        return (
         <div style={S.modalWrap} onClick={() => setFotoPicker(null)}>
           <div style={{ ...S.modalCard, maxWidth: 640, maxHeight: '82vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-            <div style={S.balTitle}>Elegir foto del platillo</div>
+            <div style={S.balTitle}>Elegir o subir foto del platillo</div>
+            <div
+              onDragOver={e => { e.preventDefault(); setDragBanco(true); }}
+              onDragLeave={() => setDragBanco(false)}
+              onDrop={e => onDropBanco(fotoPicker.idx, fotoPicker.oi, e)}
+              style={{ border: '1.5px dashed var(--gold)', borderRadius: 12, padding: '14px', textAlign: 'center', background: dragBanco ? 'rgba(205,167,136,0.16)' : 'var(--cream)', marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--dark)', marginBottom: 4 }}>¿No está en el banco? Arrastra o sube una foto aquí</div>
+              <div style={{ fontSize: 12, color: 'var(--stone)', marginBottom: 8, lineHeight: 1.4 }}>
+                {_nombre
+                  ? <>Se guardará en la biblioteca como <b>“{_nombre}”</b> y se usará para este platillo (y para los que se llamen igual).</>
+                  : 'Primero escribe el nombre del platillo para poder subir la foto.'}
+              </div>
+              <label style={{ ...S.optFotoBtn, display: 'inline-block', cursor: _nombre && !subiendoBanco ? 'pointer' : 'not-allowed', opacity: _nombre && !subiendoBanco ? 1 : 0.5, pointerEvents: _nombre && !subiendoBanco ? 'auto' : 'none' }}>
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => onSubirBanco(fotoPicker.idx, fotoPicker.oi, e)} />
+                {subiendoBanco ? 'Subiendo…' : 'Subir foto'}
+              </label>
+            </div>
+            <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--stone)', marginBottom: 6 }}>O elige del banco</div>
             <input autoFocus style={{ ...S.optName, marginBottom: 10 }} placeholder="Buscar… ej. chilaquiles, salmón, avena" value={fotoQuery} onChange={e => setFotoQuery(e.target.value)} />
             <div style={S.fpGrid}>
               {buscarFotos(fotoQuery, 60).map(f => (
@@ -1068,7 +1122,8 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
