@@ -1,4 +1,4 @@
-import { FONT_CSS, LOGO, NUTRI_NOMBRE, NUTRI_CEDULA, NUTRI_CORREO } from './reporteHTML';
+import { FONT_CSS, LOGO, NUTRI_NOMBRE, NUTRI_LINEA2 } from './reporteHTML';
 
 /* ============================================================
    NFITNESS 360 — PDF del plan deportivo (alto rendimiento)
@@ -33,7 +33,7 @@ const fechaLarga = (iso) => {
 const cornerBlock = () => `
   <table class="corner"><tr>
     <td><img src="${LOGO}" class="clogo"/></td>
-    <td class="csig">${esc(NUTRI_NOMBRE)}<br/>${esc(NUTRI_CEDULA)} · ${esc(NUTRI_CORREO)}</td>
+    <td class="csig">${esc(NUTRI_NOMBRE)}<br/>${esc(NUTRI_LINEA2)}</td>
   </tr></table>`;
 
 // Bandera a cuadros (fuera del círculo de meta), como tabla b/n: robusta en el convertidor.
