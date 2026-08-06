@@ -10,10 +10,12 @@ export const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAEhCAYAA
 const TAUPE = '#8E837B', TAUPE2 = '#978C87', TAN = '#CDA788', CREAM = '#EEE4DA', INK = '#4A443E', LINE = '#E0D6CB', SOFT = '#6E645C';
 
 // Datos de membrete de la nutrióloga, mostrados en cada página del reporte.
-export const NUTRI_NOMBRE = 'MSc. Natalia E. Flores Bonilla';
-export const NUTRI_CEDULA = 'Céd. Prof. 12278012';
-export const NUTRI_CORREO = 'natalia.db@live.com';
-const CORNER_BLOCK = `<div class="corner"><img src="${LOGO}"/><div class="signature">${NUTRI_NOMBRE}<br/>${NUTRI_CEDULA} · ${NUTRI_CORREO}</div></div>`;
+const ES_ARETIA = (typeof window !== 'undefined' && window.location && window.location.hostname.indexOf('sistemanutricio') !== -1);
+export const NUTRI_NOMBRE = ES_ARETIA ? 'Aretia' : 'MSc. Natalia E. Flores Bonilla';
+export const NUTRI_CEDULA = ES_ARETIA ? '' : 'Céd. Prof. 12278012';
+export const NUTRI_CORREO = ES_ARETIA ? '' : 'natalia.db@live.com';
+export const NUTRI_LINEA2 = ES_ARETIA ? 'Del plan al resultado' : (NUTRI_CEDULA + ' · ' + NUTRI_CORREO);
+const CORNER_BLOCK = `<div class="corner"><img src="${LOGO}"/><div class="signature">${NUTRI_NOMBRE}<br/>${NUTRI_LINEA2}</div></div>`;
 
 const GSHORT = ['Cereales', 'Cereales c/grasa', 'Leguminosas', 'Verdura', 'Fruta', 'P. animal MB', 'P. animal B', 'P. animal M', 'P. animal A', 'Leche desc.', 'Leche semi', 'Leche entera', 'Leche c/az.', 'Grasas', 'Grasas c/prot', 'Azúcares', 'Az. c/grasa', 'Libres'];
 
@@ -102,7 +104,7 @@ function mealRow(t, nCols, fotoData) {
     const txt = (t.porcionesTexto && t.porcionesTexto.trim()) ? t.porcionesTexto : generarPorcionesTexto(t.eq);
     const cuerpo = txt.split('\n').filter(l => l.trim()).map(l => `<div class="pcline">${porcionLineHTML(l)}</div>`).join('');
     return `<div class="rw">
-      <div class="mcell"><div class="mname">${esc(t.nombre)}</div><div class="mtime">${esc(t.hora)}</div></div>
+      <div class="mcell">${circle}<div class="mname">${esc(t.nombre)}</div><div class="mtime">${esc(t.hora)}</div></div>
       <div class="opts"><div class="pcbox">
         <div class="pchead">Porciones generales para armar tu comida</div>
         <div class="pcbody">${cuerpo}</div>
@@ -113,33 +115,14 @@ function mealRow(t, nCols, fotoData) {
   const ops = [];
   for (let k = 0; k < n; k++) ops.push((t.opciones || [])[k] || { nombre: '', prep: '' });
   const cols = ops.map((o, k) => {
-    const tieneFoto = o && o.fotoKey && fotoData[o.fotoKey];
-    const src = tieneFoto ? fotoData[o.fotoKey] : '';
-    // Una sola opción: la foto va como TARJETA a la izquierda del texto (proporción bonita,
-    // no una franja a todo el ancho). Con varias opciones: foto arriba, en banner (como antes).
-    if (n === 1) {
-      const foto = tieneFoto ? `<img class="ophoto1" src="${src}" alt=""/>` : '';
-      return `
-      <div class="ocol"><div class="ohead">Opción ${k + 1}</div>
-        <div class="obox obox1">${foto}<div class="otxt"><div class="dn">${esc(o.nombre) || '—'}</div><div class="od">${esc(o.prep)}</div></div></div>
-      </div>`;
-    }
-    // Dos opciones: cada columna se subdivide — 1/3 foto a la izquierda, 2/3 texto.
-    if (n === 2) {
-      const foto2 = tieneFoto ? `<img class="ophoto2" src="${src}" alt=""/>` : '';
-      return `
-      <div class="ocol"><div class="ohead">Opción ${k + 1}</div>
-        <div class="obox obox2">${foto2}<div class="otxt2"><div class="dn">${esc(o.nombre) || '—'}</div><div class="od">${esc(o.prep)}</div></div></div>
-      </div>`;
-    }
-    const foto = tieneFoto ? `<img class="ophoto" src="${src}" alt=""/>` : '';
+    const foto = (o && o.fotoKey && fotoData[o.fotoKey]) ? `<img class="ophoto" src="${fotoData[o.fotoKey]}" alt=""/>` : '';
     return `
     <div class="ocol"><div class="ohead">Opción ${k + 1}</div>
       <div class="obox">${foto}<div class="dn">${esc(o.nombre) || '—'}</div><div class="od">${esc(o.prep)}</div></div>
     </div>`;
   }).join('');
   return `<div class="rw">
-    <div class="mcell"><div class="mname">${esc(t.nombre)}</div><div class="mtime">${esc(t.hora)}</div></div>
+    <div class="mcell">${circle}<div class="mname">${esc(t.nombre)}</div><div class="mtime">${esc(t.hora)}</div></div>
     <div class="opts">${cols}</div>
   </div>`;
 }
@@ -243,7 +226,7 @@ ${FONT_CSS}
 .hlbl{background:${TAUPE2};color:#fff;font-size:11px;letter-spacing:3px;font-weight:700;padding:8px 16px;display:flex;align-items:center;}
 .hval{background:#fff;color:${INK};font-size:12px;padding:8px 18px;border:1px solid ${LINE};border-left:none;min-width:120px;display:flex;align-items:center;}
 .rw{display:flex;gap:10px;margin-bottom:4px;align-items:stretch;}
-.mcell{width:120px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.mcell{width:120px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;}
 .circle{width:74px;height:74px;border-radius:50%;background:#fff;border:2px solid ${TAN};display:flex;align-items:center;justify-content:center;color:${TAN};margin-bottom:6px;overflow:hidden;}
 .circle img{width:100%;height:100%;object-fit:cover;}
 .mname{background:${TAUPE2};color:#fff;font-size:11px;letter-spacing:2px;font-weight:700;text-transform:uppercase;padding:5px 8px;text-align:center;width:100%;}
@@ -254,12 +237,6 @@ ${FONT_CSS}
 .obox{background:#fff;border:1px solid ${LINE};border-top:none;padding:6px 10px;flex:1;}
 .dn{font-weight:800;color:${TAUPE};font-size:11.5px;margin-bottom:3px;line-height:1.2;} .od{font-size:10.5px;color:${INK};line-height:1.34;}
 .ophoto{width:100%;height:58px;object-fit:cover;border-radius:7px;margin-bottom:4px;display:block;}
-.obox1{display:flex;gap:12px;align-items:flex-start;}
-.ophoto1{width:210px;height:132px;flex-shrink:0;object-fit:cover;border-radius:7px;display:block;}
-.obox1 .otxt{flex:1;min-width:0;}
-.obox2{display:flex;gap:10px;align-items:flex-start;}
-.ophoto2{flex:1 1 0;min-width:0;height:104px;object-fit:cover;border-radius:7px;display:block;}
-.obox2 .otxt2{flex:2 1 0;min-width:0;}
 .pcbox{flex:1;display:flex;flex-direction:column;}
 .pchead{background:${TAUPE2};color:#fff;font-size:10px;letter-spacing:2px;font-weight:700;text-transform:uppercase;text-align:center;padding:6px;}
 .pcbody{background:#fff;border:1px solid ${LINE};border-top:none;padding:13px 16px;flex:1;}
