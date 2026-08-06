@@ -228,7 +228,7 @@ export default function NutriDashboard() {
       <div className="content">
         {tab === 'inicio' && (
           <>
-            <h1 style={D.saludo}>¡Hola, {primerNombre(user?.displayName) || 'Natalia'}!</h1>
+            <h1 style={D.saludo}>¡Hola, {primerNombre(user?.displayName) || (typeof window !== 'undefined' && window.location && window.location.hostname.indexOf('sistemanutricio') !== -1 ? 'Aretia' : 'Natalia')}!</h1>
 
             <div className="stats">
               <div className="stat"><div className="stat-num">{totalPac}</div><div className="stat-lbl">Pacientes</div></div>
@@ -374,9 +374,9 @@ export default function NutriDashboard() {
           <div className="card">
             <div className="card-title">Mi perfil</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-              <div className="pac-avatar">{initials(user?.displayName || 'Natalia Flores')}</div>
+              <div className="pac-avatar">{initials(user?.displayName || (typeof window !== 'undefined' && window.location && window.location.hostname.indexOf('sistemanutricio') !== -1 ? 'Aretia' : 'Natalia Flores'))}</div>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)' }}>{user?.displayName || 'Lic. N. Natalia Flores'}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)' }}>{user?.displayName || (typeof window !== 'undefined' && window.location && window.location.hostname.indexOf('sistemanutricio') !== -1 ? 'Aretia' : 'Lic. N. Natalia Flores')}</div>
                 <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 2 }}>{user?.email}</div>
               </div>
             </div>
