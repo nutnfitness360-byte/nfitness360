@@ -404,6 +404,7 @@ export default function PacienteDashboard() {
   const [expediente, setExpediente] = useState(null);
   const [creditos, setCreditos] = useState({ lotes: [], usos: [] });
   const [paquetesCfg, setPaquetesCfg] = useState(PAQUETES_DEFAULT);
+  const [facturacionActiva, setFacturacionActiva] = useState(false);
   const [compraMsg, setCompraMsg] = useState('');
   const [compraBusy, setCompraBusy] = useState('');
   const [modalCita, setModalCita] = useState(null);
@@ -533,6 +534,7 @@ export default function PacienteDashboard() {
   useEffect(() => onSnapshot(doc(db, 'config', 'dashboard'), snap => {
     const d = (snap && snap.data()) || {};
     setPaquetesCfg(Array.isArray(d.paquetes) && d.paquetes.length ? d.paquetes : PAQUETES_DEFAULT);
+    setFacturacionActiva(!!(d.cfdi && d.cfdi.activo));
   }, () => {}), []);
 
   // Aplica la preferencia de colores del paciente (capa por encima de la marca) en toda su vista.
@@ -682,6 +684,9 @@ export default function PacienteDashboard() {
         <button key={t.id} className={`nav-item${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
           {t.icon}
           <span>{t.label}</span>
+          {t.id === 'facturacion' && !facturacionActiva && (
+            <span style={{ fontSize: 7.5, lineHeight: 1, color: 'var(--gold)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2px', marginTop: 1 }}>Próximamente</span>
+          )}
         </button>
       ))}
       <div className="nav-spacer" />
