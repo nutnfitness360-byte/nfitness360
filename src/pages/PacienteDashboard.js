@@ -10,7 +10,7 @@ import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import { renderRich } from '../utils/richText';
 import { parseDriveLink } from '../utils/drive';
 import { resumenSaldo, venceDeLote, familiaLabel, nuevoLote, PAQUETES_DEFAULT } from '../utils/creditos';
-import { REGIMENES_FISCALES, USOS_CFDI } from '../data/catalogosCFDI';
+import { REGIMENES_FISCALES, USOS_CFDI, CFDI_DEFAULT } from '../data/catalogosCFDI';
 
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
 const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
@@ -137,14 +137,22 @@ function AparienciaPaciente({ expediente, brandColors }) {
 function DatosFacturacion({ email }) {
   const correo = (email || '').toLowerCase();
   const [f, setF] = useState({ rfc: '', razonSocial: '', regimen: '', usoCFDI: 'G03', cp: '', correoFactura: '' });
+  const [cfg, setCfg] = useState(CFDI_DEFAULT);
   const [st, setSt] = useState('');
   const [busy, setBusy] = useState(false);
+  const [factura, setFactura] = useState(null);   // { uuid, pdfBase64 } tras timbrar
   useEffect(() => {
     if (!correo) return undefined;
     return onSnapshot(doc(db, 'datosFiscales', correo), snap => {
       if (snap.exists()) setF(prev => ({ ...prev, ...snap.data() }));
     }, () => {});
   }, [correo]);
+  // Configuración de facturación (interruptor + datos del emisor + precio).
+  useEffect(() => onSnapshot(doc(db, 'config', 'dashboard'), snap => {
+    const d = (snap && snap.data()) || {};
+    setCfg({ ...CFDI_DEFAULT, ...(d.cfdi || {}) });
+  }, () => {}), []);
+  const activo = !!cfg.activo;
   const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
   const inp = { border: '0.5px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', width: '100%', boxSizing: 'border-box' };
   const lbl = { fontSize: 9.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4, display: 'block' };
@@ -166,24 +174,80 @@ function DatosFacturacion({ email }) {
     try { await guardar(); setSt('Datos guardados ✓'); } catch (e) { setSt('No se pudieron guardar: ' + e.message); }
     setBusy(false);
   };
+  const descargarPDF = () => {
+    if (!factura || !factura.pdfBase64) return;
+    try {
+      const a = document.createElement('a');
+      a.href = 'data:application/pdf;base64,' + factura.pdfBase64;
+      a.download = 'Factura_' + factura.uuid + '.pdf';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    } catch (e) { /* noop */ }
+  };
   const facturar = async () => {
+    if (!activo) return;   // botón inhabilitado hasta que la nutrióloga active la facturación
     if (!(f.rfc || '').trim() || !(f.razonSocial || '').trim() || !f.regimen || !(f.cp || '').trim()) {
       setSt('Completa RFC, nombre/razón social, régimen y código postal para poder facturar.'); return;
     }
-    setBusy(true); setSt('');
+    if (!cfg.emisorNombre || !cfg.lugarExpedicion || !cfg.regimenEmisor || !(Number(cfg.precioConsulta) > 0)) {
+      setSt('La facturación todavía no está configurada por completo (datos del emisor o precio). Avísale a tu nutrióloga.'); return;
+    }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setSt('No se pudo conectar con el servicio de facturación. Inténtalo más tarde.'); return; }
+    setBusy(true); setSt(''); setFactura(null);
     try {
       await guardar();
-      // (Fase 2) aquí se llamará al timbrado con FEL. Por ahora se confirma la solicitud.
-      setSt('¡Listo! Tus datos quedaron guardados. La generación automática de tu factura se activará muy pronto — estamos conectando el timbrado con el SAT.');
+      const payload = {
+        action: 'facturarCFDI',
+        ambiente: cfg.produccion ? 'produccion' : 'sandbox',
+        emisor: { nombre: cfg.emisorNombre, regimenFiscal: cfg.regimenEmisor, lugarExpedicion: cfg.lugarExpedicion },
+        receptor: {
+          rfc: (f.rfc || '').trim().toUpperCase(), nombre: (f.razonSocial || '').trim(),
+          cp: (f.cp || '').trim(), regimenFiscal: f.regimen, usoCFDI: f.usoCFDI || 'G03',
+          correo: (f.correoFactura || correo),
+        },
+        conceptos: [{
+          cantidad: 1, valorUnitario: Number(cfg.precioConsulta),
+          descripcion: cfg.descripcion || 'Consulta de nutrición',
+          claveProdServ: cfg.claveProdServ || '85121800', claveUnidad: cfg.claveUnidad || 'E48',
+          unidad: 'Servicio', ivaCode: cfg.iva || 'exento',
+        }],
+        retencion: { aplica: !!cfg.retencionAplica, isrPct: cfg.retIsr, ivaPct: cfg.retIva },
+        formaPago: '03', metodoPago: 'PUE',
+        referencia: 'NF' + Date.now(),
+        correoFactura: (f.correoFactura || correo),
+      };
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload), redirect: 'follow',
+      });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = null; }
+      if (d && d.ok && d.uuid) {
+        setFactura({ uuid: d.uuid, pdfBase64: d.pdfBase64 || '' });
+        setSt('¡Factura generada! Folio fiscal (UUID): ' + d.uuid + (d.pdfBase64 ? ' — puedes descargar el PDF abajo.' : ' — te la enviamos por correo.'));
+      } else {
+        setSt('No se pudo generar la factura: ' + ((d && d.error) || 'error desconocido') + '. Revisa que tus datos coincidan EXACTO con tu Constancia de Situación Fiscal del SAT.');
+      }
     } catch (e) { setSt('No se pudo procesar: ' + e.message); }
     setBusy(false);
   };
   return (
     <div className="card">
       <div className="card-title">Datos de facturación (CFDI)</div>
-      <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>
-        Captura tus datos fiscales (deben coincidir con tu Constancia de Situación Fiscal del SAT) y presiona <b>Facturar</b> para generar tu factura.
-      </div>
+      {activo ? (
+        <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>
+          Captura tus datos fiscales (deben coincidir con tu Constancia de Situación Fiscal del SAT) y presiona <b>Facturar</b> para generar tu factura.
+        </div>
+      ) : (
+        <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>
+          Puedes dejar aquí guardados tus datos fiscales. La <b>facturación en línea estará disponible muy pronto</b>; en cuanto se active, podrás generar tu factura desde aquí.
+        </div>
+      )}
+      {!activo && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FBF4EF', border: '1px solid var(--border)', borderRadius: 9, padding: '9px 12px', marginBottom: 12, fontSize: 12, color: 'var(--stone)' }}>
+          <span aria-hidden style={{ fontSize: 14 }}>🕓</span>
+          <span>Facturación <b>próximamente</b>. Por ahora el botón está deshabilitado.</span>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
         <label><span style={lbl}>RFC</span><input style={inp} value={f.rfc} onChange={e => set('rfc', e.target.value.toUpperCase())} placeholder="XAXX010101000" /></label>
         <label><span style={lbl}>Código postal (fiscal)</span><input style={inp} value={f.cp} onChange={e => set('cp', e.target.value.replace(/[^0-9]/g, '').slice(0, 5))} placeholder="00000" inputMode="numeric" /></label>
@@ -200,14 +264,21 @@ function DatosFacturacion({ email }) {
         <label style={{ gridColumn: '1 / -1' }}><span style={lbl}>Correo para la factura (opcional)</span><input style={inp} value={f.correoFactura} onChange={e => set('correoFactura', e.target.value)} placeholder={correo || 'correo@ejemplo.com'} /></label>
       </div>
       <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-        <button onClick={facturar} disabled={busy}
-          style={{ background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 9, padding: '10px 20px', fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+        <button onClick={facturar} disabled={busy || !activo}
+          title={activo ? 'Generar tu factura' : 'La facturación en línea aún no está disponible'}
+          style={{ background: activo ? 'var(--gold)' : '#e8ddd4', color: activo ? '#fff' : 'var(--stone)', border: 'none', borderRadius: 9, padding: '10px 20px', fontWeight: 700, fontSize: 13.5, cursor: (busy || !activo) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (busy || !activo) ? 0.75 : 1 }}>
           {busy ? 'Procesando…' : 'Facturar'}
         </button>
         <button onClick={soloGuardar} disabled={busy}
           style={{ background: '#fff', color: 'var(--dark)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 18px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
           Guardar datos
         </button>
+        {factura && factura.pdfBase64 && (
+          <button onClick={descargarPDF}
+            style={{ background: 'var(--sage)', color: '#fff', border: 'none', borderRadius: 9, padding: '10px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+            Descargar PDF
+          </button>
+        )}
       </div>
       {st && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 10, lineHeight: 1.5 }}>{st}</div>}
     </div>
