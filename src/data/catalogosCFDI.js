@@ -43,13 +43,24 @@ export const OPCIONES_IVA = [
 
 // Valores por defecto de la configuración CFDI (editables en Configuración).
 export const CFDI_DEFAULT = {
+  // Interruptor maestro: mientras esté en false, el apartado de Facturación
+  // aparece en el portal del paciente pero el botón "Facturar" está INHABILITADO
+  // (modo pruebas). Se activa desde Configuración cuando el timbrado esté validado.
+  activo: false,
+  // Ambiente: false = PRUEBAS (sandbox, no genera factura real). true = PRODUCCIÓN
+  // (timbra facturas fiscales reales con las credenciales reales de FEL).
+  produccion: false,
   claveProdServ: '85121800',        // Servicios de nutrición (SAT)
   descripcion: 'Consulta de nutrición',
   claveUnidad: 'E48',
   iva: 'exento',
-  // Datos del emisor (Natalia) y retenciones. Las retenciones dependen del
-  // régimen del emisor; normalmente solo aplican cuando el receptor es persona moral.
+  precioConsulta: '',               // Importe (MXN) a facturar por consulta. Ej. 800
+  // Datos del emisor (Natalia). El nombre debe coincidir EXACTO con su CSD/SAT.
+  emisorNombre: '',                 // Razón social del emisor (sin régimen societario)
+  lugarExpedicion: '',              // Código postal del emisor (lugar de expedición)
   regimenEmisor: '',
+  // Retenciones. Dependen del régimen del emisor; normalmente solo aplican
+  // cuando el receptor es persona moral.
   retencionAplica: false,
   retIsr: '',                       // % ISR retenido (ej. 10 en honorarios, 1.25 en RESICO)
   retIva: '',                       // % IVA retenido (ej. 10.6667 = 2/3 del 16%)
