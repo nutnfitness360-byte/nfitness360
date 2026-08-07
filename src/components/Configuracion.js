@@ -560,8 +560,28 @@ export default function Configuracion() {
       <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
         <div className="card-title">Facturación (CFDI)</div>
         <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>
-          Valores por defecto del concepto para las facturas de consultas. Confírmalos con tu contador (clave del SAT, unidad e IVA). El timbrado se conecta con tu proveedor (FEL) en el siguiente paso.
+          Valores por defecto del concepto para las facturas de consultas. Confírmalos con tu contador (clave del SAT, unidad e IVA). El timbrado se conecta con tu proveedor (FEL).
         </p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: cfdi.activo ? '#E9F1ED' : '#FBF4EF', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 16, maxWidth: 640 }}>
+          <input type="checkbox" checked={!!cfdi.activo} onChange={e => setCfdiCampo('activo', e.target.checked)} style={{ marginTop: 3 }} />
+          <label style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.5, cursor: 'pointer' }} onClick={() => setCfdiCampo('activo', !cfdi.activo)}>
+            <b>Activar facturación en línea para el paciente</b><br />
+            <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>
+              Mientras esté <b>apagado</b>, el paciente ve el apartado "Facturación" en su portal pero el botón <b>Facturar</b> queda inhabilitado (modo pruebas). Actívalo cuando el timbrado con FEL ya esté validado.
+            </span>
+          </label>
+        </div>
+        {cfdi.activo && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: cfdi.produccion ? '#F7EAE5' : '#F4F1EC', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 16, maxWidth: 640 }}>
+            <input type="checkbox" checked={!!cfdi.produccion} onChange={e => setCfdiCampo('produccion', e.target.checked)} style={{ marginTop: 3 }} />
+            <label style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.5, cursor: 'pointer' }} onClick={() => setCfdiCampo('produccion', !cfdi.produccion)}>
+              <b>Emitir facturas REALES (producción)</b><br />
+              <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>
+                Apagado = ambiente de <b>pruebas</b> (no genera facturas fiscales). Enciéndelo solo cuando ya estén cargadas las credenciales reales de FEL y quieras timbrar de verdad ante el SAT.
+              </span>
+            </label>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', maxWidth: 640 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <span style={B.label}>Clave producto/servicio (SAT)</span>
@@ -586,6 +606,21 @@ export default function Configuracion() {
               style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)', background: '#fff' }}>
               {OPCIONES_IVA.map(o => <option key={o.clave} value={o.clave}>{o.nombre}</option>)}
             </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, gridColumn: '1 / -1' }}>
+            <span style={B.label}>Nombre / razón social del emisor (como en el SAT)</span>
+            <input value={cfdi.emisorNombre} onChange={e => setCfdiCampo('emisorNombre', e.target.value)}
+              placeholder="NATALIA E FLORES BONILLA" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <span style={B.label}>Código postal del emisor (lugar de expedición)</span>
+            <input value={cfdi.lugarExpedicion} onChange={e => setCfdiCampo('lugarExpedicion', e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
+              inputMode="numeric" placeholder="64000" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <span style={B.label}>Precio de la consulta a facturar (MXN)</span>
+            <input value={cfdi.precioConsulta} onChange={e => setCfdiCampo('precioConsulta', e.target.value.replace(/[^0-9.]/g, ''))}
+              inputMode="decimal" placeholder="800" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5, gridColumn: '1 / -1' }}>
             <span style={B.label}>Régimen fiscal del emisor (Natalia)</span>
