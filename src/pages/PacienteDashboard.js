@@ -134,154 +134,266 @@ function AparienciaPaciente({ expediente, brandColors }) {
   );
 }
 
-function DatosFacturacion({ email }) {
-  const correo = (email || '').toLowerCase();
-  const [f, setF] = useState({ rfc: '', razonSocial: '', regimen: '', usoCFDI: 'G03', cp: '', correoFactura: '' });
-  const [cfg, setCfg] = useState(CFDI_DEFAULT);
-  const [st, setSt] = useState('');
+// Método de pago de la cita/lote → clave Forma de Pago del SAT (c_FormaPago).
+const METODO_A_FORMA = { efectivo: '01', transferencia: '03', tarjeta: '04', stripe: '04', consultorio: '01', reagendado: '99' };
+function metodoAFormaPago(m) { return METODO_A_FORMA[m] || '99'; }
+const FAC_INP = { border: '0.5px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', width: '100%', boxSizing: 'border-box' };
+const FAC_LBL = { fontSize: 9.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4, display: 'block' };
+const fMoney = (n) => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Normaliza el doc datosFiscales a un arreglo de perfiles (migra el formato viejo de 1 solo).
+function leerPerfiles(d) {
+  if (!d) return [];
+  if (Array.isArray(d.perfiles)) return d.perfiles;
+  if (d.rfc) return [{ id: 'p0', rfc: d.rfc, razonSocial: d.razonSocial || '', regimen: d.regimen || '', usoCFDI: d.usoCFDI || 'G03', cp: d.cp || '', correoFactura: d.correoFactura || '' }];
+  return [];
+}
+
+// Formulario para agregar / editar un perfil de facturación.
+function PerfilForm({ correo, perfil, onListo, onCancelar }) {
+  const [f, setF] = useState({ id: '', rfc: '', razonSocial: '', regimen: '', usoCFDI: 'G03', cp: '', correoFactura: '', ...(perfil || {}) });
   const [busy, setBusy] = useState(false);
-  const [factura, setFactura] = useState(null);   // { uuid, pdfBase64 } tras timbrar
-  useEffect(() => {
-    if (!correo) return undefined;
-    return onSnapshot(doc(db, 'datosFiscales', correo), snap => {
-      if (snap.exists()) setF(prev => ({ ...prev, ...snap.data() }));
-    }, () => {});
-  }, [correo]);
-  // Configuración de facturación (interruptor + datos del emisor + precio).
-  useEffect(() => onSnapshot(doc(db, 'config', 'dashboard'), snap => {
-    const d = (snap && snap.data()) || {};
-    setCfg({ ...CFDI_DEFAULT, ...(d.cfdi || {}) });
-  }, () => {}), []);
-  const activo = !!cfg.activo;
+  const [msg, setMsg] = useState('');
   const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
-  const inp = { border: '0.5px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', width: '100%', boxSizing: 'border-box' };
-  const lbl = { fontSize: 9.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4, display: 'block' };
   const guardar = async () => {
-    const datos = {
-      correo,
-      rfc: (f.rfc || '').trim().toUpperCase(),
-      razonSocial: (f.razonSocial || '').trim(),
-      regimen: f.regimen || '',
-      usoCFDI: f.usoCFDI || '',
-      cp: (f.cp || '').trim(),
-      correoFactura: (f.correoFactura || '').trim().toLowerCase(),
-    };
-    await setDoc(doc(db, 'datosFiscales', correo), datos, { merge: true });
-    return datos;
-  };
-  const soloGuardar = async () => {
-    setBusy(true); setSt('');
-    try { await guardar(); setSt('Datos guardados ✓'); } catch (e) { setSt('No se pudieron guardar: ' + e.message); }
-    setBusy(false);
-  };
-  const descargarPDF = () => {
-    if (!factura || !factura.pdfBase64) return;
-    try {
-      const a = document.createElement('a');
-      a.href = 'data:application/pdf;base64,' + factura.pdfBase64;
-      a.download = 'Factura_' + factura.uuid + '.pdf';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    } catch (e) { /* noop */ }
-  };
-  const facturar = async () => {
-    if (!activo) return;   // botón inhabilitado hasta que la nutrióloga active la facturación
     if (!(f.rfc || '').trim() || !(f.razonSocial || '').trim() || !f.regimen || !(f.cp || '').trim()) {
-      setSt('Completa RFC, nombre/razón social, régimen y código postal para poder facturar.'); return;
+      setMsg('Completa RFC, nombre/razón social, régimen y código postal.'); return;
     }
-    if (!cfg.emisorNombre || !cfg.lugarExpedicion || !cfg.regimenEmisor || !(Number(cfg.precioConsulta) > 0)) {
-      setSt('La facturación todavía no está configurada por completo (datos del emisor o precio). Avísale a tu nutrióloga.'); return;
-    }
-    const url = process.env.REACT_APP_APPSCRIPT_URL;
-    if (!url) { setSt('No se pudo conectar con el servicio de facturación. Inténtalo más tarde.'); return; }
-    setBusy(true); setSt(''); setFactura(null);
+    setBusy(true); setMsg('');
     try {
-      await guardar();
-      const payload = {
-        action: 'facturarCFDI',
-        ambiente: cfg.produccion ? 'produccion' : 'sandbox',
-        emisor: { nombre: cfg.emisorNombre, regimenFiscal: cfg.regimenEmisor, lugarExpedicion: cfg.lugarExpedicion },
-        receptor: {
-          rfc: (f.rfc || '').trim().toUpperCase(), nombre: (f.razonSocial || '').trim(),
-          cp: (f.cp || '').trim(), regimenFiscal: f.regimen, usoCFDI: f.usoCFDI || 'G03',
-          correo: (f.correoFactura || correo),
-        },
-        conceptos: [{
-          cantidad: 1, valorUnitario: Number(cfg.precioConsulta),
-          descripcion: cfg.descripcion || 'Consulta de nutrición',
-          claveProdServ: cfg.claveProdServ || '85121800', claveUnidad: cfg.claveUnidad || 'E48',
-          unidad: 'Servicio', ivaCode: cfg.iva || 'exento',
-        }],
-        retencion: { aplica: !!cfg.retencionAplica, isrPct: cfg.retIsr, ivaPct: cfg.retIva },
-        formaPago: '03', metodoPago: 'PUE',
-        referencia: 'NF' + Date.now(),
-        correoFactura: (f.correoFactura || correo),
+      const snap = await getDoc(doc(db, 'datosFiscales', correo));
+      const perfiles = leerPerfiles(snap.exists() ? snap.data() : null).slice();
+      const nuevo = {
+        id: f.id || ('p' + Date.now()),
+        rfc: (f.rfc || '').trim().toUpperCase(), razonSocial: (f.razonSocial || '').trim(),
+        regimen: f.regimen, usoCFDI: f.usoCFDI || 'G03', cp: (f.cp || '').trim(),
+        correoFactura: (f.correoFactura || '').trim().toLowerCase(),
       };
-      const res = await fetch(url, {
-        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload), redirect: 'follow',
-      });
-      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = null; }
-      if (d && d.ok && d.uuid) {
-        setFactura({ uuid: d.uuid, pdfBase64: d.pdfBase64 || '' });
-        setSt('¡Factura generada! Folio fiscal (UUID): ' + d.uuid + (d.pdfBase64 ? ' — puedes descargar el PDF abajo.' : ' — te la enviamos por correo.'));
-      } else {
-        setSt('No se pudo generar la factura: ' + ((d && d.error) || 'error desconocido') + '. Revisa que tus datos coincidan EXACTO con tu Constancia de Situación Fiscal del SAT.');
-      }
-    } catch (e) { setSt('No se pudo procesar: ' + e.message); }
-    setBusy(false);
+      const i = perfiles.findIndex(p => p.id === nuevo.id);
+      if (i >= 0) perfiles[i] = nuevo; else perfiles.push(nuevo);
+      await setDoc(doc(db, 'datosFiscales', correo), { correo, perfiles }, { merge: true });
+      if (onListo) onListo(nuevo.id);
+    } catch (e) { setMsg('No se pudo guardar: ' + e.message); setBusy(false); }
   };
   return (
-    <div className="card">
-      <div className="card-title">Datos de facturación (CFDI)</div>
-      {activo ? (
-        <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>
-          Captura tus datos fiscales (deben coincidir con tu Constancia de Situación Fiscal del SAT) y presiona <b>Facturar</b> para generar tu factura.
-        </div>
-      ) : (
-        <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>
-          Puedes dejar aquí guardados tus datos fiscales. La <b>facturación en línea estará disponible muy pronto</b>; en cuanto se active, podrás generar tu factura desde aquí.
-        </div>
-      )}
-      {!activo && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FBF4EF', border: '1px solid var(--border)', borderRadius: 9, padding: '9px 12px', marginBottom: 12, fontSize: 12, color: 'var(--stone)' }}>
-          <span aria-hidden style={{ fontSize: 14 }}>🕓</span>
-          <span>Facturación <b>próximamente</b>. Por ahora el botón está deshabilitado.</span>
-        </div>
-      )}
+    <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        <label><span style={lbl}>RFC</span><input style={inp} value={f.rfc} onChange={e => set('rfc', e.target.value.toUpperCase())} placeholder="XAXX010101000" /></label>
-        <label><span style={lbl}>Código postal (fiscal)</span><input style={inp} value={f.cp} onChange={e => set('cp', e.target.value.replace(/[^0-9]/g, '').slice(0, 5))} placeholder="00000" inputMode="numeric" /></label>
-        <label style={{ gridColumn: '1 / -1' }}><span style={lbl}>Razón social / Nombre (como en el SAT)</span><input style={inp} value={f.razonSocial} onChange={e => set('razonSocial', e.target.value)} placeholder="Nombre o razón social, sin régimen societario" /></label>
-        <label><span style={lbl}>Régimen fiscal</span>
-          <select style={inp} value={f.regimen} onChange={e => set('regimen', e.target.value)}>
+        <label><span style={FAC_LBL}>RFC</span><input style={FAC_INP} value={f.rfc} onChange={e => set('rfc', e.target.value.toUpperCase())} placeholder="XAXX010101000" /></label>
+        <label><span style={FAC_LBL}>Código postal (fiscal)</span><input style={FAC_INP} value={f.cp} onChange={e => set('cp', e.target.value.replace(/[^0-9]/g, '').slice(0, 5))} placeholder="00000" inputMode="numeric" /></label>
+        <label style={{ gridColumn: '1 / -1' }}><span style={FAC_LBL}>Razón social / Nombre (como en el SAT)</span><input style={FAC_INP} value={f.razonSocial} onChange={e => set('razonSocial', e.target.value)} placeholder="Nombre o razón social, sin régimen societario" /></label>
+        <label><span style={FAC_LBL}>Régimen fiscal</span>
+          <select style={FAC_INP} value={f.regimen} onChange={e => set('regimen', e.target.value)}>
             <option value="">Selecciona…</option>
             {REGIMENES_FISCALES.map(r => <option key={r.clave} value={r.clave}>{r.nombre}</option>)}
           </select></label>
-        <label><span style={lbl}>Uso del CFDI</span>
-          <select style={inp} value={f.usoCFDI} onChange={e => set('usoCFDI', e.target.value)}>
+        <label><span style={FAC_LBL}>Uso del CFDI</span>
+          <select style={FAC_INP} value={f.usoCFDI} onChange={e => set('usoCFDI', e.target.value)}>
             {USOS_CFDI.map(u => <option key={u.clave} value={u.clave}>{u.nombre}</option>)}
           </select></label>
-        <label style={{ gridColumn: '1 / -1' }}><span style={lbl}>Correo para la factura (opcional)</span><input style={inp} value={f.correoFactura} onChange={e => set('correoFactura', e.target.value)} placeholder={correo || 'correo@ejemplo.com'} /></label>
+        <label style={{ gridColumn: '1 / -1' }}><span style={FAC_LBL}>Correo para la factura (opcional)</span><input style={FAC_INP} value={f.correoFactura} onChange={e => set('correoFactura', e.target.value)} placeholder={correo || 'correo@ejemplo.com'} /></label>
       </div>
-      <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-        <button onClick={facturar} disabled={busy || !activo}
-          title={activo ? 'Generar tu factura' : 'La facturación en línea aún no está disponible'}
-          style={{ background: activo ? 'var(--gold)' : '#e8ddd4', color: activo ? '#fff' : 'var(--stone)', border: 'none', borderRadius: 9, padding: '10px 20px', fontWeight: 700, fontSize: 13.5, cursor: (busy || !activo) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (busy || !activo) ? 0.75 : 1 }}>
-          {busy ? 'Procesando…' : 'Facturar'}
-        </button>
-        <button onClick={soloGuardar} disabled={busy}
-          style={{ background: '#fff', color: 'var(--dark)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 18px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-          Guardar datos
-        </button>
-        {factura && factura.pdfBase64 && (
-          <button onClick={descargarPDF}
-            style={{ background: 'var(--sage)', color: '#fff', border: 'none', borderRadius: 9, padding: '10px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-            Descargar PDF
-          </button>
+      <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+        <button onClick={guardar} disabled={busy} style={{ background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 9, padding: '10px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>{busy ? 'Guardando…' : 'Guardar perfil'}</button>
+        <button onClick={onCancelar} disabled={busy} style={{ background: '#fff', color: 'var(--dark)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 18px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>Cancelar</button>
+      </div>
+      {msg && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 10 }}>{msg}</div>}
+    </div>
+  );
+}
+
+// Vista completa de Facturación en el portal del paciente.
+function FacturacionView({ email, citas, creditos }) {
+  const correo = (email || '').toLowerCase();
+  const [cfg, setCfg] = useState(CFDI_DEFAULT);
+  const [perfiles, setPerfiles] = useState([]);
+  const [facturas, setFacturas] = useState([]);
+  const [perfilSel, setPerfilSel] = useState('');
+  const [editando, setEditando] = useState(null);   // objeto perfil (editar), {} (nuevo) o null
+  const [busyKey, setBusyKey] = useState('');        // key del renglón que se está facturando
+  const [msg, setMsg] = useState('');
+  const [ultima, setUltima] = useState(null);        // { uuid, pdfBase64 }
+
+  useEffect(() => onSnapshot(doc(db, 'config', 'dashboard'), snap => {
+    setCfg({ ...CFDI_DEFAULT, ...(((snap && snap.data()) || {}).cfdi || {}) });
+  }, () => {}), []);
+  useEffect(() => {
+    if (!correo) return undefined;
+    return onSnapshot(doc(db, 'datosFiscales', correo), snap => {
+      const ps = leerPerfiles(snap.exists() ? snap.data() : null);
+      setPerfiles(ps);
+      setPerfilSel(prev => (prev && ps.some(p => p.id === prev)) ? prev : ((ps[0] && ps[0].id) || ''));
+    }, () => {});
+  }, [correo]);
+  useEffect(() => {
+    if (!correo) return undefined;
+    const qF = query(collection(db, 'facturas'), where('correo', '==', correo));
+    return onSnapshot(qF, snap => setFacturas(snap.docs.map(d => d.data())), () => {});
+  }, [correo]);
+
+  const activo = !!cfg.activo;
+
+  // Conceptos facturables: consultas pagadas (no de paquete) + paquetes comprados; sin factura previa.
+  const facturables = [];
+  (citas || []).forEach(c => {
+    if (c.estadoPago === 'pagado' && !c.loteId && !c.facturaUUID) {
+      const importe = Number(c.monto) || Number(cfg.precioConsulta) || 0;
+      if (importe > 0) facturables.push({ key: 'cita:' + c.id, tipo: 'cita', id: c.id, fecha: c.fecha || '', desc: (c.tipoNombre || 'Consulta de nutrición'), importe, formaPago: metodoAFormaPago(c.metodoPago) });
+    }
+  });
+  (((creditos && creditos.lotes) || [])).forEach(l => {
+    if (Number(l.monto) > 0 && !l.facturaUUID) {
+      facturables.push({ key: 'lote:' + l.id, tipo: 'lote', id: l.id, fecha: (l.fecha || '').slice(0, 10), desc: (l.paqueteNombre || 'Paquete de consultas'), importe: Number(l.monto), formaPago: l.origen === 'stripe' ? '04' : '01' });
+    }
+  });
+  facturables.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  const descargar = (uuid, pdf) => {
+    if (!pdf) return;
+    try { const a = document.createElement('a'); a.href = 'data:application/pdf;base64,' + pdf; a.download = 'Factura_' + uuid + '.pdf'; document.body.appendChild(a); a.click(); document.body.removeChild(a); } catch (e) { /* noop */ }
+  };
+  const marcarFacturados = async (items, uuid) => {
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (it.tipo === 'cita') { try { await updateDoc(doc(db, 'citas', it.id), { facturaUUID: uuid }); } catch (e) { /* noop */ } }
+    }
+    const ids = items.filter(x => x.tipo === 'lote').map(x => x.id);
+    if (ids.length) {
+      try {
+        const snap = await getDoc(doc(db, 'creditosConsultas', correo));
+        const data = snap.exists() ? snap.data() : { lotes: [], usos: [] };
+        const setIds = {}; ids.forEach(id => { setIds[id] = true; });
+        const lotes = (data.lotes || []).map(l => setIds[l.id] ? { ...l, facturaUUID: uuid } : l);
+        await setDoc(doc(db, 'creditosConsultas', correo), { correo, lotes, usos: data.usos || [] }, { merge: true });
+      } catch (e) { /* noop */ }
+    }
+  };
+  // Factura UN concepto (una factura por consulta/paquete, por separado).
+  const facturarItem = async (item) => {
+    if (!activo) return;
+    if (!perfilSel) { setMsg('Selecciona (o agrega) un perfil de facturación.'); return; }
+    if (!cfg.emisorNombre || !cfg.lugarExpedicion || !cfg.regimenEmisor) { setMsg('La facturación aún no está configurada por completo. Avísale a tu nutrióloga.'); return; }
+    const perfil = perfiles.find(p => p.id === perfilSel);
+    if (!perfil) { setMsg('Selecciona un perfil válido.'); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setMsg('No se pudo conectar con el servicio de facturación.'); return; }
+    const rate = cfg.iva === '16' ? 0.16 : cfg.iva === '8' ? 0.08 : 0;
+    const conceptos = [{
+      cantidad: 1,
+      valorUnitario: rate > 0 ? Math.round((item.importe / (1 + rate)) * 100) / 100 : item.importe,
+      descripcion: (cfg.descripcion || 'Consulta de nutrición') + (item.fecha ? ' — ' + item.fecha : ''),
+      claveProdServ: cfg.claveProdServ || '85121800', claveUnidad: cfg.claveUnidad || 'E48', unidad: 'Servicio', ivaCode: cfg.iva || 'exento',
+    }];
+    setBusyKey(item.key); setMsg(''); setUltima(null);
+    try {
+      const payload = {
+        action: 'facturarCFDI', ambiente: cfg.produccion ? 'produccion' : 'sandbox',
+        emisor: { nombre: cfg.emisorNombre, regimenFiscal: cfg.regimenEmisor, lugarExpedicion: cfg.lugarExpedicion },
+        receptor: { rfc: (perfil.rfc || '').toUpperCase(), nombre: perfil.razonSocial, cp: perfil.cp, regimenFiscal: perfil.regimen, usoCFDI: perfil.usoCFDI || 'G03', correo: perfil.correoFactura || correo },
+        conceptos, retencion: { aplica: !!cfg.retencionAplica, isrPct: cfg.retIsr, ivaPct: cfg.retIva },
+        formaPago: item.formaPago || '99', metodoPago: 'PUE', referencia: 'NF' + Date.now(), correoFactura: perfil.correoFactura || correo,
+      };
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload), redirect: 'follow' });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = null; }
+      if (d && d.ok && d.uuid) {
+        await marcarFacturados([item], d.uuid);
+        try { await setDoc(doc(db, 'facturas', d.uuid), { uuid: d.uuid, correo, fecha: new Date().toISOString(), total: item.importe, rfc: (perfil.rfc || '').toUpperCase(), conceptos: [{ desc: item.desc, fecha: item.fecha, importe: item.importe }] }); } catch (e) { /* noop */ }
+        setUltima({ uuid: d.uuid, pdfBase64: d.pdfBase64 || '' });
+        setMsg('¡Factura generada! Folio fiscal (UUID): ' + d.uuid + (d.pdfBase64 ? '' : ' — te la enviamos por correo.'));
+      } else {
+        setMsg('No se pudo generar la factura: ' + ((d && d.error) || 'error desconocido') + '.');
+      }
+    } catch (e) { setMsg('No se pudo procesar: ' + e.message); }
+    setBusyKey('');
+  };
+
+  return (
+    <>
+      <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--dark)', margin: '4px 4px 16px', fontFamily: 'var(--font)' }}>Facturación</h1>
+
+      {!activo && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FBF4EF', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', marginBottom: 14, fontSize: 12.5, color: 'var(--stone)' }}>
+          <span aria-hidden style={{ fontSize: 15 }}>🕓</span>
+          <span>La <b>facturación en línea estará disponible muy pronto</b>. Por ahora puedes guardar tus datos fiscales; el botón para facturar se activará en cuanto esté listo.</span>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="card-title">Perfil de facturación</div>
+        {editando ? (
+          <>
+            <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>Tus datos deben coincidir EXACTO con tu Constancia de Situación Fiscal del SAT.</div>
+            <PerfilForm correo={correo} perfil={editando.id ? editando : null} onCancelar={() => setEditando(null)} onListo={(id) => { setEditando(null); if (id) setPerfilSel(id); }} />
+          </>
+        ) : (
+          <>
+            {perfiles.length === 0 ? (
+              <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>Aún no tienes un perfil de facturación. Agrega uno para poder generar tus facturas.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {perfiles.map(p => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', background: perfilSel === p.id ? '#F4F8F6' : '#fff' }}>
+                    <input type="radio" name="perfilSel" checked={perfilSel === p.id} onChange={() => setPerfilSel(p.id)} title="Usar este perfil para facturar" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--dark)' }}>{p.razonSocial || '(sin nombre)'}</div>
+                      <div style={{ fontSize: 12, color: 'var(--stone)' }}>{p.rfc}{p.cp ? ' · CP ' + p.cp : ''}</div>
+                    </div>
+                    <button onClick={() => setEditando(p)} style={{ background: '#fff', color: 'var(--dark)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'var(--font)' }}>Editar datos</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setEditando({})} style={{ background: perfiles.length ? '#fff' : 'var(--gold)', color: perfiles.length ? 'var(--dark)' : '#fff', border: perfiles.length ? '1px solid var(--border)' : 'none', borderRadius: 9, padding: '10px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>+ Agregar perfil de facturación</button>
+          </>
         )}
       </div>
-      {st && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 10, lineHeight: 1.5 }}>{st}</div>}
-    </div>
+
+      <div className="card">
+        <div className="card-title">Pendientes por facturar</div>
+        {facturables.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5 }}>No tienes consultas o paquetes pagados pendientes de facturar. Cuando pagues una consulta (o la nutrióloga la marque como pagada), aparecerá aquí.</div>
+        ) : (
+          <>
+            <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 10, lineHeight: 1.5 }}>Cada consulta o paquete se factura <b>por separado</b>. Presiona <b>Facturar</b> en el que quieras.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {facturables.map(x => (
+                <div key={x.key} style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', background: '#fff' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--dark)' }}>{x.desc}</div>
+                    <div style={{ fontSize: 12, color: 'var(--stone)' }}>{x.tipo === 'lote' ? 'Paquete' : 'Consulta'}{x.fecha ? ' · ' + x.fecha : ''}</div>
+                  </div>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--dark)', marginRight: 4 }}>{fMoney(x.importe)}</div>
+                  <button onClick={() => facturarItem(x)} disabled={!!busyKey || !activo}
+                    title={activo ? 'Generar la factura de este concepto' : 'La facturación aún no está disponible'}
+                    style={{ background: activo ? 'var(--gold)' : '#e8ddd4', color: activo ? '#fff' : 'var(--stone)', border: 'none', borderRadius: 8, padding: '8px 14px', fontWeight: 700, fontSize: 12.5, cursor: (busyKey || !activo) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (busyKey || !activo) ? 0.75 : 1, whiteSpace: 'nowrap' }}>
+                    {busyKey === x.key ? 'Procesando…' : 'Facturar'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {ultima && ultima.pdfBase64 && (
+          <button onClick={() => descargar(ultima.uuid, ultima.pdfBase64)} style={{ marginTop: 12, background: 'var(--sage)', color: '#fff', border: 'none', borderRadius: 9, padding: '9px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>Descargar PDF de tu factura</button>
+        )}
+        {msg && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 10, lineHeight: 1.5 }}>{msg}</div>}
+      </div>
+
+      {facturas.length > 0 && (
+        <div className="card">
+          <div className="card-title">Facturas generadas</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {facturas.slice().sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).map(fa => (
+              <div key={fa.uuid} style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--dark)', wordBreak: 'break-all' }}>{fa.uuid}</div>
+                  <div style={{ fontSize: 12, color: 'var(--stone)' }}>{String(fa.fecha || '').slice(0, 10)} · {fMoney(fa.total)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--stone)', marginTop: 10, lineHeight: 1.5 }}>Tu factura (XML y PDF) también llega a tu correo al generarse.</div>
+        </div>
+      )}
+    </>
   );
 }
 export default function PacienteDashboard() {
@@ -561,6 +673,7 @@ export default function PacienteDashboard() {
     { id: 'agendar', label: 'Agendar', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg> },
     { id: 'planes', label: 'Mis archivos', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg> },
     { id: 'recomendaciones', label: 'Recomendaciones', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/></svg> },
+    { id: 'facturacion', label: 'Facturación', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 3.75h6M9 8.25h6M6.75 3h10.5A1.5 1.5 0 0118.75 4.5v16.19a.3.3 0 01-.46.253L15.75 19.5l-2.25 1.5-2.25-1.5-2.25 1.5-2.29-1.307A.3.3 0 015.25 20.69V4.5A1.5 1.5 0 016.75 3z"/></svg> },
   ];
 
   const navEl = (
@@ -827,7 +940,6 @@ export default function PacienteDashboard() {
               </div>
             )}
 
-            <DatosFacturacion email={user.email} />
 
             <h2 style={D.section}>Tu progreso</h2>
             <div style={D.grid}>
@@ -1017,6 +1129,10 @@ export default function PacienteDashboard() {
               })
             )}
           </div>
+        )}
+
+        {tab === 'facturacion' && (
+          <FacturacionView email={user.email} citas={citas} creditos={creditos} />
         )}
       </div>
 
