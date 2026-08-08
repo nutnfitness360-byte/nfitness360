@@ -190,6 +190,35 @@ body {
 .nav-item.active svg { stroke: var(--gold); }
 .nav-item.active span { color: var(--gold); }
 
+/* Menú "Más" (Opción A): el botón Más solo aparece en móvil; en escritorio
+   (barra lateral) se muestran todos los apartados y se oculta el "Más". */
+.nav-mas svg { stroke: var(--stone); }
+.nav-mas.active svg { stroke: var(--gold); }
+@media (min-width: 768px) {
+  .nav-mas { display: none !important; }
+  .nav-sheet, .nav-sheet-scrim { display: none !important; }
+}
+@media (max-width: 767px) {
+  .nav-deskonly { display: none !important; }
+}
+.nav-sheet-scrim { position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,0.28); }
+.nav-sheet {
+  position: fixed; left: 10px; right: 10px; bottom: 72px; z-index: 60;
+  background: var(--dark); border: 1px solid #3a332c; border-radius: 14px; padding: 6px;
+  box-shadow: 0 -10px 34px rgba(0,0,0,0.42);
+}
+.nav-sheet-item {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px 12px; border-radius: 10px; border: none; background: transparent;
+  cursor: pointer; color: #EEE4DA; font-family: 'Montserrat', sans-serif; font-size: 14px; font-weight: 600;
+}
+.nav-sheet-item:hover { background: rgba(255,255,255,0.06); }
+.nav-sheet-item svg { width: 20px; height: 20px; stroke: var(--stone); fill: none; flex-shrink: 0; }
+.nav-sheet-item span { flex: 1; text-align: left; }
+.nav-sheet-item.active { color: var(--gold); }
+.nav-sheet-item.active svg { stroke: var(--gold); }
+.nav-mini { flex: none !important; font-size: 8px; font-weight: 800; color: #fff; background: var(--gold); border-radius: 6px; padding: 2px 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+
 /* Cards */
 .card { background: var(--card); border-radius: 16px; padding: 1.25rem; margin-bottom: 0.875rem; border: 0.5px solid var(--border); }
 .card-title { font-size: 14px; font-weight: 600; color: var(--dark); letter-spacing: 0.3px; margin-bottom: 1rem; font-family: 'Montserrat', sans-serif; }
