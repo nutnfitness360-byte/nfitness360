@@ -405,6 +405,7 @@ export default function PacienteDashboard() {
   const [creditos, setCreditos] = useState({ lotes: [], usos: [] });
   const [paquetesCfg, setPaquetesCfg] = useState(PAQUETES_DEFAULT);
   const [facturacionActiva, setFacturacionActiva] = useState(false);
+  const [masOpen, setMasOpen] = useState(false);
   const [compraMsg, setCompraMsg] = useState('');
   const [compraBusy, setCompraBusy] = useState('');
   const [modalCita, setModalCita] = useState(null);
@@ -678,23 +679,53 @@ export default function PacienteDashboard() {
     { id: 'facturacion', label: 'Facturación', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 3.75h6M9 8.25h6M6.75 3h10.5A1.5 1.5 0 0118.75 4.5v16.19a.3.3 0 01-.46.253L15.75 19.5l-2.25 1.5-2.25-1.5-2.25 1.5-2.29-1.307A.3.3 0 015.25 20.69V4.5A1.5 1.5 0 016.75 3z"/></svg> },
   ];
 
+  // Opción A: en móvil la barra muestra los principales + "Más"; los secundarios
+  // (y Mi perfil) viven dentro de "Más". En escritorio (barra lateral) se ven todos.
+  const PRIMARIOS = ['inicio', 'agendar', 'planes'];
+  const tabsPrimarios = tabs.filter(t => PRIMARIOS.indexOf(t.id) >= 0);
+  const tabsSecundarios = tabs.filter(t => PRIMARIOS.indexOf(t.id) < 0);
+  const enMas = masOpen || tab === 'perfil' || tabsSecundarios.some(t => t.id === tab);
+  const iconoPerfil = <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>;
+  const badgeProx = (<span style={{ fontSize: 7.5, lineHeight: 1, color: 'var(--gold)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2px', marginTop: 1 }}>Próximamente</span>);
+  const tabBtn = (t, extra) => (
+    <button key={t.id} className={`nav-item${extra ? ' ' + extra : ''}${tab === t.id ? ' active' : ''}`} onClick={() => { setTab(t.id); setMasOpen(false); }}>
+      {t.icon}
+      <span>{t.label}</span>
+      {t.id === 'facturacion' && !facturacionActiva && badgeProx}
+    </button>
+  );
   const navEl = (
-    <nav className="bottomnav">
-      {tabs.map(t => (
-        <button key={t.id} className={`nav-item${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
-          {t.icon}
-          <span>{t.label}</span>
-          {t.id === 'facturacion' && !facturacionActiva && (
-            <span style={{ fontSize: 7.5, lineHeight: 1, color: 'var(--gold)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2px', marginTop: 1 }}>Próximamente</span>
-          )}
+    <>
+      <nav className="bottomnav">
+        {tabsPrimarios.map(t => tabBtn(t, ''))}
+        {tabsSecundarios.map(t => tabBtn(t, 'nav-deskonly'))}
+        <button className={`nav-item nav-mas${enMas ? ' active' : ''}`} onClick={() => setMasOpen(o => !o)} title="Más secciones">
+          <svg viewBox="0 0 24 24" strokeWidth="2" fill="none" stroke="currentColor"><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></svg>
+          <span>Más</span>
         </button>
-      ))}
-      <div className="nav-spacer" />
-      <button className={`nav-item${tab === 'perfil' ? ' active' : ''}`} onClick={() => setTab('perfil')}>
-        <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
-        <span>Mi perfil</span>
-      </button>
-    </nav>
+        <div className="nav-spacer" />
+        <button className={`nav-item nav-deskonly${tab === 'perfil' ? ' active' : ''}`} onClick={() => { setTab('perfil'); setMasOpen(false); }}>
+          {iconoPerfil}
+          <span>Mi perfil</span>
+        </button>
+      </nav>
+      {masOpen && (
+        <>
+          <div className="nav-sheet-scrim" onClick={() => setMasOpen(false)} />
+          <div className="nav-sheet">
+            {tabsSecundarios.map(t => (
+              <button key={t.id} className={`nav-sheet-item${tab === t.id ? ' active' : ''}`} onClick={() => { setTab(t.id); setMasOpen(false); }}>
+                {t.icon}<span>{t.label}</span>
+                {t.id === 'facturacion' && !facturacionActiva && <span className="nav-mini">Próximamente</span>}
+              </button>
+            ))}
+            <button className={`nav-sheet-item${tab === 'perfil' ? ' active' : ''}`} onClick={() => { setTab('perfil'); setMasOpen(false); }}>
+              {iconoPerfil}<span>Mi perfil</span>
+            </button>
+          </div>
+        </>
+      )}
+    </>
   );
 
   if (tab === 'perfil') {
