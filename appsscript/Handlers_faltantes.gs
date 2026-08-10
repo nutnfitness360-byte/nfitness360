@@ -318,3 +318,73 @@ function analizarEstudio_(body) {
     return json_({ ok: false, error: e.message });
   }
 }
+
+
+/* =====================================================================
+ *  Resumen del paciente (IA) · pone al día a la nutrióloga antes de la consulta
+ *  Acción: { action:"resumenPacienteIA", contexto:{...expediente...} }
+ * ===================================================================== */
+function resumenPacienteIA_(body) {
+  try {
+    var ctx = body.contexto || {};
+    var sys = "Eres asistente clínico de una nutrióloga mexicana. Recibes el EXPEDIENTE de un paciente " +
+      "(datos generales, objetivo, mediciones a lo largo del tiempo, historia clínica, notas de la nutrióloga, " +
+      "planes y recomendaciones previas). Tu tarea es hacer un RESUMEN BREVE para que la nutrióloga se ponga al día " +
+      "antes de la consulta (las consultas suelen ser mensuales). " +
+      "REGLAS: básate ÚNICAMENTE en los datos recibidos; NO inventes cifras, diagnósticos ni indicaciones que no estén. " +
+      "Si falta información para un punto, dilo con naturalidad ('sin datos'). Sé concreto, clínico y en español de México. " +
+      "Para la evolución compara la PRIMERA y la ÚLTIMA medición y di la tendencia (bajó/subió/estable) con las cifras y fechas. " +
+      "No des indicaciones médicas nuevas: resume lo que hay. " +
+      "Devuelve EXCLUSIVAMENTE JSON válido, sin markdown, con esta forma exacta: " +
+      "{\"estado\":\"\",\"evolucion\":\"\",\"adherencia\":\"\",\"clave\":[\"\"],\"ultimaConsulta\":\"\",\"revisar\":[\"\"]}. " +
+      "estado = 1-2 frases de cómo llega el paciente hoy. evolucion = peso/grasa/músculo con tendencia y cifras. " +
+      "adherencia = apego/constancia reportada (si hay). clave = 2 a 5 puntos relevantes de la historia clínica y las notas de la nutrióloga. " +
+      "ultimaConsulta = qué se hizo o indicó la última vez (plan/recomendaciones). revisar = 2 a 5 puntos a checar o preguntar en esta consulta.";
+    var instruccion = "Genera el resumen del paciente para la consulta de hoy.\n\nExpediente:\n" + JSON.stringify(ctx);
+    var r = iaJSON_(sys, instruccion, null);
+    return json_({ ok: true, resumen: {
+      estado: (r && r.estado) || "",
+      evolucion: (r && r.evolucion) || "",
+      adherencia: (r && r.adherencia) || "",
+      clave: (r && Array.isArray(r.clave)) ? r.clave : [],
+      ultimaConsulta: (r && r.ultimaConsulta) || "",
+      revisar: (r && Array.isArray(r.revisar)) ? r.revisar : []
+    }});
+  } catch (e) {
+    return json_({ ok: false, error: e.message });
+  }
+}
+
+/* =====================================================================
+ *  Pregúntale a la IA sobre el paciente (chat del expediente)
+ *  Acción: { action:"preguntarPacienteIA", contexto:{...}, pregunta:"", historial:[{rol,texto}] }
+ * ===================================================================== */
+function preguntarPacienteIA_(body) {
+  try {
+    var ctx = body.contexto || {};
+    var pregunta = (body.pregunta || "").toString().trim();
+    if (!pregunta) return json_({ ok: false, error: "No se recibió la pregunta." });
+    var historial = Array.isArray(body.historial) ? body.historial : [];
+
+    var sys = "Eres asistente clínico de una nutrióloga mexicana. Respondes preguntas sobre UN paciente a partir de su " +
+      "EXPEDIENTE (datos generales, objetivo, mediciones, historia clínica, notas de la nutrióloga, planes y recomendaciones). " +
+      "REGLAS: responde ÚNICAMENTE con base en el expediente; NO inventes datos. Si la respuesta no está en el expediente, " +
+      "dilo claramente ('No hay ese dato en el expediente'). Sé breve, claro y en español de México. No des diagnósticos ni " +
+      "indicaciones médicas nuevas: informa lo que hay y, si acaso, sugiere qué revisar. " +
+      "Devuelve EXCLUSIVAMENTE JSON válido, sin markdown, con la forma: {\"respuesta\":\"\"}.";
+
+    var hist = historial.slice(-6).map(function (m) {
+      return ((m && m.rol) === "nutri" ? "Nutrióloga: " : "IA: ") + ((m && m.texto) || "");
+    }).join("\n");
+
+    var instruccion = "Expediente del paciente:\n" + JSON.stringify(ctx) +
+      (hist ? ("\n\nConversación previa:\n" + hist) : "") +
+      "\n\nPregunta de la nutrióloga: " + pregunta +
+      "\n\nResponde SOLO con JSON {\"respuesta\":\"...\"}.";
+
+    var r = iaJSON_(sys, instruccion, null);
+    return json_({ ok: true, respuesta: (r && r.respuesta) ? r.respuesta : "" });
+  } catch (e) {
+    return json_({ ok: false, error: e.message });
+  }
+}
