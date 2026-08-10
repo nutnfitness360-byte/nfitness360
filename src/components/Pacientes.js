@@ -105,7 +105,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [editApego, setEditApego] = useState('');
   const [openEdit, setOpenEdit] = useState(false);
   const [openInfo, setOpenInfo] = useState(false);
-  const [infoForm, setInfoForm] = useState({ edad: '', sexo: '', estatura: '', contacto: '', objetivo: '' });
+  const [infoForm, setInfoForm] = useState({ edad: '', sexo: '', estatura: '', contacto: '', objetivo: '', correo: '' });
   const [recoPdfMsg, setRecoPdfMsg] = useState('');
   const [plan, setPlan] = useState({ nombre: '', fecha: hoyISO(), link: '' });
   const [openMed, setOpenMed] = useState(false);
@@ -288,19 +288,26 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       estatura: (sel.estatura === 0 || sel.estatura) ? String(sel.estatura) : '',
       contacto: sel.contacto || '',
       objetivo: sel.objetivo || '',
+      correo: sel.correo || '',
     });
     setErr(''); setOpenInfo(true);
   };
   const guardarInfo = async () => {
+    const correo = (infoForm.correo || '').trim().toLowerCase();
     const patch = {
       edad: infoForm.edad === '' ? null : (parseInt(infoForm.edad, 10) || null),
       sexo: infoForm.sexo || '',
       estatura: infoForm.estatura === '' ? null : (parseFloat(infoForm.estatura) || null),
       contacto: infoForm.contacto || '',
       objetivo: infoForm.objetivo || '',
+      correo: correo,
     };
     try {
       await updateDoc(doc(db, 'pacientes', sel.id), patch);
+      // Vincula/actualiza la cuenta del paciente (para que vea su plan al entrar con ese correo).
+      if (correo && correo.indexOf('@') >= 0) {
+        try { await setDoc(doc(db, 'suscriptores', correo), { correo, sexo: infoForm.sexo || sel.sexo || '', nombre: sel.nombre || '' }, { merge: true }); } catch (e) {}
+      }
       setOpenInfo(false); setErr('');
     } catch (e) { setErr('No se pudo guardar: ' + e.message); }
   };
@@ -985,6 +992,9 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
               <Field l="Estatura (cm)"><input style={S.inp} inputMode="decimal" value={infoForm.estatura} onChange={e => setInfoForm({ ...infoForm, estatura: e.target.value })} /></Field>
               <Field l="Número telefónico"><input style={S.inp} inputMode="tel" value={infoForm.contacto} onChange={e => setInfoForm({ ...infoForm, contacto: e.target.value })} /></Field>
               <Field l="Objetivo"><input style={S.inp} value={infoForm.objetivo} onChange={e => setInfoForm({ ...infoForm, objetivo: e.target.value })} /></Field>
+              <label style={{ ...S.field, gridColumn: '1 / -1' }}><span style={S.fieldLbl}>Correo del paciente (para su acceso)</span>
+                <input style={S.inp} value={infoForm.correo} onChange={e => setInfoForm({ ...infoForm, correo: e.target.value })} placeholder="correo@gmail.com" inputMode="email" /></label>
+              <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--stone)', marginTop: -4, lineHeight: 1.5 }}>Debe ser el mismo de su cuenta de Google; con ese correo el paciente verá su plan al iniciar sesión.</div>
               <button style={S.saveBtn} onClick={guardarInfo}>Guardar cambios</button>
             </div>
           ) : (
@@ -995,11 +1005,13 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
               <Info l="Inicio" v={sel.inicio ? fmtFecha(sel.inicio) : '—'} />
               <Info l="Número telefónico" v={sel.contacto || '—'} />
               <Info l="Objetivo" v={sel.objetivo || '—'} />
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Info l="Correo del paciente (acceso a su cuenta)" v={sel.correo || 'Sin vincular'} />
+              </div>
             </div>
           )}
         </div>
 
-        <CorreoVinculo patient={sel} key={'cv-' + sel.id} />
         <SaldoConsultas patient={sel} key={'saldo-' + sel.id} />
 
         <div className="card">
@@ -1726,6 +1738,7 @@ function SaldoConsultas({ patient }) {
   const [custom, setCustom] = useState({ familia: 'normal', consultas: '', monto: '', vigenciaMeses: '' });
   const [st, setSt] = useState('');
   const [busy, setBusy] = useState(false);
+  const [abonarOpen, setAbonarOpen] = useState(false);   // abono manual colapsado (efectivo/transferencia)
 
   useEffect(() => {
     if (!correo) return undefined;
@@ -1743,7 +1756,7 @@ function SaldoConsultas({ patient }) {
       <div className="card">
         <div className="card-title">Saldo de consultas (paquetes)</div>
         <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5 }}>
-          Para llevar el saldo de consultas primero vincula el correo del paciente (tarjeta de arriba). El saldo se guarda por correo.
+          Para llevar el saldo de consultas primero captura el correo del paciente en <b>Información general</b>. El saldo se guarda por correo.
         </div>
       </div>
     );
@@ -1753,6 +1766,7 @@ function SaldoConsultas({ patient }) {
   const resumen = resumenSaldo(cred, now);
   const pkg = paquetes.find(p => p.id === sel) || null;
   const fmt = (iso) => { if (!iso) return '—'; return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }); };
+  const familiasConLotes = ['normal', 'deportiva'].filter(f => resumen[f].lotes.length > 0);
 
   const abonar = async () => {
     const familia = pkg ? pkg.familia : custom.familia;
@@ -1780,81 +1794,62 @@ function SaldoConsultas({ patient }) {
   return (
     <div className="card">
       <div className="card-title">Saldo de consultas (paquetes)</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 12 }}>
-        {['normal', 'deportiva'].map(f => (
-          <div key={f} style={{ background: 'var(--cream)', borderRadius: 12, padding: '12px 14px' }}>
-            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)' }}>{familiaLabel(f)}</div>
-            <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--dark)', lineHeight: 1.1 }}>{resumen[f].disponible}<span style={{ fontSize: 12, fontWeight: 600, color: 'var(--stone)' }}> disponibles</span></div>
-            {resumen[f].lotes.length === 0 && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 4 }}>Sin lotes.</div>}
-            {resumen[f].lotes.map(l => (
-              <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, fontSize: 12, color: 'var(--dark)', marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-                <span><b>{l.restantes}/{l.consultas}</b> · {l.paqueteNombre || 'manual'} · {l.origen || 'manual'}<br />
-                  <span style={{ color: 'var(--stone)' }}>{l.primeraConsultaFecha ? ('vence ' + fmt(venceDeLote(l))) : 'sin usar (no vence aún)'}</span>
-                </span>
-                <button title="Quitar lote" onClick={() => quitarLote(l.id)} style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 13, flexShrink: 0 }}>✕</button>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      <div style={{ background: 'var(--cream)', borderRadius: 12, padding: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)', marginBottom: 8 }}>Abonar consultas</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select value={sel} onChange={e => setSel(e.target.value)} style={{ ...styles.inp, flex: '1 1 180px' }}>
-            <option value="">Personalizado…</option>
-            {paquetes.map(p => <option key={p.id} value={p.id}>{p.nombre} — {'$' + Number(p.precio || 0).toLocaleString('es-MX')} ({familiaLabel(p.familia)}, {p.vigenciaMeses}m)</option>)}
-          </select>
-          {!pkg && (
-            <>
-              <select value={custom.familia} onChange={e => setCustom(c => ({ ...c, familia: e.target.value }))} style={{ ...styles.inp, width: 130 }}>
-                {FAMILIAS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
-              </select>
-              <input inputMode="numeric" placeholder="# consultas" value={custom.consultas} onChange={e => setCustom(c => ({ ...c, consultas: e.target.value }))} style={{ ...styles.inp, width: 110 }} />
-              <input inputMode="numeric" placeholder="$ monto" value={custom.monto} onChange={e => setCustom(c => ({ ...c, monto: e.target.value }))} style={{ ...styles.inp, width: 100 }} />
-              <input inputMode="numeric" placeholder="meses vig." value={custom.vigenciaMeses} onChange={e => setCustom(c => ({ ...c, vigenciaMeses: e.target.value }))} style={{ ...styles.inp, width: 100 }} />
-            </>
-          )}
-          <select value={origen} onChange={e => setOrigen(e.target.value)} style={{ ...styles.inp, width: 150 }}>
-            <option value="efectivo">Efectivo</option>
-            <option value="tarjeta">Tarjeta</option>
-            <option value="transferencia">Transferencia</option>
-            <option value="cortesia">Cortesía</option>
-          </select>
-          <button style={styles.saveBtn} onClick={abonar} disabled={busy}>{busy ? 'Abonando…' : 'Abonar'}</button>
+      {familiasConLotes.length > 0 ? (
+        <div style={{ display: 'grid', gridTemplateColumns: familiasConLotes.length === 1 ? '1fr' : 'repeat(2, 1fr)', gap: 12, marginBottom: 12 }}>
+          {familiasConLotes.map(f => (
+            <div key={f} style={{ background: 'var(--cream)', borderRadius: 12, padding: '12px 14px' }}>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)' }}>{familiaLabel(f)}</div>
+              <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--dark)', lineHeight: 1.1 }}>{resumen[f].disponible}<span style={{ fontSize: 12, fontWeight: 600, color: 'var(--stone)' }}> disponibles</span></div>
+              {resumen[f].lotes.map(l => (
+                <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, fontSize: 12, color: 'var(--dark)', marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                  <span><b>{l.restantes}/{l.consultas}</b> · {l.paqueteNombre || 'manual'} · {l.origen || 'manual'}<br />
+                    <span style={{ color: 'var(--stone)' }}>{l.primeraConsultaFecha ? ('vence ' + fmt(venceDeLote(l))) : 'sin usar (no vence aún)'}</span>
+                  </span>
+                  <button title="Quitar lote" onClick={() => quitarLote(l.id)} style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 13, flexShrink: 0 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
-        {pkg && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{pkg.consultas} consultas · {familiaLabel(pkg.familia)} · {'$' + Number(pkg.precio || 0).toLocaleString('es-MX')} · vigencia {pkg.vigenciaMeses} meses desde la 1ª consulta.</div>}
-        {st && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{st}</div>}
-      </div>
-    </div>
-  );
-}
-function CorreoVinculo({ patient }) {
-  const [v, setV] = useState(patient.correo || '');
-  const [st, setSt] = useState('');
-  const save = async () => {
-    setSt('Guardando…');
-    const correo = v.trim().toLowerCase();
-    try {
-      await updateDoc(doc(db, 'pacientes', patient.id), { correo });
-      if (correo && correo.indexOf('@') >= 0) {
-        try { await setDoc(doc(db, 'suscriptores', correo), { correo, sexo: patient.sexo || '', nombre: patient.nombre || '' }, { merge: true }); } catch (e) {}
-      }
-      setSt('Vínculo guardado ✓');
-    }
-    catch (e) { setSt('Error: ' + e.message); }
-  };
-  return (
-    <div className="card">
-      <div className="card-title">Vínculo con la cuenta del paciente</div>
-      <div style={{ fontSize: 12, color: 'var(--stone)', marginBottom: 10, lineHeight: 1.5 }}>
-        El paciente verá su plan al iniciar sesión con este correo (debe ser el mismo de su cuenta de Google).
-      </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <input style={{ ...styles.inp, flex: 1, minWidth: 200 }} value={v} onChange={e => setV(e.target.value)} placeholder="correo@gmail.com" />
-        <button style={styles.smallBtn} onClick={save}>Guardar correo</button>
-      </div>
-      {st && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{st}</div>}
+      ) : (
+        <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5, marginBottom: 10 }}>
+          Este paciente aún no tiene consultas de paquete. Las compras en línea se acreditan <b>automáticamente</b>; si pagó en efectivo o transferencia, cárgalas con “Abonar consultas”.
+        </div>
+      )}
+
+      <button onClick={() => setAbonarOpen(o => !o)}
+        style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: '4px 0' }}>
+        {abonarOpen ? '× Cerrar' : '＋ Abonar consultas (pago en efectivo / transferencia)'}
+      </button>
+      {abonarOpen && (
+        <div style={{ background: 'var(--cream)', borderRadius: 12, padding: 12, marginTop: 6 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select value={sel} onChange={e => setSel(e.target.value)} style={{ ...styles.inp, flex: '1 1 180px' }}>
+              <option value="">Personalizado…</option>
+              {paquetes.map(p => <option key={p.id} value={p.id}>{p.nombre} — {'$' + Number(p.precio || 0).toLocaleString('es-MX')} ({familiaLabel(p.familia)}, {p.vigenciaMeses}m)</option>)}
+            </select>
+            {!pkg && (
+              <>
+                <select value={custom.familia} onChange={e => setCustom(c => ({ ...c, familia: e.target.value }))} style={{ ...styles.inp, width: 130 }}>
+                  {FAMILIAS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+                </select>
+                <input inputMode="numeric" placeholder="# consultas" value={custom.consultas} onChange={e => setCustom(c => ({ ...c, consultas: e.target.value }))} style={{ ...styles.inp, width: 110 }} />
+                <input inputMode="numeric" placeholder="$ monto" value={custom.monto} onChange={e => setCustom(c => ({ ...c, monto: e.target.value }))} style={{ ...styles.inp, width: 100 }} />
+                <input inputMode="numeric" placeholder="meses vig." value={custom.vigenciaMeses} onChange={e => setCustom(c => ({ ...c, vigenciaMeses: e.target.value }))} style={{ ...styles.inp, width: 100 }} />
+              </>
+            )}
+            <select value={origen} onChange={e => setOrigen(e.target.value)} style={{ ...styles.inp, width: 150 }}>
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="cortesia">Cortesía</option>
+            </select>
+            <button style={styles.saveBtn} onClick={abonar} disabled={busy}>{busy ? 'Abonando…' : 'Abonar'}</button>
+          </div>
+          {pkg && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{pkg.consultas} consultas · {familiaLabel(pkg.familia)} · {'$' + Number(pkg.precio || 0).toLocaleString('es-MX')} · vigencia {pkg.vigenciaMeses} meses desde la 1ª consulta.</div>}
+          {st && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{st}</div>}
+        </div>
+      )}
     </div>
   );
 }
