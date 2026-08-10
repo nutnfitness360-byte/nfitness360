@@ -237,12 +237,24 @@ function doPost(e) {
       return analizarEstudio_(body);
     }
 
+    if (action === "resumenPacienteIA") {
+      return resumenPacienteIA_(body);
+    }
+
+    if (action === "preguntarPacienteIA") {
+      return preguntarPacienteIA_(body);
+    }
+
     if (action === "crearCheckoutStripe") {
       return crearCheckoutStripe_(body);
     }
 
     if (action === "verificarPagoStripe") {
       return verificarPagoStripe_(body);
+    }
+
+    if (action === "facturarCFDI") {
+      return facturarCFDI_(body);
     }
 
     if (action === "setReactivacion") {
@@ -1074,16 +1086,19 @@ function generarMenusIA_(body) {
     "la preparación DEBE indicar cuánto yogurt y cómo se usa; si la preparación no lleva yogurt, entonces el nombre " +
     "tampoco debe decir 'con yogurt'. No dejes ingredientes anunciados en el nombre fuera de la preparación. " +
     "NO agregues frases redundantes como 'consumir como colación' al cierre de las opciones: el nombre del tiempo ya indica que es colación. " +
-    "COHERENCIA CULINARIA (muy importante): cada platillo debe ser algo que una persona realmente prepararía y comería; "
-    "combina solo ingredientes que tengan sentido juntos segun la cocina mexicana y el sentido comun. "
-    "NUNCA mezcles en una misma preparacion ingredientes incompatibles. Un LICUADO, SMOOTHIE o BEBIDA solo admite "
-    "liquidos (agua, leche o bebida vegetal), fruta, avena, proteina en polvo, semillas o crema de frutos secos; "
-    "JAMAS lleva frijoles, leguminosas, verduras cocidas, carne, huevo, tortilla ni cereales salados. "
-    "Si los equivalentes de un tiempo incluyen grupos que no embonan en ese tipo de platillo (por ejemplo una leguminosa "
-    "en un tiempo con licuado), NO los metas dentro de esa preparacion: ubicalos en un acompanamiento APARTE y solido "
-    "(por ejemplo 'acompanar con 1/2 taza de frijoles' como plato al lado), o elige otro tipo de platillo que si integre "
-    "bien todos los grupos. Antes de devolver cada opcion, verifica que ningun ingrediente resulte extrano o desagradable "
-    "dentro de ese platillo; si algo no combina, corrigelo. Mezclar ingredientes que no combinan es un ERROR grave. "
+    "EL NOMBRE SE DERIVA DE LA PREPARACIÓN: primero define la preparación concreta; luego escribe el 'nombre' usando ÚNICAMENTE 2 o 3 de los ingredientes PRINCIPALES que aparecen en esa preparación. " +
+    "Está PROHIBIDO nombrar en el título cualquier ingrediente que NO esté en la preparación. Ejemplo de ERROR: titular 'Pan con miel y fruta' cuando la preparación lleva mantequilla de cacahuate y naranja (no lleva miel); el título debe reflejar lo que realmente se come. " +
+    "COHERENCIA CULINARIA (muy importante): cada platillo debe ser algo que una persona realmente prepararía y comería; " +
+    "combina solo ingredientes que tengan sentido juntos según la cocina mexicana y el sentido común. " +
+    "NUNCA mezcles en una misma preparación ingredientes incompatibles. Un LICUADO, SMOOTHIE o BEBIDA solo admite " +
+    "líquidos (agua, leche o bebida vegetal), fruta, avena, proteína en polvo, semillas o crema de frutos secos; " +
+    "JAMÁS lleva frijoles, leguminosas, verduras cocidas, carne, huevo, tortilla ni cereales salados. " +
+    "Cuida también las porciones y las combinaciones: evita mezclas desbalanceadas o extrañas (por ejemplo 2 plátanos enteros junto a unas tortillas); las cantidades deben ser realistas para una comida normal. " +
+    "Si los equivalentes de un tiempo incluyen grupos que no embonan en ese tipo de platillo (por ejemplo una leguminosa " +
+    "en un tiempo con licuado), NO los metas dentro de esa preparación: ubícalos en un acompañamiento APARTE y sólido " +
+    "(por ejemplo 'acompañar con 1/2 taza de frijoles' como plato al lado), o elige otro tipo de platillo que sí integre " +
+    "bien todos los grupos. " +
+    "REVISIÓN FINAL OBLIGATORIA: antes de responder, revisa CADA opción y confirma que (1) todos los ingredientes del nombre están en la preparación; (2) ningún ingrediente principal de la preparación falta en el nombre; (3) la combinación tiene sentido y es algo que alguien realmente comería; (4) las porciones son realistas. Corrige cualquier opción que falle. Un título que no corresponde a la preparación, o mezclar ingredientes que no combinan, son ERRORES graves. " +
     "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
   var datos = {
@@ -1113,7 +1128,7 @@ function generarMenusIA_(body) {
   var payload = {
     model: IA_MODEL,
     max_tokens: IA_MAX_TOKENS,
-    temperature: 1,
+    temperature: 0.5,
     system: sys,
     messages: [{ role: "user", content: instruccion }]
   };
