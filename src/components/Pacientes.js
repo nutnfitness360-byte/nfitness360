@@ -123,6 +123,12 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const recoLoadedForRef = useRef(null);
   const [bitacoraTexto, setBitacoraTexto] = useState('');
   const [bitacoraApego, setBitacoraApego] = useState('');
+  // Resumen IA + chat "pregúntale a la IA" del expediente
+  const [resumenBusy, setResumenBusy] = useState(false);
+  const [resumenMsg, setResumenMsg] = useState('');
+  const [chatMsgs, setChatMsgs] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatBusy, setChatBusy] = useState(false);
   const [isakFile, setIsakFile] = useState(null);
   const [isakBusy, setIsakBusy] = useState(false);
   const [estudioFile, setEstudioFile] = useState(null);
@@ -174,6 +180,9 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   }, [selId, pacientes]);
 
   const sel = pacientes.find(p => p.id === selId);
+
+  // Al cambiar de paciente, limpia el chat y los mensajes del resumen.
+  useEffect(() => { setChatMsgs([]); setChatInput(''); setResumenMsg(''); }, [selId]);
 
   /* ----- Navegación con historial del navegador (botón Atrás / mouse / gesto) ----- */
   const navRef = useRef({});
@@ -544,6 +553,65 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     }
   };
 
+  // Contexto del paciente que se manda a la IA (resumen y chat).
+  const construirContextoIA = () => ({
+    nombre: sel.nombre, edad: sel.edad, sexo: sel.sexo, estatura: sel.estatura,
+    objetivo: sel.objetivo, inicio: sel.inicio,
+    mediciones: (sel.mediciones || []).slice().sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).slice(-8),
+    apego: bitacoraToApego(sel.bitacora).slice(-8),
+    bitacora: (sel.bitacora || []).slice(-6).map(b => ({ fecha: b.fecha, texto: b.texto, apego: b.apego })),
+    historia: sel.historia || null,
+    recomendaciones: (sel.recomendaciones || []).slice(-3),
+    planes: (sel.planes || []).map(p => ({ nombre: p.nombre, fecha: p.fecha })),
+  });
+
+  // Genera (o actualiza) el resumen IA y lo guarda en el documento del paciente.
+  const generarResumen = async () => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setResumenMsg('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    if (!sel) return;
+    setResumenBusy(true); setResumenMsg('');
+    try {
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'resumenPacienteIA', contexto: construirContextoIA() }),
+        redirect: 'follow',
+      });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = null; }
+      if (d && d.ok && d.resumen) {
+        await updateDoc(doc(db, 'pacientes', sel.id), { resumenIA: { ...d.resumen, fecha: Date.now() } });
+      } else {
+        setResumenMsg('No se pudo generar el resumen: ' + ((d && d.error) || 'error desconocido') + '.');
+      }
+    } catch (e) { setResumenMsg('No se pudo generar: ' + e.message); }
+    setResumenBusy(false);
+  };
+
+  // Chat "pregúntale a la IA sobre este paciente".
+  const preguntarIA = async () => {
+    const q = (chatInput || '').trim();
+    if (!q || chatBusy || !sel) return;
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    const previos = chatMsgs.slice(-6);
+    setChatMsgs(m => [...m, { rol: 'nutri', texto: q }]);
+    setChatInput('');
+    if (!url) { setChatMsgs(m => [...m, { rol: 'ia', texto: 'Falta configurar la conexión con el servicio de IA.' }]); return; }
+    setChatBusy(true);
+    try {
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'preguntarPacienteIA', contexto: construirContextoIA(), pregunta: q, historial: previos }),
+        redirect: 'follow',
+      });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = null; }
+      const resp = (d && d.ok && d.respuesta) ? d.respuesta : ('No se pudo responder: ' + ((d && d.error) || 'error desconocido') + '.');
+      setChatMsgs(m => [...m, { rol: 'ia', texto: resp }]);
+    } catch (e) {
+      setChatMsgs(m => [...m, { rol: 'ia', texto: 'No se pudo responder: ' + e.message }]);
+    }
+    setChatBusy(false);
+  };
+
   const addBitacora = async () => {
     const t = bitacoraTexto.trim();
     if (!t) { setErr('Escribe la nota de la consulta.'); return; }
@@ -803,6 +871,92 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
               <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--dark)' }}>{sel.nombre}</div>
               <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 2 }}>{sel.codigo} · {sel.objetivo || 'sin objetivo'}</div>
             </div>
+          </div>
+        </div>
+
+        {/* Resumen para la consulta (IA) */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="card-title" style={{ margin: 0 }}>Resumen para la consulta</div>
+              <span style={{ background: '#fff', border: '1px solid var(--gold)', color: 'var(--gold)', borderRadius: 7, fontSize: 10, fontWeight: 800, padding: '2px 7px', letterSpacing: '0.3px' }}>IA ✦</span>
+            </div>
+            {sel.resumenIA && !resumenBusy && (
+              <button style={S.smallBtn} onClick={generarResumen}>Actualizar</button>
+            )}
+          </div>
+
+          {resumenBusy ? (
+            <div style={{ padding: '18px 6px', textAlign: 'center', color: 'var(--stone)', fontSize: 13 }}>Generando resumen…</div>
+          ) : sel.resumenIA ? (
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--stone)', margin: '4px 0 10px' }}>
+                Generado el {(() => { try { return new Date(sel.resumenIA.fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return '—'; } })()}
+              </div>
+              {[['Cómo llega', sel.resumenIA.estado], ['Evolución', sel.resumenIA.evolucion], ['Adherencia', sel.resumenIA.adherencia]]
+                .filter(x => x[1]).map(([l, t], i) => (
+                  <div key={i} style={{ marginTop: 11 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>{l}</div>
+                    <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--dark)' }}>{t}</div>
+                  </div>
+                ))}
+              {Array.isArray(sel.resumenIA.clave) && sel.resumenIA.clave.length > 0 && (
+                <div style={{ marginTop: 11 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>Puntos clave</div>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>{sel.resumenIA.clave.map((x, i) => <li key={i} style={{ fontSize: 13.5, lineHeight: 1.5, marginBottom: 3 }}>{x}</li>)}</ul>
+                </div>
+              )}
+              {sel.resumenIA.ultimaConsulta && (
+                <div style={{ marginTop: 11 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>Última consulta</div>
+                  <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--dark)' }}>{sel.resumenIA.ultimaConsulta}</div>
+                </div>
+              )}
+              {Array.isArray(sel.resumenIA.revisar) && sel.resumenIA.revisar.length > 0 && (
+                <div style={{ background: '#F4F8F6', border: '1px solid #d9e7e0', borderRadius: 11, padding: '10px 12px', marginTop: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: '#3E6B5B', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>A revisar hoy</div>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>{sel.resumenIA.revisar.map((x, i) => <li key={i} style={{ fontSize: 13.5, lineHeight: 1.5, marginBottom: 3 }}>{x}</li>)}</ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px 8px', textAlign: 'center' }}>
+              <div style={{ fontSize: 24 }} aria-hidden>📝</div>
+              <div style={{ fontSize: 13, color: 'var(--stone)', lineHeight: 1.5, maxWidth: 440 }}>Aún no has generado el resumen de este paciente. Genéralo antes de la consulta para ponerte al día en segundos.</div>
+              <button style={S.saveBtn} onClick={generarResumen}>Generar resumen</button>
+            </div>
+          )}
+          {resumenMsg && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 10 }}>{resumenMsg}</div>}
+        </div>
+
+        {/* Pregúntale a la IA sobre este paciente */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="card-title" style={{ margin: 0 }}>Pregúntale a la IA sobre este paciente</div>
+              <span style={{ background: '#fff', border: '1px solid var(--gold)', color: 'var(--gold)', borderRadius: 7, fontSize: 10, fontWeight: 800, padding: '2px 7px', letterSpacing: '0.3px' }}>IA ✦</span>
+            </div>
+            <span style={{ background: 'rgba(154,185,173,0.18)', border: '1px solid #cfe0d8', color: '#3E6B5B', borderRadius: 999, fontSize: 9.5, fontWeight: 800, padding: '2px 8px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>solo usa el expediente</span>
+          </div>
+          {chatMsgs.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12 }}>
+              {chatMsgs.map((mensaje, i) => (
+                <div key={i} style={{ maxWidth: '88%', padding: '9px 12px', borderRadius: 13, fontSize: 13.5, lineHeight: 1.5,
+                  alignSelf: mensaje.rol === 'nutri' ? 'flex-end' : 'flex-start',
+                  background: mensaje.rol === 'nutri' ? 'var(--gold)' : '#F4F1EC',
+                  color: mensaje.rol === 'nutri' ? '#fff' : 'var(--dark)',
+                  border: mensaje.rol === 'nutri' ? 'none' : '1px solid var(--border)' }}>
+                  {mensaje.rol === 'ia' && <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>IA</div>}
+                  {mensaje.texto}
+                </div>
+              ))}
+              {chatBusy && <div style={{ alignSelf: 'flex-start', fontSize: 12.5, color: 'var(--stone)', padding: '4px 2px' }}>La IA está revisando el expediente…</div>}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <input style={{ ...S.inp, flex: 1 }} value={chatInput} onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') preguntarIA(); }} placeholder="Escribe tu pregunta sobre el paciente…" />
+            <button style={S.saveBtn} onClick={preguntarIA} disabled={chatBusy || !chatInput.trim()}>Enviar</button>
           </div>
         </div>
 
