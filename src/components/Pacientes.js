@@ -12,6 +12,7 @@ import ImportarPacientes from './ImportarPacientes';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import RichArea from './RichArea';
 import { renderRich } from '../utils/richText';
+import { apegoPorPeriodo } from '../utils/apego';
 
 /* ===== utilidades ===== */
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -845,7 +846,9 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     const hayPliegueManual = PLIEGUES.some(p => !isNaN(parseFloat(manual[p.k])));
     const manualMasculino = /masc|hombre|var[oó]n|^m$/i.test((sel.sexo || '').trim());
     const umbralPliegues = manualMasculino ? 50 : 30;
-    const apegoData = bitacoraToApego(sel.bitacora);
+    // Apego = promedio de los % diarios que el paciente registró con el contador
+    // de equivalencias, entre una consulta y otra (respaldo: apego manual de bitácora).
+    const apegoData = apegoPorPeriodo(sel.mediciones, sel.seguimientoEq, sel.bitacora);
     const ultApego = apegoData.length ? apegoData[apegoData.length - 1].apego : null;
     if (sub === 'plan') {
       // La talla/edad/sexo alimentan el cálculo. Viven en el campo de nivel superior,
