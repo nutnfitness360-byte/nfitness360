@@ -306,6 +306,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const setOpcionFoto = (idx, oi, key) => setOpcion(idx, oi, { fotoKey: key || '', fotoAuto: false });
   const [fotoPicker, setFotoPicker] = useState(null);   // { idx, oi } de la opción cuya foto se está eligiendo
   const [fotoQuery, setFotoQuery] = useState('');
+  const [fotoPage, setFotoPage] = useState(0);          // paginación del banco de imágenes
   const [bancoCustom, setBancoCustomState] = useState([]);
   const [subiendoBanco, setSubiendoBanco] = useState(false);
   const [dragBanco, setDragBanco] = useState(false);
@@ -1010,10 +1011,10 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                         ? <img src={fotoUrl(o.fotoKey)} alt="" style={S.optFotoThumb} />
                         : <div style={S.optFotoThumbEmpty}>Sin foto</div>}
                       <div style={S.optFotoBtns}>
-                        <button style={S.optFotoBtn} onClick={() => { setFotoQuery(o.nombre || ''); setFotoPicker({ idx, oi }); }}>
+                        <button style={S.optFotoBtn} onClick={() => { setFotoQuery(o.nombre || ''); setFotoPage(0); setFotoPicker({ idx, oi }); }}>
                           {o.fotoKey ? 'Cambiar foto' : 'Elegir foto'}
                         </button>
-                        <button style={S.optFotoBtn} onClick={() => { setFotoQuery(''); setFotoPicker({ idx, oi }); }}>Subir foto</button>
+                        <button style={S.optFotoBtn} onClick={() => { setFotoQuery(''); setFotoPage(0); setFotoPicker({ idx, oi }); }}>Subir foto</button>
                         {o.fotoKey && <button style={S.optFotoClear} onClick={() => setOpcionFoto(idx, oi, '')}>Quitar</button>}
                         {o.fotoKey && o.fotoAuto !== false && <span style={S.optFotoAuto}>automática</span>}
                       </div>
@@ -1108,18 +1109,38 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
               </label>
             </div>
             <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--stone)', marginBottom: 6 }}>O elige del banco</div>
-            <input autoFocus style={{ ...S.optName, marginBottom: 10 }} placeholder="Buscar… ej. chilaquiles, salmón, avena" value={fotoQuery} onChange={e => setFotoQuery(e.target.value)} />
-            <div style={S.fpGrid}>
-              {buscarFotos(fotoQuery, 60).map(f => (
-                <button key={f.file} style={S.fpItem} onClick={() => { setOpcionFoto(fotoPicker.idx, fotoPicker.oi, f.file); setFotoPicker(null); }}>
-                  <img src={fotoUrl(f.file)} alt="" style={S.fpImg} />
-                  <span style={S.fpLabel}>{f.label}</span>
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
-              <button style={S.volverBtn} onClick={() => setFotoPicker(null)}>Cerrar</button>
-            </div>
+            <input autoFocus style={{ ...S.optName, marginBottom: 10 }} placeholder="Buscar… ej. chilaquiles, salmón, avena" value={fotoQuery} onChange={e => { setFotoQuery(e.target.value); setFotoPage(0); }} />
+            {(() => {
+              const FP_POR_PAGINA = 12;
+              const _todas = buscarFotos(fotoQuery, 500);
+              const _totalPag = Math.max(1, Math.ceil(_todas.length / FP_POR_PAGINA));
+              const _pag = Math.min(fotoPage, _totalPag - 1);
+              const _visibles = _todas.slice(_pag * FP_POR_PAGINA, _pag * FP_POR_PAGINA + FP_POR_PAGINA);
+              return (
+                <>
+                  <div style={S.fpGrid}>
+                    {_visibles.length === 0
+                      ? <div style={S.fpEmpty}>No hay fotos que coincidan con la búsqueda.</div>
+                      : _visibles.map(f => (
+                        <button key={f.file} style={S.fpItem} onClick={() => { setOpcionFoto(fotoPicker.idx, fotoPicker.oi, f.file); setFotoPicker(null); }}>
+                          <img src={fotoUrl(f.file)} alt="" style={S.fpImg} />
+                          <span style={S.fpLabel}>{f.label}</span>
+                        </button>
+                      ))}
+                  </div>
+                  <div style={S.fpFoot}>
+                    {_todas.length > FP_POR_PAGINA
+                      ? <div style={S.fpPager}>
+                          <button style={{ ...S.fpPageBtn, ...(_pag === 0 ? S.fpPageBtnOff : null) }} onClick={() => setFotoPage(p => Math.max(0, p - 1))} disabled={_pag === 0}>‹</button>
+                          <span>Página {_pag + 1} de {_totalPag}</span>
+                          <button style={{ ...S.fpPageBtn, ...(_pag >= _totalPag - 1 ? S.fpPageBtnOff : null) }} onClick={() => setFotoPage(p => Math.min(_totalPag - 1, p + 1))} disabled={_pag >= _totalPag - 1}>›</button>
+                        </div>
+                      : <span />}
+                    <button style={S.volverBtn} onClick={() => setFotoPicker(null)}>Cerrar</button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
         );
@@ -1131,17 +1152,22 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
 const styles = {
   root: { fontFamily: mono, color: T.ink },
   // Foto por opción
-  optFotoRow: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 },
-  optFotoThumb: { width: 46, height: 46, borderRadius: 8, objectFit: 'cover', border: '1px solid ' + T.line, flexShrink: 0 },
-  optFotoThumbEmpty: { width: 46, height: 46, borderRadius: 8, border: '1px dashed ' + T.line, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: T.inkSoft, flexShrink: 0, textAlign: 'center' },
-  optFotoBtns: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  optFotoRow: { display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 },
+  optFotoThumb: { width: 120, height: 120, borderRadius: 12, objectFit: 'cover', border: '2px solid ' + T.amber, flexShrink: 0, boxShadow: '0 4px 14px rgba(0,0,0,0.12)' },
+  optFotoThumbEmpty: { width: 120, height: 120, borderRadius: 12, border: '1px dashed ' + T.line, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: T.inkSoft, flexShrink: 0, textAlign: 'center' },
+  optFotoBtns: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   optFotoBtn: { background: T.mint, border: '1px solid ' + T.line, borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 600, color: T.ink, cursor: 'pointer', fontFamily: mono },
   optFotoClear: { background: 'transparent', border: 'none', color: T.danger, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: mono },
   optFotoAuto: { fontSize: 9.5, color: T.sage, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' },
-  fpGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 8, overflowY: 'auto', padding: 2 },
-  fpItem: { border: '1px solid ' + T.line, borderRadius: 10, overflow: 'hidden', background: '#fff', cursor: 'pointer', padding: 0, textAlign: 'left', fontFamily: mono },
-  fpImg: { width: '100%', height: 84, objectFit: 'cover', display: 'block' },
-  fpLabel: { display: 'block', fontSize: 10.5, color: T.ink, padding: '5px 7px', lineHeight: 1.25 },
+  fpGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, overflowY: 'auto', padding: 2 },
+  fpItem: { position: 'relative', aspectRatio: '1 / 1', border: '1px solid ' + T.line, borderRadius: 12, overflow: 'hidden', background: '#fff', cursor: 'pointer', padding: 0, textAlign: 'left', fontFamily: mono },
+  fpImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+  fpLabel: { position: 'absolute', left: 0, right: 0, bottom: 0, fontSize: 10.5, fontWeight: 700, color: '#fff', background: 'linear-gradient(transparent, rgba(0,0,0,0.55))', padding: '14px 7px 5px', lineHeight: 1.2 },
+  fpFoot: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, gap: 10, flexWrap: 'wrap' },
+  fpPager: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: T.inkSoft, fontWeight: 700 },
+  fpPageBtn: { width: 32, height: 32, borderRadius: 8, border: '1px solid ' + T.line, background: '#fff', cursor: 'pointer', fontSize: 15, color: T.ink, fontFamily: mono },
+  fpPageBtnOff: { opacity: 0.4, cursor: 'not-allowed' },
+  fpEmpty: { gridColumn: '1 / -1', textAlign: 'center', color: T.inkSoft, fontSize: 12.5, padding: '24px 8px' },
   back: { background: 'transparent', border: 'none', color: T.inkSoft, fontFamily: mono, fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 10 },
   titleRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
   eyebrow: { fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: T.amber, marginBottom: 4 },
