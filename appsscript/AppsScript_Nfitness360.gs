@@ -109,7 +109,10 @@ function doPost(e) {
       var recFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, RECOMENDACIONES_NAME]);
       var fileR = recFolder.createFile(blobR);
       compartirConPaciente_(fileR, body.correo);
-      enviarPdfPaciente_(body.correo, patient, "recomendaciones", blobR);
+      // El correo solo se envía cuando enviarCorreo !== false. Así el paciente puede
+      // ABRIR el PDF dentro de la app (enviarCorreo:false) sin que le llegue al correo,
+      // y el botón "PDF" (enviarCorreo:true, o sin el campo) sí lo manda.
+      if (body.enviarCorreo !== false) enviarPdfPaciente_(body.correo, patient, "recomendaciones", blobR);
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileR.getId(), link: fileR.getUrl(),
