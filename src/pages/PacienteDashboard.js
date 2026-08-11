@@ -594,11 +594,13 @@ export default function PacienteDashboard() {
     setCompraBusy('');
   };
 
-  const generarPDFReco = async (reco) => {
+  // enviar = true  -> genera el PDF y lo manda al correo del paciente (botón "PDF").
+  // enviar = false -> solo genera y lo ABRE dentro de la app, sin mandar correo (botón "Abrir").
+  const generarPDFReco = async (reco, enviar = true) => {
     const url = process.env.REACT_APP_APPSCRIPT_URL;
     if (!url) { setRecoPdfMsg('No se pudo generar el PDF (configuración del servidor).'); return; }
     if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales)) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
-    setRecoPdfMsg('Generando tu PDF…');
+    setRecoPdfMsg(enviar ? 'Enviando el PDF a tu correo…' : 'Abriendo tu PDF…');
     try {
       const nombrePac = expediente?.nombre || user?.displayName || 'Paciente';
       // La tabla de suplementos debe salir de ESTA recomendación (la que llenó la nutrióloga),
@@ -608,15 +610,20 @@ export default function PacienteDashboard() {
       const filename = `Recomendacion_${String(nombrePac).replace(/[^\w-]+/g, '_')}_${stamp}.pdf`;
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'saveRecomendaciones', patient: nombrePac, correo: (expediente?.correo || user?.email || '').toLowerCase(), filename, html }),
+        // enviarCorreo=false -> el backend guarda y comparte el PDF, pero NO manda el correo.
+        body: JSON.stringify({ action: 'saveRecomendaciones', patient: nombrePac, correo: (expediente?.correo || user?.email || '').toLowerCase(), filename, html, enviarCorreo: !!enviar }),
         redirect: 'follow',
       });
       let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (!d.ok || !d.link) throw new Error(d.error || 'No se recibió el enlace del PDF.');
-      setRecoPdfMsg('');
-      abrirArchivo(d.link, 'Recomendación');
+      if (enviar) {
+        setRecoPdfMsg('Te enviamos el PDF a tu correo ✓');
+      } else {
+        setRecoPdfMsg('');
+        abrirArchivo(d.link, 'Recomendación');
+      }
     } catch (e) {
-      setRecoPdfMsg('No se pudo generar el PDF. Intenta de nuevo.');
+      setRecoPdfMsg(enviar ? 'No se pudo enviar el PDF. Intenta de nuevo.' : 'No se pudo abrir el PDF. Intenta de nuevo.');
     }
   };
 
@@ -1167,10 +1174,16 @@ export default function PacienteDashboard() {
                           </div>))
                         : <div className="reco-rich" style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: renderRich(r.texto) }} />}
                     </div>
-                    <button onClick={() => generarPDFReco(r)} title="Generar PDF de esta recomendación"
-                      style={{ background: '#221C16', color: '#EEE4DA', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 12px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      PDF
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                      <button onClick={() => generarPDFReco(r, false)} title="Ver esta recomendación en la app (sin enviar correo)"
+                        style={{ background: 'var(--gold)', color: '#fff', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '6px 14px', borderRadius: 8, whiteSpace: 'nowrap' }}>
+                        Abrir
+                      </button>
+                      <button onClick={() => generarPDFReco(r, true)} title="Enviar el PDF de esta recomendación a tu correo"
+                        style={{ background: '#221C16', color: '#EEE4DA', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 14px', borderRadius: 8, whiteSpace: 'nowrap' }}>
+                        PDF
+                      </button>
+                    </div>
                   </div>
                 </div>
                 );
