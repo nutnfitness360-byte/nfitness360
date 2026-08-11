@@ -6,6 +6,8 @@ import { useBranding, aplicarColores } from '../context/BrandingContext';
 import Topbar from '../components/Topbar';
 import PerfilPaciente from '../components/PerfilPaciente';
 import Agenda from '../components/Agenda';
+import ContadorEquivalencias from '../components/ContadorEquivalencias';
+import { apegoPorPeriodo } from '../utils/apego';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import { renderRich } from '../utils/richText';
 import { parseDriveLink } from '../utils/drive';
@@ -666,9 +668,9 @@ export default function PacienteDashboard() {
   const planes = expediente && Array.isArray(expediente.planes) ? [...expediente.planes].reverse() : [];
   const medics = expediente && Array.isArray(expediente.mediciones) ? expediente.mediciones : [];
   const ultMed = medics.length ? medics[medics.length - 1] : null;
-  const apegoData = (expediente && Array.isArray(expediente.bitacora) ? expediente.bitacora : [])
-    .filter(b => typeof b.apego === 'number')
-    .map(b => { const d = new Date(b.fecha); const iso = isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; return { fecha: iso, apego: b.apego }; });
+  // Apego = promedio de los % diarios del contador de equivalencias entre consultas
+  // (con respaldo al apego manual de la bitácora). Mismo dato que ve la nutrióloga.
+  const apegoData = apegoPorPeriodo(medics, expediente && expediente.seguimientoEq, expediente && expediente.bitacora);
   const ultApego = apegoData.length ? apegoData[apegoData.length - 1].apego : null;
 
   const tabs = [
@@ -932,6 +934,14 @@ export default function PacienteDashboard() {
                 <div className="empty-state">No tienes citas próximas</div>
               )}
             </div>
+
+            {expediente && expediente.plan && (
+              <ContadorEquivalencias
+                expedienteId={expediente.id}
+                plan={expediente.plan}
+                seguimiento={expediente.seguimientoEq}
+              />
+            )}
 
             {tieneSaldo && (
               <div className="card">
