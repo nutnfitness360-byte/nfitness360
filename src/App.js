@@ -15,12 +15,12 @@ function aplicarMarcaPorDominio() {
     if (host.indexOf('sistemanutricio') === -1) return; // solo la instancia Aretia (venta/demo)
     // Colores Aretia al INSTANTE (antes de pintar), para que no se vea el destello de la
     // paleta por defecto mientras carga la config desde la base de datos.
-    var C = { '--cream': '#F4F1EA', '--gold': '#BE6E30', '--sage': '#7C9BBE', '--stone': '#64726B', '--dark': '#1E3A5F', '--card': '#FFFFFF', '--border': '#E4E1D8' };
+    var C = { '--cream': '#F4F1EA', '--gold': '#E0913F', '--sage': '#7C9BBE', '--stone': '#64726B', '--dark': '#1E3A5F', '--card': '#FFFFFF', '--border': '#E4E1D8' };
     var rs = document.documentElement.style;
     Object.keys(C).forEach(function (k) { rs.setProperty(k, C[k]); });
     document.title = 'Aretia';
     // Favicon = símbolo Aretia (SVG en línea, teja esmeralda + "A" con punta ámbar)
-    const favicon = "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='24'%20fill='%231E3A5F'/%3E%3Cpath%20d='M29%2074%20L50%2030%20L71%2074'%20fill='none'%20stroke='%23F4F1EA'%20stroke-width='9'%20stroke-linejoin='miter'/%3E%3Cpath%20d='M40.5%2050%20L50%2030%20L59.5%2050'%20fill='none'%20stroke='%23BE6E30'%20stroke-width='9'%20stroke-linejoin='miter'/%3E%3C/svg%3E";
+    const favicon = "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='24'%20fill='%231E3A5F'/%3E%3Cpath%20d='M29%2074%20L50%2030%20L71%2074'%20fill='none'%20stroke='%23F4F1EA'%20stroke-width='9'%20stroke-linejoin='miter'/%3E%3Cpath%20d='M40.5%2050%20L50%2030%20L59.5%2050'%20fill='none'%20stroke='%23E0913F'%20stroke-width='9'%20stroke-linejoin='miter'/%3E%3C/svg%3E";
     let link = document.querySelector("link[rel~='icon']");
     if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
     link.setAttribute('type', 'image/svg+xml');
