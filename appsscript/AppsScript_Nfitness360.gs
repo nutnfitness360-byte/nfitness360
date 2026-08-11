@@ -1098,11 +1098,21 @@ function generarMenusIA_(body) {
     "en un tiempo con licuado), NO los metas dentro de esa preparación: ubícalos en un acompañamiento APARTE y sólido " +
     "(por ejemplo 'acompañar con 1/2 taza de frijoles' como plato al lado), o elige otro tipo de platillo que sí integre " +
     "bien todos los grupos. " +
-    "REVISIÓN FINAL OBLIGATORIA: antes de responder, revisa CADA opción y confirma que (1) todos los ingredientes del nombre están en la preparación; (2) ningún ingrediente principal de la preparación falta en el nombre; (3) la combinación tiene sentido y es algo que alguien realmente comería; (4) las porciones son realistas. Corrige cualquier opción que falle. Un título que no corresponde a la preparación, o mezclar ingredientes que no combinan, son ERRORES graves. " +
+    "PREFERENCIAS DEL PACIENTE (muy importante): recibirás 'preferencias_paciente' con 'le_gusta', 'no_le_gusta' y 'alergias'. " +
+    "Es OBLIGATORIO: NUNCA incluyas ningún alimento —ni sus ingredientes o derivados— que aparezca en 'no_le_gusta' ni en 'alergias'. " +
+    "Las ALERGIAS son de SEGURIDAD: por ningún motivo las uses ni las escondas dentro de un platillo (revisa también acompañamientos y salsas). " +
+    "Da PREFERENCIA a incluir los alimentos de 'le_gusta' cuando embonen con los equivalentes y macros del tiempo, sin forzarlos donde no correspondan. " +
+    "Si un candidato del recetario contiene un alimento no permitido, úsalo solo si puedes sustituir ese ingrediente por otro del MISMO grupo que sí sea aceptable; si no, descártalo y elige otro platillo. " +
+    "REVISIÓN FINAL OBLIGATORIA: antes de responder, revisa CADA opción y confirma que (1) todos los ingredientes del nombre están en la preparación; (2) ningún ingrediente principal de la preparación falta en el nombre; (3) la combinación tiene sentido y es algo que alguien realmente comería; (4) las porciones son realistas; (5) NO aparece nada de 'no_le_gusta' ni 'alergias'. Corrige cualquier opción que falle. Un título que no corresponde a la preparación, mezclar ingredientes que no combinan, o incluir un alimento prohibido, son ERRORES graves. " +
     "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
   var datos = {
     objetivo: body.objetivo || "",
+    preferencias_paciente: {
+      le_gusta: (body.gustos || "").toString(),
+      no_le_gusta: (body.disgustos || "").toString(),
+      alergias: (body.alergias || "").toString()
+    },
     totales_del_dia: body.totales || {},
     n_opciones_por_tiempo: nOp,
     tiempos: tiempos.map(function (t) {
