@@ -686,7 +686,7 @@ export default function PacienteDashboard() {
     { id: 'inicio', label: 'Inicio', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg> },
     { id: 'agendar', label: 'Agendar', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg> },
     { id: 'planes', label: 'Mis archivos', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg> },
-    { id: 'miDia', label: 'Mi día', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> },
+    { id: 'miDia', label: 'Contador de equivalencias', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> },
     { id: 'recomendaciones', label: 'Recomendaciones', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/></svg> },
     { id: 'facturacion', label: 'Facturación', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 3.75h6M9 8.25h6M6.75 3h10.5A1.5 1.5 0 0118.75 4.5v16.19a.3.3 0 01-.46.253L15.75 19.5l-2.25 1.5-2.25-1.5-2.25 1.5-2.29-1.307A.3.3 0 015.25 20.69V4.5A1.5 1.5 0 016.75 3z"/></svg> },
   ];
@@ -967,28 +967,6 @@ export default function PacienteDashboard() {
               </div>
             )}
 
-            {paquetesCfg.length > 0 && (
-              <div className="card">
-                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 4 }}>Recordatorio</div>
-                <div className="card-title">Aprovecha un paquete de consultas</div>
-                <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>En lugar de pagar una sola consulta, puedes comprar un paquete y ahorrar. Paga en línea y tus consultas se agregan al instante; la vigencia empieza a correr desde tu primera consulta.</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
-                  {paquetesCfg.map(pk => (
-                    <div key={pk.id} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dark)' }}>{pk.nombre}</div>
-                      <div style={{ fontSize: 12, color: 'var(--stone)' }}>{pk.consultas} consultas · {familiaLabel(pk.familia)} · vigencia {pk.vigenciaMeses} meses</div>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--dark)' }}>{'$' + Number(pk.precio || 0).toLocaleString('es-MX')}</div>
-                      <button onClick={() => comprarPaquete(pk)} disabled={compraBusy === pk.id}
-                        style={{ marginTop: 4, background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 9, padding: '9px 12px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                        {compraBusy === pk.id ? 'Redirigiendo…' : 'Comprar'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {compraMsg && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 10 }}>{compraMsg}</div>}
-              </div>
-            )}
-
 
             <h2 style={D.section}>Tu progreso</h2>
             <div style={D.grid}>
@@ -1051,7 +1029,30 @@ export default function PacienteDashboard() {
         )}
 
         {tab === 'agendar' && (
-          <Agenda isNutri={false} reagendarDe={reagendando} onReagendado={() => { setReagendando(null); setTab('inicio'); }} onSolicitarCancelar={(c) => setModalCita(c)} />
+          <>
+            <Agenda isNutri={false} reagendarDe={reagendando} onReagendado={() => { setReagendando(null); setTab('inicio'); }} onSolicitarCancelar={(c) => setModalCita(c)} />
+            {paquetesCfg.length > 0 && (
+              <div className="card">
+                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 4 }}>Recordatorio</div>
+                <div className="card-title">Aprovecha un paquete de consultas</div>
+                <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 }}>En lugar de pagar una sola consulta, puedes comprar un paquete y ahorrar. Paga en línea y tus consultas se agregan al instante; la vigencia empieza a correr desde tu primera consulta.</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
+                  {paquetesCfg.map(pk => (
+                    <div key={pk.id} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dark)' }}>{pk.nombre}</div>
+                      <div style={{ fontSize: 12, color: 'var(--stone)' }}>{pk.consultas} consultas · {familiaLabel(pk.familia)} · vigencia {pk.vigenciaMeses} meses</div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--dark)' }}>{'$' + Number(pk.precio || 0).toLocaleString('es-MX')}</div>
+                      <button onClick={() => comprarPaquete(pk)} disabled={compraBusy === pk.id}
+                        style={{ marginTop: 4, background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 9, padding: '9px 12px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        {compraBusy === pk.id ? 'Redirigiendo…' : 'Comprar'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {compraMsg && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 10 }}>{compraMsg}</div>}
+              </div>
+            )}
+          </>
         )}
 
         {tab === 'miDia' && (
