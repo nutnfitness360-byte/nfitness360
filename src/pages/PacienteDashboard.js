@@ -601,7 +601,9 @@ export default function PacienteDashboard() {
     setRecoPdfMsg('Generando tu PDF…');
     try {
       const nombrePac = expediente?.nombre || user?.displayName || 'Paciente';
-      const html = buildRecomendacionesHTML({ nombre: nombrePac, recomendaciones: [reco], fecha: Date.now(), suplementacion: expediente?.historia?.suplementacion });
+      // La tabla de suplementos debe salir de ESTA recomendación (la que llenó la nutrióloga),
+      // no de los suplementos globales de la historia clínica; así coincide con el PDF que se envía por correo.
+      const html = buildRecomendacionesHTML({ nombre: nombrePac, recomendaciones: [reco], fecha: Date.now(), suplementacion: reco.suplementacionTabla || null });
       const stamp = (reco.fecha && !isNaN(new Date(reco.fecha).getTime())) ? new Date(reco.fecha).getTime() : Date.now();
       const filename = `Recomendacion_${String(nombrePac).replace(/[^\w-]+/g, '_')}_${stamp}.pdf`;
       const res = await fetch(url, {
