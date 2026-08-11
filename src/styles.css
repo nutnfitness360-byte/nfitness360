@@ -71,6 +71,8 @@ body {
   .bottomnav .nav-item {
     flex-direction: row;
     justify-content: flex-start;
+    align-items: center;
+    text-align: left;
     gap: 12px;
     width: 100%;
     padding: 0.7rem 0.85rem;
@@ -79,6 +81,8 @@ body {
     font-size: 13px;
     text-transform: none;
     letter-spacing: 0.2px;
+    text-align: left;
+    line-height: 1.25;
   }
   .bottomnav .nav-item.active {
     background: rgba(205,167,136,0.16);
