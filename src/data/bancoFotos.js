@@ -1,4 +1,6 @@
-// Banco de fotos de platillos (128). Generado automáticamente.
+// Banco de fotos de platillos (128). Índice MEJORADO: se añadieron variantes y typos
+// (omellete, claras, requeson, sincronizadas, entomatadas, mollete, banana…) para que
+// más platillos del recetario encuentren una foto real que YA existe en el banco.
 // Cada entrada: { file, label, keys }. Las imágenes viven en public/menu-images/.
 const BANCO_FOTOS = [
  {
@@ -16,7 +18,8 @@ const BANCO_FOTOS = [
   "keys": [
    "yogurt",
    "platano",
-   "chia"
+   "chia",
+   "banana"
   ]
  },
  {
@@ -26,7 +29,9 @@ const BANCO_FOTOS = [
    "huevo",
    "huevos",
    "nopal",
-   "nopales"
+   "nopales",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -38,7 +43,9 @@ const BANCO_FOTOS = [
    "espinaca",
    "espinacas",
    "jitomate",
-   "tomate"
+   "tomate",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -155,7 +162,9 @@ const BANCO_FOTOS = [
    "huevos",
    "fresa",
    "aguacate",
-   "cafe"
+   "cafe",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -205,7 +214,9 @@ const BANCO_FOTOS = [
    "aguacate",
    "avo",
    "toast",
-   "huevo"
+   "huevo",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -245,7 +256,12 @@ const BANCO_FOTOS = [
    "omelette",
    "omelet",
    "huevo",
-   "ensalada"
+   "ensalada",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -306,7 +322,10 @@ const BANCO_FOTOS = [
    "waffles",
    "platano",
    "huevo",
-   "fresa"
+   "fresa",
+   "banana",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -336,7 +355,12 @@ const BANCO_FOTOS = [
    "omelette",
    "omelet",
    "huevo",
-   "ensalada"
+   "ensalada",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -346,9 +370,13 @@ const BANCO_FOTOS = [
    "omelette",
    "omelet",
    "champinones",
-   "champiñones",
    "espinaca",
-   "huevo"
+   "huevo",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -390,7 +418,8 @@ const BANCO_FOTOS = [
    "aguacate",
    "avo",
    "toast",
-   "cottage"
+   "cottage",
+   "requeson"
   ]
  },
  {
@@ -497,7 +526,10 @@ const BANCO_FOTOS = [
    "hot",
    "cakes",
    "pancakes",
-   "fresa"
+   "fresa",
+   "hotcake",
+   "panqueque",
+   "panqueques"
   ]
  },
  {
@@ -520,7 +552,9 @@ const BANCO_FOTOS = [
    "huevos",
    "rajas",
    "mexicana",
-   "poblano"
+   "poblano",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -551,7 +585,10 @@ const BANCO_FOTOS = [
    "cakes",
    "pancakes",
    "fresa",
-   "yogurt"
+   "yogurt",
+   "hotcake",
+   "panqueque",
+   "panqueques"
   ]
  },
  {
@@ -601,7 +638,8 @@ const BANCO_FOTOS = [
    "cottage",
    "fresa",
    "pistache",
-   "yogurt"
+   "yogurt",
+   "requeson"
   ]
  },
  {
@@ -629,7 +667,9 @@ const BANCO_FOTOS = [
    "gorditas",
    "gordita",
    "huevo",
-   "arepa"
+   "arepa",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -640,7 +680,8 @@ const BANCO_FOTOS = [
    "pan",
    "cacahuate",
    "mermelada",
-   "platano"
+   "platano",
+   "banana"
   ]
  },
  {
@@ -670,7 +711,9 @@ const BANCO_FOTOS = [
   "keys": [
    "enfrijoladas",
    "enchiladas",
-   "frijol"
+   "frijol",
+   "entomatadas",
+   "entomatada"
   ]
  },
  {
@@ -702,7 +745,12 @@ const BANCO_FOTOS = [
    "omelet",
    "espinaca",
    "huevo",
-   "jitomate"
+   "jitomate",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -712,7 +760,8 @@ const BANCO_FOTOS = [
    "chia",
    "pudding",
    "platano",
-   "granola"
+   "granola",
+   "banana"
   ]
  },
  {
@@ -721,7 +770,9 @@ const BANCO_FOTOS = [
   "keys": [
    "quesadillas",
    "quesadilla",
-   "pollo"
+   "pollo",
+   "sincronizada",
+   "sincronizadas"
   ]
  },
  {
@@ -730,7 +781,9 @@ const BANCO_FOTOS = [
   "keys": [
    "huevo",
    "huevos",
-   "mexicana"
+   "mexicana",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -750,7 +803,9 @@ const BANCO_FOTOS = [
    "huevos",
    "nopal",
    "nopales",
-   "frijol"
+   "frijol",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -789,7 +844,9 @@ const BANCO_FOTOS = [
   "keys": [
    "huevos",
    "huevo",
-   "rancheros"
+   "rancheros",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -798,7 +855,8 @@ const BANCO_FOTOS = [
   "keys": [
    "cottage",
    "durazno",
-   "granola"
+   "granola",
+   "requeson"
   ]
  },
  {
@@ -807,7 +865,8 @@ const BANCO_FOTOS = [
   "keys": [
    "smoothie",
    "platano",
-   "batido"
+   "batido",
+   "banana"
   ]
  },
  {
@@ -843,7 +902,12 @@ const BANCO_FOTOS = [
    "omelette",
    "omelet",
    "atun",
-   "huevo"
+   "huevo",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -883,7 +947,12 @@ const BANCO_FOTOS = [
    "espinaca",
    "huevo",
    "jitomate",
-   "frittata"
+   "frittata",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -895,7 +964,10 @@ const BANCO_FOTOS = [
    "cakes",
    "pancakes",
    "arandano",
-   "blueberry"
+   "blueberry",
+   "hotcake",
+   "panqueque",
+   "panqueques"
   ]
  },
  {
@@ -907,7 +979,9 @@ const BANCO_FOTOS = [
    "jamon",
    "avo",
    "toast",
-   "aguacate"
+   "aguacate",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -927,7 +1001,8 @@ const BANCO_FOTOS = [
    "sandwich",
    "cacahuate",
    "platano",
-   "crema"
+   "crema",
+   "banana"
   ]
  },
  {
@@ -937,7 +1012,10 @@ const BANCO_FOTOS = [
    "hotcakes",
    "hot",
    "cakes",
-   "pancakes"
+   "pancakes",
+   "hotcake",
+   "panqueque",
+   "panqueques"
   ]
  },
  {
@@ -966,7 +1044,8 @@ const BANCO_FOTOS = [
   "keys": [
    "avena",
    "platano",
-   "canela"
+   "canela",
+   "banana"
   ]
  },
  {
@@ -1057,7 +1136,10 @@ const BANCO_FOTOS = [
    "cakes",
    "pancakes",
    "espinaca",
-   "verde"
+   "verde",
+   "hotcake",
+   "panqueque",
+   "panqueques"
   ]
  },
  {
@@ -1096,7 +1178,11 @@ const BANCO_FOTOS = [
    "cakes",
    "pancakes",
    "avena",
-   "platano"
+   "platano",
+   "hotcake",
+   "panqueque",
+   "panqueques",
+   "banana"
   ]
  },
  {
@@ -1132,7 +1218,8 @@ const BANCO_FOTOS = [
   "keys": [
    "rice",
    "cake",
-   "cottage"
+   "cottage",
+   "requeson"
   ]
  },
  {
@@ -1172,7 +1259,11 @@ const BANCO_FOTOS = [
    "hot",
    "cakes",
    "pancakes",
-   "platano"
+   "platano",
+   "hotcake",
+   "panqueque",
+   "panqueques",
+   "banana"
   ]
  },
  {
@@ -1184,7 +1275,12 @@ const BANCO_FOTOS = [
    "cakes",
    "pancakes",
    "huevo",
-   "fresa"
+   "fresa",
+   "hotcake",
+   "panqueque",
+   "panqueques",
+   "clara",
+   "claras"
   ]
  },
  {
@@ -1204,7 +1300,9 @@ const BANCO_FOTOS = [
    "pan",
    "huevo",
    "aguacate",
-   "pico"
+   "pico",
+   "clara",
+   "claras"
   ]
  },
  {
