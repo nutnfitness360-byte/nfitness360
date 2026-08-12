@@ -8,6 +8,17 @@ import { doc, getDoc } from 'firebase/firestore';
 import { NUTRI_EMAIL } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
 
+// Detecta si la app se abrió DENTRO de otra app (WhatsApp, Instagram, Facebook,
+// Messenger, etc.), es decir, un "navegador incrustado". Google bloquea el inicio
+// de sesión con Google en estos navegadores, así que ahí guiamos al paciente a
+// entrar con correo o a abrir la página en su navegador real.
+const INCRUSTADO = (() => {
+  try {
+    const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+    return ['WhatsApp', 'FBAN', 'FBAV', 'FB_IAB', 'Instagram', 'Line/', 'Messenger', 'Twitter', '; wv', 'GSA/'].some(r => ua.indexOf(r) !== -1);
+  } catch (_) { return false; }
+})();
+
 async function esNutriAutorizada(email) {
   const e = (email || '').toLowerCase();
   if (e === NUTRI_EMAIL) return true;
@@ -73,7 +84,12 @@ export default function LoginPage() {
       }
       // Si pasa, AuthContext detecta el rol y entra al panel que corresponde.
     } catch (e) {
-      setError(traducir(e.code));
+      const fallaEntorno = ['auth/popup-blocked', 'auth/cancelled-popup-request', 'auth/web-storage-unsupported', 'auth/operation-not-supported-in-this-environment', 'auth/internal-error'].includes(e.code);
+      if (INCRUSTADO || fallaEntorno) {
+        setError('El acceso con Google no funciona dentro de apps como WhatsApp. Usa “Continuar con correo” aquí mismo, o abre esta página en tu navegador (Chrome o Safari).');
+      } else {
+        setError(traducir(e.code));
+      }
     }
     setLoading(false);
   };
@@ -149,6 +165,10 @@ export default function LoginPage() {
     lbl: { fontSize: 10, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', margin: '0 0 4px', display: 'block' },
     inp: { width: '100%', boxSizing: 'border-box', border: '0.5px solid var(--border)', borderRadius: 9, padding: 10, fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', marginBottom: 12 },
     err: { background: '#fbeae6', color: '#B0593F', fontSize: 11.5, padding: '9px 11px', borderRadius: 8, marginBottom: 12, lineHeight: 1.4 },
+    aviso: { background: 'rgba(205,167,136,0.14)', border: '1px solid var(--gold)', color: 'var(--dark)', fontSize: 11.5, padding: '10px 12px', borderRadius: 9, marginBottom: 14, lineHeight: 1.5 },
+    avisoT: { fontWeight: 700, display: 'block', marginBottom: 3 },
+    orLbl: { fontSize: 10, color: 'var(--stone)', textAlign: 'center', margin: '12px 0 9px', letterSpacing: '0.4px' },
+    hintMini: { fontSize: 10.5, color: 'var(--stone)', lineHeight: 1.45, marginTop: 8, textAlign: 'center' },
     back: { background: 'none', border: 'none', color: 'var(--stone)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 14, fontFamily: 'var(--font)' },
     ico: { fontSize: 16, verticalAlign: '-3px', marginRight: 7 },
     // --- Pantalla de inicio (info + recuadros) ---
@@ -269,14 +289,22 @@ export default function LoginPage() {
               {vista === 'acceso' && (
                 <>
                   <p style={S.p}>Elige cómo ingresar. Validaremos que tu correo tenga acceso.</p>
+                  {INCRUSTADO && (
+                    <div style={S.aviso}>
+                      <span style={S.avisoT}>Abriste esta página dentro de una app (como WhatsApp).</span>
+                      Entra con <b>“Continuar con correo”</b>, que funciona aquí sin problema. El acceso con Google no funciona dentro de estas apps; si lo prefieres, abre esta página en tu navegador (Chrome o Safari).
+                    </div>
+                  )}
                   {error && <div style={S.err}>{error}</div>}
+                  <button style={{ ...S.btn, ...S.btnDark }} onClick={() => { setError(''); setVista('email'); }} disabled={loading}>
+                    Continuar con correo
+                  </button>
+                  <div style={S.orLbl}>o</div>
                   <button style={{ ...S.btn, ...S.btnGoogle }} onClick={conGoogle} disabled={loading}>
                     <svg style={S.ico} width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"/></svg>
                     Continuar con Google
                   </button>
-                  <button style={{ ...S.btn, ...S.btnDark }} onClick={() => { setError(''); setVista('email'); }} disabled={loading}>
-                    Continuar con correo
-                  </button>
+                  {INCRUSTADO && <div style={S.hintMini}>Si el botón de Google marca “Something went wrong”, abre esta página en tu navegador.</div>}
                 </>
               )}
 
