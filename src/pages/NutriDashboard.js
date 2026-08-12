@@ -6,12 +6,10 @@ import Agenda from '../components/Agenda';
 import Topbar from '../components/Topbar';
 import Pacientes from '../components/Pacientes';
 import Configuracion from '../components/Configuracion';
-
 function initials(name) { return name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'NU'; }
 const SERVICIOS_NOMBRES_DEFAULT = ['Primera vez', 'Seguimiento', 'Deportivo', 'Seguimiento deportivo', 'Online', 'Deportivo online'];
 const money = (n) => '$' + Math.round(n || 0).toLocaleString('es-MX');
 const uid = () => Math.random().toString(36).slice(2, 9);
-
 function primerNombre(full) {
   if (!full) return '';
   const limpio = full.replace(/^(lic\.?|nut\.?|dra?\.?|mtra?\.?)\s+/i, '').trim();
@@ -25,7 +23,6 @@ function diasDesde(fechaStr, hoy) {
   if (isNaN(d)) return null;
   return Math.floor((hoy.getTime() - d.getTime()) / 86400000);
 }
-
 export default function NutriDashboard() {
   const { user } = useAuth();
   const [tab, setTab] = useState('inicio');
@@ -50,37 +47,30 @@ export default function NutriDashboard() {
   const [edit, setEdit] = useState(null); // { lista, id }
   const [editTexto, setEditTexto] = useState('');
   const [editaPrecios, setEditaPrecios] = useState(false);
-
   const hoy = new Date();
   const hoyKey = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0') + '-' + String(hoy.getDate()).padStart(2, '0');
   const mesKey = hoyKey.slice(0, 7);
-
   useEffect(() => {
     const q = query(collection(db, 'citas'), orderBy('fecha', 'asc'));
     return onSnapshot(q, snap => setCitas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, []);
-
   useEffect(() => {
     return onSnapshot(collection(db, 'pacientes'), snap => setPacientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, []);
-
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
       const d = snap.exists() ? snap.data() : {};
       setCfg({ pendientes: Array.isArray(d.pendientes) ? d.pendientes : [], pendientesPago: Array.isArray(d.pendientesPago) ? d.pendientesPago : [], pendientesPlan: Array.isArray(d.pendientesPlan) ? d.pendientesPlan : [], precios: d.precios || {}, servicios: Array.isArray(d.servicios) ? d.servicios : [] });
     });
   }, []);
-
   const guardarCfg = async (patch) => {
     const next = { pendientes: cfg.pendientes, pendientesPago: cfg.pendientesPago, pendientesPlan: cfg.pendientesPlan, precios: cfg.precios, servicios: cfg.servicios, ...patch };
     setCfg(next);
     try { await setDoc(doc(db, 'config', 'dashboard'), next, { merge: true }); } catch (e) { /* no bloquear UI */ }
   };
-
   // ---- Citas ----
   const citasHoy = citas.filter(c => c.fecha === hoyKey && c.estado !== 'cancelada').sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
   const proximas = citas.filter(c => c.fecha >= hoyKey && c.estado !== 'cancelada').length;
-
   // ---- Pendientes (checklist) ----
   const addPendiente = () => {
     const t = nuevoPend.trim();
@@ -90,7 +80,6 @@ export default function NutriDashboard() {
   };
   const togglePend = (id) => guardarCfg({ pendientes: cfg.pendientes.map(p => p.id === id ? { ...p, hecho: !p.hecho } : p) });
   const delPend = (id) => guardarCfg({ pendientes: cfg.pendientes.filter(p => p.id !== id) });
-
   // ---- Pendientes de pago (misma mecánica, lista aparte) ----
   const addPago = () => {
     const t = nuevoPago.trim();
@@ -100,7 +89,6 @@ export default function NutriDashboard() {
   };
   const togglePago = (id) => guardarCfg({ pendientesPago: (cfg.pendientesPago || []).map(p => p.id === id ? { ...p, hecho: !p.hecho } : p) });
   const delPago = (id) => guardarCfg({ pendientesPago: (cfg.pendientesPago || []).filter(p => p.id !== id) });
-
   // ---- Planes pendientes (misma mecánica, lista aparte) ----
   const addPlan = () => {
     const t = nuevoPlan.trim();
@@ -110,7 +98,6 @@ export default function NutriDashboard() {
   };
   const togglePlan = (id) => guardarCfg({ pendientesPlan: (cfg.pendientesPlan || []).map(p => p.id === id ? { ...p, hecho: !p.hecho } : p) });
   const delPlan = (id) => guardarCfg({ pendientesPlan: (cfg.pendientesPlan || []).filter(p => p.id !== id) });
-
   // ---- Edición en línea (para ambas listas) ----
   const startEdit = (lista, p) => { setEdit({ lista, id: p.id }); setEditTexto(p.texto); };
   const cancelEdit = () => setEdit(null);
@@ -122,7 +109,6 @@ export default function NutriDashboard() {
     guardarCfg({ [key]: arr });
     setEdit(null);
   };
-
   // Fila de pendiente reutilizable (con edición en línea).
   const filaPend = (lista, p, onToggle, onDel) => {
     const enEdicion = edit && edit.lista === lista && edit.id === p.id;
@@ -141,7 +127,6 @@ export default function NutriDashboard() {
       </div>
     );
   };
-
   // ---- Financiero (mes actual) ----
   const citasMes = citas.filter(c => (c.fecha || '').slice(0, 7) === mesKey && c.estado !== 'cancelada');
   const conteoTipo = {};
@@ -153,7 +138,6 @@ export default function NutriDashboard() {
   const ingresoMes = porServicio.reduce((a, s) => a + s.ingreso, 0);
   const masVende = Object.keys(conteoTipo).sort((a, b) => conteoTipo[b] - conteoTipo[a])[0];
   const hayPrecios = serviciosNombres.some(s => (precios[s] || 0) > 0);
-
   // ---- Retención (semáforo por fecha del último PLAN generado) ----
   // El reloj de "regreso a consulta" arranca el día en que se generó el plan completo
   // (entrada más reciente en p.planes): ese día se le envió la información al paciente.
@@ -174,13 +158,11 @@ export default function NutriDashboard() {
   const totalPac = pacientes.length;
   const conPlan = cuenta.verde + cuenta.amarillo + cuenta.rojo;
   const pctRetencion = conPlan ? Math.round(cuenta.verde * 100 / conPlan) : 0;
-
   // ---- Pacientes por objetivo ----
   const porObjetivo = {};
   pacientes.forEach(p => { const o = (p.objetivo || '').trim() || 'Sin objetivo'; porObjetivo[o] = (porObjetivo[o] || 0) + 1; });
   const objetivos = Object.keys(porObjetivo).map(o => ({ obj: o, n: porObjetivo[o] })).sort((a, b) => b.n - a.n);
   const maxObj = objetivos.reduce((m, o) => Math.max(m, o.n), 0) || 1;
-
   const COLOR = { verde: '#9AB9AD', amarillo: '#CDA788', rojo: '#B0593F', sinplan: '#C9BFB4' };
   const retFiltrada = filtroRet ? retencion.filter(r => r.color === filtroRet) : retencion;
   const semBtn = (color, label) => (
@@ -192,7 +174,6 @@ export default function NutriDashboard() {
       <span style={{ ...D.dot, background: COLOR[color] }} /> {cuenta[color]} {label}
     </div>
   );
-
   const CitaItem = ({ c }) => (
     <div style={{ borderBottom: '0.5px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
       <div className="cita-item" style={{ paddingBottom: 0, marginBottom: 0, borderBottom: 'none' }}>
@@ -205,13 +186,11 @@ export default function NutriDashboard() {
       </div>
     </div>
   );
-
   const tabs = [
     { id: 'inicio', label: 'Inicio', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg> },
     { id: 'agenda', label: 'Agenda', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg> },
     { id: 'pacientes', label: 'Pacientes', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg> },
   ];
-
   const navEl = (
     <nav className="bottomnav">
       {tabs.map(t => (
@@ -231,24 +210,24 @@ export default function NutriDashboard() {
       </button>
     </nav>
   );
-
   return (
     <div className="app">
+      <style>{`
+        .dash-grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        @media (max-width: 640px) { .dash-grid2 { grid-template-columns: 1fr; } }
+      `}</style>
       <Topbar role="nutriologa" user={user} onPerfil={() => goTab('perfil')} />
-
       <div className="content">
         {tab === 'inicio' && (
           <>
             <h1 style={D.saludo}>¡Hola, {primerNombre(user?.displayName) || 'Natalia'}!</h1>
-
             <div className="stats">
               <div className="stat"><div className="stat-num">{totalPac}</div><div className="stat-lbl">Pacientes</div></div>
               <div className="stat"><div className="stat-num">{citasHoy.length}</div><div className="stat-lbl">Citas hoy</div></div>
               <div className="stat"><div className="stat-num">{proximas}</div><div className="stat-lbl">Próximas</div></div>
               <div className="stat"><div className="stat-num">{citas.filter(c => c.estado !== 'cancelada').length}</div><div className="stat-lbl">Total citas</div></div>
             </div>
-
-            <div style={D.grid2}>
+            <div className="dash-grid2" style={D.grid2}>
               {/* Citas de hoy */}
               <div className="card">
                 <div className="card-title">Citas de hoy</div>
@@ -256,7 +235,6 @@ export default function NutriDashboard() {
                   ? <div className="empty-state">Sin citas programadas para hoy</div>
                   : citasHoy.map(c => <CitaItem key={c.id} c={c} />)}
               </div>
-
               {/* Pendientes */}
               <div className="card">
                 <div className="card-title">Pendientes</div>
@@ -269,7 +247,6 @@ export default function NutriDashboard() {
                   ? <div className="empty-state">Sin pendientes. ¡Todo al día!</div>
                   : cfg.pendientes.map(p => filaPend('pend', p, togglePend, delPend))}
               </div>
-
               {/* Pendientes de pago */}
               <div className="card">
                 <div className="card-title">Pendientes de pago</div>
@@ -283,7 +260,6 @@ export default function NutriDashboard() {
                   ? <div className="empty-state">Sin pendientes de pago.</div>
                   : cfg.pendientesPago.map(p => filaPend('pago', p, togglePago, delPago))}
               </div>
-
               {/* Planes pendientes */}
               <div className="card">
                 <div className="card-title">Planes pendientes</div>
@@ -298,14 +274,12 @@ export default function NutriDashboard() {
                   : cfg.pendientesPlan.map(p => filaPend('plan', p, togglePlan, delPlan))}
               </div>
             </div>
-
             {/* Resumen financiero */}
             <div className="card">
               <div style={D.cardHeadRow}>
                 <div className="card-title" style={{ marginBottom: 0 }}>Resumen financiero · {mesKey}</div>
                 <button style={D.linkBtn} onClick={() => setEditaPrecios(v => !v)}>{editaPrecios ? 'Cerrar' : 'Editar precios'}</button>
               </div>
-
               {editaPrecios && (
                 <div style={D.preciosBox}>
                   <div style={{ fontSize: 12, color: 'var(--stone)', marginBottom: 8 }}>Precio por tipo de consulta (MXN). El ingreso se calcula como citas × precio.</div>
@@ -319,7 +293,6 @@ export default function NutriDashboard() {
                   ))}
                 </div>
               )}
-
               {!hayPrecios && !editaPrecios ? (
                 <div className="empty-state">Define el precio de cada consulta (botón “Editar precios”) para ver tus ingresos.</div>
               ) : (
@@ -348,8 +321,7 @@ export default function NutriDashboard() {
                 </>
               )}
             </div>
-
-            <div style={D.grid2}>
+            <div className="dash-grid2" style={D.grid2}>
               {/* Retención */}
               <div className="card">
                 <div className="card-title">Retención de pacientes</div>
@@ -374,7 +346,6 @@ export default function NutriDashboard() {
                       ))}
                 </div>
               </div>
-
               {/* Pacientes por objetivo */}
               <div className="card">
                 <div className="card-title">Pacientes por objetivo</div>
@@ -409,15 +380,13 @@ export default function NutriDashboard() {
           </div>
         )}
       </div>
-
       {navEl}
     </div>
   );
 }
-
 const D = {
   saludo: { fontSize: 30, fontWeight: 800, color: 'var(--dark)', margin: '4px 4px 16px', fontFamily: 'Montserrat, sans-serif', letterSpacing: 0.2 },
-  grid2: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14, marginBottom: 14 },
+  grid2: { display: 'grid', gap: 14, marginBottom: 14 },
   cardHeadRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 10 },
   linkBtn: { background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif' },
   pendInput: { flex: 1, padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 9, fontSize: 13, fontFamily: 'Montserrat, sans-serif', background: '#fff', color: 'var(--dark)' },
