@@ -1,7 +1,7 @@
-// Banco de fotos de platillos (128). Índice MEJORADO: se añadieron variantes y typos
-// (omellete, claras, requeson, sincronizadas, entomatadas, mollete, banana…) para que
-// más platillos del recetario encuentren una foto real que YA existe en el banco.
-// Cada entrada: { file, label, keys }. Las imágenes viven en public/menu-images/.
+// Banco de fotos de platillos (139). Índice MEJORADO + 11 platillos nuevos
+// (chilaquiles, sopes, tlacoyos, crepa, pasta boloñesa, pizza, hamburguesa, plato mediterráneo,
+// frijoles, cereal, bisquet) tomados del recetario. Cada entrada: { file, label, keys }.
+// Las imágenes viven en public/menu-images/.
 const BANCO_FOTOS = [
  {
   "file": "avena-con-fresa-y-nuez-04721cae.jpg",
@@ -1385,6 +1385,105 @@ const BANCO_FOTOS = [
    "pina",
    "coco",
    "batido"
+  ]
+ },
+ {
+  "file": "chilaquiles-verdes-457f20d6.jpg",
+  "label": "Chilaquiles verdes",
+  "keys": [
+   "chilaquiles",
+   "chilquiles",
+   "totopos",
+   "verdes"
+  ]
+ },
+ {
+  "file": "sopes-7615428c.jpg",
+  "label": "Sopes",
+  "keys": [
+   "sopes",
+   "sope"
+  ]
+ },
+ {
+  "file": "tlacoyos-a1a334ff.jpg",
+  "label": "Tlacoyos",
+  "keys": [
+   "tlacoyos",
+   "tlacoyo"
+  ]
+ },
+ {
+  "file": "crepa-salada-de-huevo-57d0d5c9.jpg",
+  "label": "Crepa salada de huevo",
+  "keys": [
+   "crepa",
+   "crepas",
+   "crepe",
+   "huevo",
+   "espinaca"
+  ]
+ },
+ {
+  "file": "pasta-a-la-bolonesa-6488fc84.jpg",
+  "label": "Pasta a la boloñesa",
+  "keys": [
+   "pasta",
+   "spaghetti",
+   "espagueti",
+   "bolonesa",
+   "carne"
+  ]
+ },
+ {
+  "file": "pizza-casera-fit-2e5cc603.jpg",
+  "label": "Pizza casera / fit",
+  "keys": [
+   "pizza",
+   "pita"
+  ]
+ },
+ {
+  "file": "hamburguesa-a4f5f420.jpg",
+  "label": "Hamburguesa",
+  "keys": [
+   "hamburguesa",
+   "burger"
+  ]
+ },
+ {
+  "file": "plato-mediterraneo-b180f8b3.jpg",
+  "label": "Plato mediterráneo",
+  "keys": [
+   "mediterraneo",
+   "mediterranea"
+  ]
+ },
+ {
+  "file": "frijoles-refritos-7ba97a98.jpg",
+  "label": "Frijoles refritos",
+  "keys": [
+   "frijoles",
+   "frijol",
+   "refritos"
+  ]
+ },
+ {
+  "file": "cereal-con-leche-556c4682.jpg",
+  "label": "Cereal con leche",
+  "keys": [
+   "cereal",
+   "hojuelas",
+   "proteina"
+  ]
+ },
+ {
+  "file": "bisquet-con-huevo-20ea085e.jpg",
+  "label": "Bisquet con huevo",
+  "keys": [
+   "bisquet",
+   "bagel",
+   "huevo"
   ]
  }
 ];
