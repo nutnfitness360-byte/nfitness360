@@ -291,7 +291,7 @@ export default function NutriDashboard() {
               </div>
             </div>
 
-            <div style={D.grid2}>
+            <div style={{ ...D.grid2, gridTemplateColumns: 'repeat(2, minmax(0,1fr))' }}>
               {/* Citas de hoy */}
               <div className="card">
                 <div className="card-title">Citas de hoy</div>
