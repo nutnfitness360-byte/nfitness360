@@ -272,7 +272,7 @@ export default function NutriDashboard() {
             <div className="card">
               <div className="card-title">Usuarios de la app</div>
               <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: -6, marginBottom: 14 }}>Usuarios que realmente usan la app, según su último acceso.</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
                 {[
                   { n: usuHoy, l: 'Activos hoy', hi: true },
                   { n: usu7, l: 'Últimos 7 días', hi: false },
