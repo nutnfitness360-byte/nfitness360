@@ -441,7 +441,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                       <span style={{
                         display: 'inline-block', padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700,
                         background: c.estadoPago === 'pagado' ? '#E9F1ED' : '#F7EAE5',
-                        color: c.estadoPago === 'pagado' ? '#3E6B5B' : '#B0593F',
+                        color: c.estadoPago === 'pagado' ? '#3E6B5B' : 'var(--danger)',
                       }}>
                         {c.estadoPago === 'pagado' ? 'Pagado' : 'Pendiente de pago'}
                       </span>
@@ -462,7 +462,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                   : <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>}
                 {c.estado !== 'cancelada' && !citaPasada(c) && (
                   <button onClick={() => (!isNutri && onSolicitarCancelar) ? onSolicitarCancelar(c) : setLocalModal(c)} title="Cancelar cita"
-                    style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid #B0593F', borderRadius: 8, fontSize: 11, fontWeight: 600, color: '#B0593F', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', flexShrink: 0 }}>
+                    style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid var(--danger)', borderRadius: 8, fontSize: 11, fontWeight: 600, color: 'var(--danger)', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', flexShrink: 0 }}>
                     Cancelar
                   </button>
                 )}
@@ -614,7 +614,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                   Reagendar
                 </button>
                 <button onClick={() => setLocalConfirm(true)}
-                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: 'transparent', border: '1px solid #B0593F', color: '#B0593F' }}>
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)' }}>
                   Cancelar cita
                 </button>
                 <button onClick={() => { setLocalModal(null); setLocalConfirm(false); }}
@@ -629,7 +629,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                   Se cancelará la cita de {localModal.pacienteNombre || 'el paciente'} del {localModal.fecha} a las {localModal.hora}. Se libera el horario, se elimina el evento del calendario y se envía el correo de cancelación.
                 </div>
                 <button onClick={async () => { const c = localModal; setLocalModal(null); setLocalConfirm(false); try { await cancelarEnServidor(c, 'nutriologa'); } catch (e) { alert('No se pudo cancelar: ' + e.message); } }}
-                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: '#B0593F', border: 'none', color: '#fff' }}>
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: 'var(--danger)', border: 'none', color: '#fff' }}>
                   Sí, cancelar la cita
                 </button>
                 <button onClick={() => setLocalConfirm(false)}
