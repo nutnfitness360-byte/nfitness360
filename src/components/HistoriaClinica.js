@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useBranding } from "../context/BrandingContext";
+import { LOGO_ARETIA } from "../report/logoAretia";
 
 /* ============================================================
    NFITNESS 360 — Historia Clínico-Nutriológica
@@ -177,8 +178,11 @@ function histParts(data) {
     `<table class="data"><tbody>${(di.dieta || [])
       .map((r) => `<tr><td class="momento">${v(r.momento)}</td><td>${v(r.alimentos)}</td></tr>`).join("")}</tbody></table>`;
 
-  const logo = LOGO_PDF
-    ? `<img src="${LOGO_PDF}" alt="Nfitness 360" class="logo"/>`
+  // Logo del PDF por instancia: Aretia usa su logo; Natalia conserva el suyo.
+  const esAretiaPDF = (typeof window !== "undefined" && window.location && window.location.hostname.indexOf("sistemanutricio") !== -1);
+  const logoPdf = esAretiaPDF ? LOGO_ARETIA : LOGO_PDF;
+  const logo = logoPdf
+    ? `<img src="${logoPdf}" alt="" class="logo"/>`
     : `<span class="logoph">N</span>`;
 
   const header =
