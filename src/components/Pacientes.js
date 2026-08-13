@@ -53,7 +53,7 @@ const PERIMETROS = [
   { k: 'cadera', l: 'Cadera' },
 ];
 const MANUAL_CAMPOS = [...PLIEGUES, ...PERIMETROS].reduce((o, c) => { o[c.k] = ''; return o; }, {});
-const ANTRO_COLORS = ['var(--gold)', 'var(--stone)', 'var(--sage)', '#B0593F', '#5B7C99', '#3E6B5B', '#8E7CC3', '#C98A3F', '#6FA8A0', '#A0522D', '#4A7BA6'];
+const ANTRO_COLORS = ['var(--gold)', 'var(--stone)', 'var(--sage)', 'var(--danger)', '#5B7C99', '#3E6B5B', '#8E7CC3', '#C98A3F', '#6FA8A0', '#A0522D', '#4A7BA6'];
 
 /* ===== mini gráfica de línea (SVG, sin librerías) ===== */
 function Linea({ data, field, color, unit }) {
@@ -1055,8 +1055,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
             <ChartCard title="Peso" unit=" kg" valor={m ? m.peso : null}><Linea data={sel.mediciones} field="peso" color="var(--gold)" unit="" /></ChartCard>
             <ChartCard title="% de grasa" unit="%" valor={m ? m.grasa : null}><Linea data={sel.mediciones} field="grasa" color="var(--stone)" unit="" /></ChartCard>
             <ChartCard title="Masa muscular" unit=" kg" valor={m ? m.musculo : null}><Linea data={sel.mediciones} field="musculo" color="var(--sage)" unit="" /></ChartCard>
-            <ChartCard title="Masa grasa" unit=" kg" valor={m ? m.grasaKg : null}><Linea data={sel.mediciones} field="grasaKg" color="#B0593F" unit="" /></ChartCard>
-            <ChartCard title="Grasa visceral" unit="" valor={m ? m.visceral : null}><Linea data={sel.mediciones} field="visceral" color="#36302B" unit="" /></ChartCard>
+            <ChartCard title="Masa grasa" unit=" kg" valor={m ? m.grasaKg : null}><Linea data={sel.mediciones} field="grasaKg" color="var(--danger)" unit="" /></ChartCard>
+            <ChartCard title="Grasa visceral" unit="" valor={m ? m.visceral : null}><Linea data={sel.mediciones} field="visceral" color="var(--ink)" unit="" /></ChartCard>
             <ChartCard title="Agua corporal total" unit=" L" valor={m ? m.agua : null}><Linea data={sel.mediciones} field="agua" color="#5B7C99" unit="" /></ChartCard>
             <ChartCard title="Apego al plan" unit="%" valor={ultApego}><Linea data={apegoData} field="apego" color="#3E6B5B" unit="%" /></ChartCard>
           </div>
@@ -1711,7 +1711,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                             <div style={S.menuOverlay} onClick={(e) => { e.stopPropagation(); setMenuId(null); }} />
                             <div style={S.menu} onClick={(e) => e.stopPropagation()}>
                               <button style={S.menuItem} onClick={() => abrir(p.id)}>Ver paciente</button>
-                              <button style={{ ...S.menuItem, color: '#B0593F' }} onClick={() => eliminar(p)}>Eliminar</button>
+                              <button style={{ ...S.menuItem, color: 'var(--danger)' }} onClick={() => eliminar(p)}>Eliminar</button>
                             </div>
                           </>
                         )}
