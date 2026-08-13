@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth, googleProvider, db } from '../firebase/config';
 import {
   signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  updateProfile, signOut,
+  updateProfile, signOut, sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { NUTRI_EMAIL } from '../context/AuthContext';
@@ -65,12 +65,33 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [ofrecerCrear, setOfrecerCrear] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
 
   const esNutriPuerta = puerta === 'nutri';
   const tituloPuerta = esNutriPuerta ? 'Panel de nutrición' : 'Portal del paciente';
 
-  const abrir = (p) => { setPuerta(p); setError(''); setEmail(''); setPass(''); setPass2(''); setNombre(''); setOfrecerCrear(false); setVista('acceso'); };
-  const volverInicio = () => { setError(''); setVista('inicio'); };
+  const abrir = (p) => { setPuerta(p); setError(''); setResetMsg(''); setEmail(''); setPass(''); setPass2(''); setNombre(''); setOfrecerCrear(false); setVista('acceso'); };
+  const volverInicio = () => { setError(''); setResetMsg(''); setVista('inicio'); };
+
+  // ---- Crear o restablecer contraseña por correo ----
+  // Resuelve dos casos que hoy dejan atorado al paciente: (1) creó su cuenta con
+  // Google y NO tiene contraseña; (2) olvidó su contraseña. En ambos, este correo
+  // le permite fijar una contraseña y entrar con correo. Funciona aun con la
+  // protección de enumeración activada (no revela si el correo existe).
+  const recuperarContrasena = async () => {
+    const e = email.trim().toLowerCase();
+    if (!e || e.indexOf('@') < 0) { setError('Escribe tu correo arriba y vuelve a tocar “Crear o restablecer contraseña”.'); return; }
+    setLoading(true); setError(''); setResetMsg('');
+    try {
+      await sendPasswordResetEmail(auth, e);
+    } catch (err) {
+      if (err.code === 'auth/invalid-email') { setError('El correo no es válido.'); setLoading(false); return; }
+      if (err.code === 'auth/too-many-requests') { setError('Demasiados intentos. Espera un momento e inténtalo de nuevo.'); setLoading(false); return; }
+      // Otros errores (p. ej. correo no registrado con enumeración activada): mensaje genérico de éxito.
+    }
+    setResetMsg('Te enviamos un correo a ' + e + ' para crear o restablecer tu contraseña. Revisa tu bandeja (y la carpeta de spam), crea tu contraseña y regresa aquí a iniciar sesión.');
+    setLoading(false);
+  };
 
   // ---- Google ----
   const conGoogle = async () => {
@@ -109,9 +130,9 @@ export default function LoginPage() {
       // éxito → AuthContext entra al panel
     } catch (err) {
       if (err.code === 'auth/wrong-password') {
-        setError('La contraseña no es correcta.');
+        setError('La contraseña no es correcta. Si la olvidaste, toca “Crear o restablecer contraseña”.');
       } else if (POSIBLE_SIN_CUENTA.includes(err.code)) {
-        setError('No pudimos iniciar sesión. Si ya tienes cuenta, revisa tu contraseña; si es tu primera vez, crea tu cuenta.');
+        setError('No pudimos iniciar sesión. Si creaste tu cuenta con Google, regresa y usa “Continuar con Google”. Si olvidaste tu contraseña o nunca la creaste, toca “Crear o restablecer contraseña”.');
         setOfrecerCrear(true);
       } else {
         setError(traducir(err.code));
@@ -165,6 +186,9 @@ export default function LoginPage() {
     lbl: { fontSize: 10, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', margin: '0 0 4px', display: 'block' },
     inp: { width: '100%', boxSizing: 'border-box', border: '0.5px solid var(--border)', borderRadius: 9, padding: 10, fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', marginBottom: 12 },
     err: { background: '#fbeae6', color: '#B0593F', fontSize: 11.5, padding: '9px 11px', borderRadius: 8, marginBottom: 12, lineHeight: 1.4 },
+    ok: { background: '#E9F1ED', color: '#3E6B5B', fontSize: 11.5, padding: '9px 11px', borderRadius: 8, marginBottom: 12, lineHeight: 1.45 },
+    linkBtn: { background: 'none', border: 'none', color: 'var(--gold)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: '10px 0 2px', fontFamily: 'var(--font)', width: '100%', textAlign: 'center' },
+    googleHint: { fontSize: 11, color: 'var(--stone)', lineHeight: 1.45, marginTop: 6, textAlign: 'center' },
     aviso: { background: 'rgba(205,167,136,0.14)', border: '1px solid var(--gold)', color: 'var(--dark)', fontSize: 11.5, padding: '10px 12px', borderRadius: 9, marginBottom: 14, lineHeight: 1.5 },
     avisoT: { fontWeight: 700, display: 'block', marginBottom: 3 },
     orLbl: { fontSize: 10, color: 'var(--stone)', textAlign: 'center', margin: '12px 0 9px', letterSpacing: '0.4px' },
@@ -312,8 +336,9 @@ export default function LoginPage() {
                 <>
                   <p style={S.p}>Ingresa tu correo y contraseña.</p>
                   {error && <div style={S.err}>{error}</div>}
+                  {resetMsg && <div style={S.ok}>{resetMsg}</div>}
                   <label style={S.lbl}>Correo electrónico</label>
-                  <input style={S.inp} type="email" value={email} onChange={e => { setEmail(e.target.value); setOfrecerCrear(false); }} placeholder="correo@ejemplo.com" />
+                  <input style={S.inp} type="email" value={email} onChange={e => { setEmail(e.target.value); setOfrecerCrear(false); setResetMsg(''); }} placeholder="correo@ejemplo.com" />
                   <label style={S.lbl}>Contraseña</label>
                   <input style={S.inp} type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••"
                     onKeyDown={e => { if (e.key === 'Enter') entrarConCorreo(); }} />
@@ -325,6 +350,10 @@ export default function LoginPage() {
                       Crear cuenta con este correo
                     </button>
                   )}
+                  <button style={S.linkBtn} onClick={recuperarContrasena} disabled={loading}>
+                    ¿Olvidaste tu contraseña? Crear o restablecer contraseña
+                  </button>
+                  <div style={S.googleHint}>¿Creaste tu cuenta con Google? Regresa y entra con <b>“Continuar con Google”</b>.</div>
                 </>
               )}
 
