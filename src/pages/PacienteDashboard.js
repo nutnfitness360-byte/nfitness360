@@ -365,7 +365,7 @@ function FacturacionView({ email, citas, creditos }) {
                   <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--dark)', marginRight: 4 }}>{fMoney(x.importe)}</div>
                   <button onClick={() => facturarItem(x)} disabled={!!busyKey || !activo}
                     title={activo ? 'Generar la factura de este concepto' : 'La facturación aún no está disponible'}
-                    style={{ background: activo ? 'var(--gold)' : '#e8ddd4', color: activo ? '#fff' : 'var(--stone)', border: 'none', borderRadius: 8, padding: '8px 14px', fontWeight: 700, fontSize: 12.5, cursor: (busyKey || !activo) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (busyKey || !activo) ? 0.75 : 1, whiteSpace: 'nowrap' }}>
+                    style={{ background: activo ? 'var(--gold)' : 'var(--border)', color: activo ? '#fff' : 'var(--stone)', border: 'none', borderRadius: 8, padding: '8px 14px', fontWeight: 700, fontSize: 12.5, cursor: (busyKey || !activo) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (busyKey || !activo) ? 0.75 : 1, whiteSpace: 'nowrap' }}>
                     {busyKey === x.key ? 'Procesando…' : 'Facturar'}
                   </button>
                 </div>
@@ -870,16 +870,16 @@ export default function PacienteDashboard() {
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '24px 22px', maxWidth: 380, width: '100%', textAlign: 'center', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--dark)', marginBottom: 8 }}>Pago</div>
             <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--dark)', margin: 0 }}>{pagoMsg}</p>
-            <button onClick={() => setPagoMsg('')} style={{ marginTop: 16, background: '#CDA788', color: '#211C17', border: 'none', borderRadius: 11, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font)' }}>Entendido</button>
+            <button onClick={() => setPagoMsg('')} style={{ marginTop: 16, background: 'var(--gold)', color: 'var(--pine)', border: 'none', borderRadius: 11, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font)' }}>Entendido</button>
           </div>
         </div>
       )}
       {visor && (
-        <div style={{ position: 'fixed', inset: 0, background: '#1a1612', zIndex: 2000, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: '#1a1612', borderBottom: '1px solid rgba(255,255,255,0.12)', flexShrink: 0 }}>
-            <span style={{ color: '#EEE4DA', fontFamily: 'var(--font)', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{visor.nombre}</span>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--dark)', zIndex: 2000, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: 'var(--dark)', borderBottom: '1px solid rgba(255,255,255,0.12)', flexShrink: 0 }}>
+            <span style={{ color: 'var(--cream)', fontFamily: 'var(--font)', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{visor.nombre}</span>
             <button onClick={() => setVisor(null)}
-              style={{ background: 'var(--gold)', color: '#211C17', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+              style={{ background: 'var(--gold)', color: 'var(--pine)', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
               ✕ Cerrar
             </button>
           </div>
@@ -897,7 +897,7 @@ export default function PacienteDashboard() {
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '24px 22px', maxWidth: 380, width: '100%', textAlign: 'center', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--dark)', marginBottom: 8 }}>Documento</div>
             <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--dark)', margin: 0 }}>{visorMsg}</p>
-            <button onClick={() => setVisorMsg('')} style={{ marginTop: 16, background: '#CDA788', color: '#211C17', border: 'none', borderRadius: 11, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font)' }}>Entendido</button>
+            <button onClick={() => setVisorMsg('')} style={{ marginTop: 16, background: 'var(--gold)', color: 'var(--pine)', border: 'none', borderRadius: 11, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font)' }}>Entendido</button>
           </div>
         </div>
       )}
@@ -923,7 +923,7 @@ export default function PacienteDashboard() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                       {proxima.estadoPago ? (
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: proxima.estadoPago === 'pagado' ? '#E9F1ED' : '#F7EAE5', color: proxima.estadoPago === 'pagado' ? '#3E6B5B' : '#B0593F' }}>
+                          <span style={{ padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: proxima.estadoPago === 'pagado' ? '#E9F1ED' : '#F7EAE5', color: proxima.estadoPago === 'pagado' ? '#3E6B5B' : 'var(--danger)' }}>
                             {proxima.estadoPago === 'pagado' ? 'Pagado' : 'Pendiente de pago'}
                           </span>
                           {proxima.metodoPago && METODO_LABEL[proxima.metodoPago] && proxima.estadoPago !== 'pagado' && (
@@ -933,7 +933,7 @@ export default function PacienteDashboard() {
                       ) : <span />}
                       {proxima.estado !== 'cancelada' && (
                         <button onClick={() => setModalCita(proxima)} title="Cancelar o reagendar"
-                          style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #B0593F', borderRadius: 8, fontSize: 11, fontWeight: 600, color: '#B0593F', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                          style={{ padding: '5px 10px', background: 'transparent', border: '1px solid var(--danger)', borderRadius: 8, fontSize: 11, fontWeight: 600, color: 'var(--danger)', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
                           Cancelar
                         </button>
                       )}
@@ -988,12 +988,12 @@ export default function PacienteDashboard() {
               <div style={D.tile}>
                 <div style={D.tileTitle}>Masa grasa</div>
                 <div style={D.tileValue}>{ultMed && typeof ultMed.grasaKg === 'number' ? ultMed.grasaKg : '—'}<span style={D.tileUnit}> kg</span></div>
-                <Linea data={medics} field="grasaKg" color="#B0593F" unit="" />
+                <Linea data={medics} field="grasaKg" color="var(--danger)" unit="" />
               </div>
               <div style={D.tile}>
                 <div style={D.tileTitle}>Grasa visceral</div>
                 <div style={D.tileValue}>{ultMed && typeof ultMed.visceral === 'number' ? ultMed.visceral : '—'}</div>
-                <Linea data={medics} field="visceral" color="#36302B" unit="" />
+                <Linea data={medics} field="visceral" color="var(--ink)" unit="" />
               </div>
               <div style={D.tile}>
                 <div style={D.tileTitle}>Agua corporal total</div>
@@ -1198,7 +1198,7 @@ export default function PacienteDashboard() {
                         Abrir
                       </button>
                       <button onClick={() => generarPDFReco(r, true)} title="Enviar el PDF de esta recomendación a tu correo"
-                        style={{ background: '#221C16', color: '#EEE4DA', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 14px', borderRadius: 8, whiteSpace: 'nowrap' }}>
+                        style={{ background: '#221C16', color: 'var(--cream)', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 14px', borderRadius: 8, whiteSpace: 'nowrap' }}>
                         PDF
                       </button>
                     </div>
@@ -1229,7 +1229,7 @@ export default function PacienteDashboard() {
                 </div>
 
                 {!puedeReagendar(modalCita) && (
-                  <div style={{ background: '#fbeae6', color: '#B0593F', fontSize: 11.5, padding: '9px 11px', borderRadius: 8, marginBottom: 14, lineHeight: 1.45 }}>
+                  <div style={{ background: '#fbeae6', color: 'var(--danger)', fontSize: 11.5, padding: '9px 11px', borderRadius: 8, marginBottom: 14, lineHeight: 1.45 }}>
                     Ya no es posible reagendar: falta menos de 24 h para tu cita. Según las políticas, una cancelación a destiempo o inasistencia se penaliza con el importe total de la consulta.
                   </div>
                 )}
@@ -1239,7 +1239,7 @@ export default function PacienteDashboard() {
                   Reagendar
                 </button>
                 <button onClick={pedirConfirmacion}
-                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: 'transparent', border: '1px solid #B0593F', color: '#B0593F' }}>
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)' }}>
                   Cancelar cita
                 </button>
                 <button onClick={cerrarModal}
@@ -1254,7 +1254,7 @@ export default function PacienteDashboard() {
                   Cancelarás tu cita del {fmtFecha(modalCita.fecha)} a las {modalCita.hora}. Esta acción no se puede deshacer.
                 </div>
                 <button onClick={confirmarCancelar}
-                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: '#B0593F', border: 'none', color: '#fff' }}>
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: 'var(--danger)', border: 'none', color: '#fff' }}>
                   Sí, cancelar mi cita
                 </button>
                 <button onClick={() => setConfirmarCancel(false)}
