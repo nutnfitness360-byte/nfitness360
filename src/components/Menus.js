@@ -13,10 +13,12 @@ import { gridKeyDown } from '../utils/gridNav';
    queda lista para enchufar en `generarIA`.
    ============================================================ */
 
+// Paleta por variables de marca (configurable por instancia). Valores por
+// defecto = Nfitness 360 (Natalia idéntica); Aretia los recolorea en config/branding.
 const T = {
-  bg: '#EEE4DA', surface: '#FFFFFF', ink: '#36302B', inkSoft: '#978C87',
-  line: '#E3D8CC', lineSoft: '#EFE7DD', pine: '#211C17', amber: '#CDA788',
-  mint: '#F4EBDF', danger: '#B0593F', sage: '#9AB9AD',
+  bg: 'var(--cream)', surface: 'var(--card)', ink: 'var(--ink)', inkSoft: 'var(--stone)',
+  line: 'var(--line)', lineSoft: 'var(--line-soft)', pine: 'var(--pine)', amber: 'var(--gold)',
+  mint: 'var(--mint)', danger: 'var(--danger)', sage: 'var(--sage)',
 };
 const mono = "'Montserrat', system-ui, sans-serif";
 
