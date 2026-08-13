@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth, googleProvider, db } from '../firebase/config';
 import {
   signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  updateProfile, signOut, sendPasswordResetEmail,
+  updateProfile, signOut, sendPasswordResetEmail, fetchSignInMethodsForEmail,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { NUTRI_EMAIL } from '../context/AuthContext';
@@ -66,12 +66,25 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [ofrecerCrear, setOfrecerCrear] = useState(false);
   const [resetMsg, setResetMsg] = useState('');
+  const [metodos, setMetodos] = useState(null);   // proveedores del correo: ['google.com'] | ['password'] | [] | null
 
   const esNutriPuerta = puerta === 'nutri';
   const tituloPuerta = esNutriPuerta ? 'Panel de nutrición' : 'Portal del paciente';
 
-  const abrir = (p) => { setPuerta(p); setError(''); setResetMsg(''); setEmail(''); setPass(''); setPass2(''); setNombre(''); setOfrecerCrear(false); setVista('acceso'); };
-  const volverInicio = () => { setError(''); setResetMsg(''); setVista('inicio'); };
+  const abrir = (p) => { setPuerta(p); setError(''); setResetMsg(''); setMetodos(null); setEmail(''); setPass(''); setPass2(''); setNombre(''); setOfrecerCrear(false); setVista('acceso'); };
+  const volverInicio = () => { setError(''); setResetMsg(''); setMetodos(null); setVista('inicio'); };
+
+  // Detecta con qué método se registró el correo (Google vs contraseña) para guiar
+  // al paciente y no pedirle una contraseña que no tiene. Requiere que la "protección
+  // de enumeración" esté DESACTIVADA en Firebase; si está activada, Firebase devuelve
+  // una lista vacía y simplemente no se muestra la pista (todo lo demás sigue igual).
+  const revisarMetodos = async () => {
+    const e = email.trim().toLowerCase();
+    if (!e || e.indexOf('@') < 0) { setMetodos(null); return; }
+    try { setMetodos(await fetchSignInMethodsForEmail(auth, e)); }
+    catch (_) { setMetodos(null); }
+  };
+  const soloGoogle = Array.isArray(metodos) && metodos.indexOf('google.com') >= 0 && metodos.indexOf('password') < 0;
 
   // ---- Crear o restablecer contraseña por correo ----
   // Resuelve dos casos que hoy dejan atorado al paciente: (1) creó su cuenta con
@@ -337,8 +350,18 @@ export default function LoginPage() {
                   <p style={S.p}>Ingresa tu correo y contraseña.</p>
                   {error && <div style={S.err}>{error}</div>}
                   {resetMsg && <div style={S.ok}>{resetMsg}</div>}
+                  {soloGoogle && !resetMsg && (
+                    <div style={S.aviso}>
+                      <span style={S.avisoT}>Esta cuenta se creó con Google.</span>
+                      Entra con <b>“Continuar con Google”</b> (ábrela en Chrome o Safari si estás dentro de WhatsApp). Si prefieres una contraseña para entrar aquí mismo, toca <b>“Crear o restablecer contraseña”</b> abajo.
+                      <button style={{ ...S.btn, ...S.btnGoogle, marginTop: 10, marginBottom: 0 }} onClick={conGoogle} disabled={loading}>
+                        <svg style={S.ico} width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"/></svg>
+                        Continuar con Google
+                      </button>
+                    </div>
+                  )}
                   <label style={S.lbl}>Correo electrónico</label>
-                  <input style={S.inp} type="email" value={email} onChange={e => { setEmail(e.target.value); setOfrecerCrear(false); setResetMsg(''); }} placeholder="correo@ejemplo.com" />
+                  <input style={S.inp} type="email" value={email} onChange={e => { setEmail(e.target.value); setOfrecerCrear(false); setResetMsg(''); setMetodos(null); }} onBlur={revisarMetodos} placeholder="correo@ejemplo.com" />
                   <label style={S.lbl}>Contraseña</label>
                   <input style={S.inp} type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••"
                     onKeyDown={e => { if (e.key === 'Enter') entrarConCorreo(); }} />
