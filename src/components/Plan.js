@@ -11,10 +11,13 @@ import HistoriaClinica from './HistoriaClinica';
 
 const CODE_PREFIX = process.env.REACT_APP_CODE_PREFIX || 'NF-';
 
+// Paleta por variables de marca (configurable por instancia). Los valores por
+// defecto de cada variable son los de Nfitness 360, así Natalia se ve idéntica;
+// Aretia (u otra instancia) los recolorea desde config/branding.
 const T = {
-  bg: '#EEE4DA', surface: '#FFFFFF', ink: '#36302B', inkSoft: '#978C87',
-  line: '#E3D8CC', lineSoft: '#EFE7DD', pine: '#211C17', amber: '#CDA788',
-  mint: '#F4EBDF', danger: '#B0593F', sage: '#9AB9AD', black: '#000000',
+  bg: 'var(--cream)', surface: 'var(--card)', ink: 'var(--ink)', inkSoft: 'var(--stone)',
+  line: 'var(--line)', lineSoft: 'var(--line-soft)', pine: 'var(--pine)', amber: 'var(--gold)',
+  mint: 'var(--mint)', danger: 'var(--danger)', sage: 'var(--sage)', black: '#000000',
 };
 const mono = "'Montserrat', system-ui, sans-serif";
 
