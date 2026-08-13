@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useBranding } from "../context/BrandingContext";
 
 /* ============================================================
    NFITNESS 360 — Historia Clínico-Nutriológica
@@ -378,6 +379,10 @@ function toISODate(s) {
 }
 
 export default function HistoriaClinica({ initial, codigo, onSave, onBack, readOnly, onGuardChange }) {
+  // Logo de la INSTANCIA (Aretia u otra). Si la instancia no configuró logo, se
+  // usa el histórico de Nfitness (LOGO) como respaldo → Natalia se ve idéntica.
+  const { logo } = useBranding();
+  const logoSrc = logo === undefined ? LOGO : logo;
   const [data, setData] = useState(() => {
     const s = baseSeed();
     if (initial && typeof initial === "object") {
@@ -598,8 +603,8 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
       {/* ---------- ENCABEZADO ---------- */}
       <header style={styles.header}>
         <div style={styles.brandRow}>
-          {LOGO ? (
-            <img src={LOGO} alt="Nfitness 360" style={styles.logoImg} />
+          {logoSrc ? (
+            <img src={logoSrc} alt="" style={styles.logoImg} />
           ) : (
             <span style={styles.logoMark}>N</span>
           )}
