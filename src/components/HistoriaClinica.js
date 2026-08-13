@@ -1281,7 +1281,7 @@ const styles = {
     padding: "0 0 96px", WebkitFontSmoothing: "antialiased",
   },
   header: { position: "static", background: T.bg, paddingTop: 0, borderBottom: `1px solid ${T.line}` },
-  brandRow: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 22px", background: T.black },
+  brandRow: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 22px", background: T.pine },
   logo: { display: "flex", alignItems: "center", gap: 12 },
   logoMark: { width: 38, height: 38, borderRadius: 11, background: T.amber, color: "#000", display: "grid", placeItems: "center", fontWeight: 800, fontSize: 20, letterSpacing: -0.5 },
   logoImg: { height: 34, width: "auto", maxWidth: 230, objectFit: "contain", display: "block" },
