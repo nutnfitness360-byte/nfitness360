@@ -109,10 +109,7 @@ function doPost(e) {
       var recFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, RECOMENDACIONES_NAME]);
       var fileR = recFolder.createFile(blobR);
       compartirConPaciente_(fileR, body.correo);
-      // El correo solo se envía cuando enviarCorreo !== false. Así el paciente puede
-      // ABRIR el PDF dentro de la app (enviarCorreo:false) sin que le llegue al correo,
-      // y el botón "PDF" (enviarCorreo:true, o sin el campo) sí lo manda.
-      if (body.enviarCorreo !== false) enviarPdfPaciente_(body.correo, patient, "recomendaciones", blobR);
+      enviarPdfPaciente_(body.correo, patient, "recomendaciones", blobR);
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileR.getId(), link: fileR.getUrl(),
@@ -240,24 +237,12 @@ function doPost(e) {
       return analizarEstudio_(body);
     }
 
-    if (action === "resumenPacienteIA") {
-      return resumenPacienteIA_(body);
-    }
-
-    if (action === "preguntarPacienteIA") {
-      return preguntarPacienteIA_(body);
-    }
-
     if (action === "crearCheckoutStripe") {
       return crearCheckoutStripe_(body);
     }
 
     if (action === "verificarPagoStripe") {
       return verificarPagoStripe_(body);
-    }
-
-    if (action === "facturarCFDI") {
-      return facturarCFDI_(body);
     }
 
     if (action === "setReactivacion") {
@@ -1089,33 +1074,20 @@ function generarMenusIA_(body) {
     "la preparación DEBE indicar cuánto yogurt y cómo se usa; si la preparación no lleva yogurt, entonces el nombre " +
     "tampoco debe decir 'con yogurt'. No dejes ingredientes anunciados en el nombre fuera de la preparación. " +
     "NO agregues frases redundantes como 'consumir como colación' al cierre de las opciones: el nombre del tiempo ya indica que es colación. " +
-    "EL NOMBRE SE DERIVA DE LA PREPARACIÓN: primero define la preparación concreta; luego escribe el 'nombre' usando ÚNICAMENTE 2 o 3 de los ingredientes PRINCIPALES que aparecen en esa preparación. " +
-    "Está PROHIBIDO nombrar en el título cualquier ingrediente que NO esté en la preparación. Ejemplo de ERROR: titular 'Pan con miel y fruta' cuando la preparación lleva mantequilla de cacahuate y naranja (no lleva miel); el título debe reflejar lo que realmente se come. " +
     "COHERENCIA CULINARIA (muy importante): cada platillo debe ser algo que una persona realmente prepararía y comería; " +
-    "combina solo ingredientes que tengan sentido juntos según la cocina mexicana y el sentido común. " +
-    "NUNCA mezcles en una misma preparación ingredientes incompatibles. Un LICUADO, SMOOTHIE o BEBIDA solo admite " +
-    "líquidos (agua, leche o bebida vegetal), fruta, avena, proteína en polvo, semillas o crema de frutos secos; " +
-    "JAMÁS lleva frijoles, leguminosas, verduras cocidas, carne, huevo, tortilla ni cereales salados. " +
-    "Cuida también las porciones y las combinaciones: evita mezclas desbalanceadas o extrañas (por ejemplo 2 plátanos enteros junto a unas tortillas); las cantidades deben ser realistas para una comida normal. " +
+    "combina solo ingredientes que tengan sentido juntos segun la cocina mexicana y el sentido comun. " +
+    "NUNCA mezcles en una misma preparacion ingredientes incompatibles. Un LICUADO, SMOOTHIE o BEBIDA solo admite " +
+    "liquidos (agua, leche o bebida vegetal), fruta, avena, proteina en polvo, semillas o crema de frutos secos; " +
+    "JAMAS lleva frijoles, leguminosas, verduras cocidas, carne, huevo, tortilla ni cereales salados. " +
     "Si los equivalentes de un tiempo incluyen grupos que no embonan en ese tipo de platillo (por ejemplo una leguminosa " +
-    "en un tiempo con licuado), NO los metas dentro de esa preparación: ubícalos en un acompañamiento APARTE y sólido " +
-    "(por ejemplo 'acompañar con 1/2 taza de frijoles' como plato al lado), o elige otro tipo de platillo que sí integre " +
-    "bien todos los grupos. " +
-    "PREFERENCIAS DEL PACIENTE (muy importante): recibirás 'preferencias_paciente' con 'le_gusta', 'no_le_gusta' y 'alergias'. " +
-    "Es OBLIGATORIO: NUNCA incluyas ningún alimento —ni sus ingredientes o derivados— que aparezca en 'no_le_gusta' ni en 'alergias'. " +
-    "Las ALERGIAS son de SEGURIDAD: por ningún motivo las uses ni las escondas dentro de un platillo (revisa también acompañamientos y salsas). " +
-    "Da PREFERENCIA a incluir los alimentos de 'le_gusta' cuando embonen con los equivalentes y macros del tiempo, sin forzarlos donde no correspondan. " +
-    "Si un candidato del recetario contiene un alimento no permitido, úsalo solo si puedes sustituir ese ingrediente por otro del MISMO grupo que sí sea aceptable; si no, descártalo y elige otro platillo. " +
-    "REVISIÓN FINAL OBLIGATORIA: antes de responder, revisa CADA opción y confirma que (1) todos los ingredientes del nombre están en la preparación; (2) ningún ingrediente principal de la preparación falta en el nombre; (3) la combinación tiene sentido y es algo que alguien realmente comería; (4) las porciones son realistas; (5) NO aparece nada de 'no_le_gusta' ni 'alergias'. Corrige cualquier opción que falle. Un título que no corresponde a la preparación, mezclar ingredientes que no combinan, o incluir un alimento prohibido, son ERRORES graves. " +
+    "en un tiempo con licuado), NO los metas dentro de esa preparacion: ubicalos en un acompanamiento APARTE y solido " +
+    "(por ejemplo 'acompanar con 1/2 taza de frijoles' como plato al lado), o elige otro tipo de platillo que si integre " +
+    "bien todos los grupos. Antes de devolver cada opcion, verifica que ningun ingrediente resulte extrano o desagradable " +
+    "dentro de ese platillo; si algo no combina, corrigelo. Mezclar ingredientes que no combinan es un ERROR grave. " +
     "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
   var datos = {
     objetivo: body.objetivo || "",
-    preferencias_paciente: {
-      le_gusta: (body.gustos || "").toString(),
-      no_le_gusta: (body.disgustos || "").toString(),
-      alergias: (body.alergias || "").toString()
-    },
     totales_del_dia: body.totales || {},
     n_opciones_por_tiempo: nOp,
     tiempos: tiempos.map(function (t) {
@@ -1141,7 +1113,7 @@ function generarMenusIA_(body) {
   var payload = {
     model: IA_MODEL,
     max_tokens: IA_MAX_TOKENS,
-    temperature: 0.5,
+    temperature: 1,
     system: sys,
     messages: [{ role: "user", content: instruccion }]
   };
