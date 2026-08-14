@@ -1043,6 +1043,81 @@ function limpiarColacion_(str) {
   return t;
 }
 
+// ── Restricciones de la nutrióloga: prohibiciones DURAS (helpers) ──
+
+// Extrae de la indicación en texto libre los alimentos PROHIBIDOS.
+// Capta frases tipo "no plátano ni tortillas", "sin azúcar", "evita lácteos".
+// Es solo una AYUDA: el modelo también recibe la indicación completa.
+function prohibidosDeIndicacion_(txt) {
+  if (!txt) return [];
+  var t = String(txt).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  var out = [];
+  var re = /\b(?:no|sin|evita(?:r)?|nada de|que no (?:lleve|tenga|contenga)|libre de)\b([^.;:]*)/g;
+  var STOP = { quiero:1, que:1, tenga:1, lleve:1, contenga:1, el:1, la:1, los:1, las:1,
+    un:1, una:1, unos:1, unas:1, de:1, del:1, y:1, o:1, en:1, para:1, este:1, esta:1,
+    ese:1, esa:1, tiempo:1, pre:1, post:1, entreno:1, entrenamiento:1, comida:1, cena:1,
+    desayuno:1, colacion:1, me:1, le:1, su:1, con:1, como:1, muy:1, solo:1, solamente:1,
+    nada:1, quiere:1, favor:1, porque:1, pero:1 };
+  var m;
+  while ((m = re.exec(t))) {
+    var frag = m[1] || '';
+    frag.split(/\bni\b|,|\by\b|\bo\b/).forEach(function (chunk) {
+      chunk.replace(/[^a-z\s]/g, ' ').split(/\s+/).forEach(function (w) {
+        if (w.length >= 4 && !STOP[w]) out.push(w);
+      });
+    });
+  }
+  return out.filter(function (v, i) { return out.indexOf(v) === i; }).slice(0, 15);
+}
+
+// Distancia de edición (Levenshtein) para tolerar errores de dedo en las restricciones.
+function _levDist_(a, b) {
+  var m = a.length, n = b.length, d = [];
+  for (var i = 0; i <= m; i++) d[i] = [i];
+  for (var j = 0; j <= n; j++) d[0][j] = j;
+  for (i = 1; i <= m; i++) for (j = 1; j <= n; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+  return d[m][n];
+}
+
+// Expande cada prohibición a sus formas y "disfraces" (tortilla -> tostada, totopo, taco...).
+function familiaProhibidos_(prohibidos) {
+  if (!prohibidos || !prohibidos.length) return [];
+  var FAM = {
+    tortilla: ['tortilla','tostada','totopo','sope','gordita','chilaquil','chilaquiles','taco','quesadilla','enchilada','tlacoyo','chalupa','memela','tlayuda'],
+    maiz:     ['tortilla','tostada','totopo','sope','gordita','chilaquil','chilaquiles','taco','quesadilla','enchilada','tlacoyo','chalupa','memela','tlayuda','elote','esquite'],
+    platano:  ['platano','platanos'],
+    lacteo:   ['leche','queso','yogur','yogurt','crema','lacteo','lacteos'],
+    lacteos:  ['leche','queso','yogur','yogurt','crema','lacteo','lacteos'],
+    gluten:   ['pan','trigo','harina','pasta','galleta','galletas','tortilla'],
+    azucar:   ['azucar','azucares','miel'],
+    huevo:    ['huevo','huevos'],
+    frijol:   ['frijol','frijoles'],
+    aguacate: ['aguacate','guacamole']
+  };
+  var set = {};
+  prohibidos.forEach(function (w) {
+    w = String(w).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    var fam = FAM[w] || null;
+    if (!fam) { for (var kk in FAM) { if (w.indexOf(kk) === 0 || kk.indexOf(w) === 0) { fam = FAM[kk]; break; } } }
+    if (!fam) { var ws = (w.charAt(w.length - 1) === 's') ? w.slice(0, -1) : w; for (var k2 in FAM) { if (k2.length >= 6 && (_levDist_(w, k2) <= 2 || _levDist_(ws, k2) <= 2)) { fam = FAM[k2]; break; } } }
+    var lista = fam ? fam.slice() : [];
+    lista.push(w);
+    if (w.charAt(w.length - 1) === 's') lista.push(w.slice(0, -1)); else lista.push(w + 's');
+    lista.forEach(function (x) { if (x && x.length >= 3) set[x] = 1; });
+  });
+  return Object.keys(set);
+}
+
+// ¿El texto contiene algún alimento prohibido (como palabra completa)?
+function textoViolaProhibido_(texto, banned) {
+  if (!banned || !banned.length) return false;
+  var t = String(texto).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  var esc = banned.map(function (b) { return b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); });
+  var re = new RegExp('\\b(' + esc.join('|') + ')\\b');
+  return re.test(t);
+}
+
 function generarMenusIA_(body) {
   var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!key) return json_({ ok: false, error: "Falta ANTHROPIC_API_KEY en las Propiedades del script." });
@@ -1068,6 +1143,15 @@ function generarMenusIA_(body) {
     "(estilo, ingredientes deseados o restricciones) que debes respetar, NUNCA como el texto del platillo a copiar. " +
     "No la transcribas ni la repitas literalmente en el 'nombre'. Debes proponer un platillo CONCRETO Y DISTINTO que " +
     "cumpla esa guía; si la indicación menciona un platillo, propón una VARIANTE diferente de esa idea, no el mismo texto. " +
+    "RESTRICCIONES DURAS (máxima prioridad): si la 'indicacion_de_la_nutriologa' o la lista 'prohibidos' del tiempo " +
+    "vetan algún alimento o ingrediente —frases como 'no…', 'sin…', 'evita…', 'nada de…', 'que no tenga…', o alimentos " +
+    "unidos con 'ni'— esa prohibición es ABSOLUTA E INNEGOCIABLE. El alimento vetado NO puede aparecer en NINGUNA opción " +
+    "de ese tiempo: ni en el 'nombre', ni en la 'prep', ni como acompañamiento, ni disfrazado ni como derivado. " +
+    "Cuentan como el mismo alimento sus formas y derivados: 'tostada', 'totopo', 'chilaquiles', 'sope', 'gordita', " +
+    "'taco', 'quesadilla' y 'enchilada' CUENTAN como TORTILLA/maíz; 'pan de plátano' o 'plátano macho' CUENTAN como plátano; " +
+    "un licuado o platillo con leche/queso/yogur CUENTA como lácteo. Para cubrir el equivalente del grupo vetado, usa OTRO " +
+    "alimento permitido del MISMO grupo (por ejemplo, si se prohíbe la tortilla para el cereal: avena, arroz, papa, pan " +
+    "integral, tortita de arroz, etc.). Incluir un alimento prohibido es un ERROR GRAVE; ante la duda, exclúyelo. " +
     "COHERENCIA nombre↔preparación: el 'nombre' y la 'prep' deben describir EXACTAMENTE el mismo platillo. " +
     "TODO ingrediente que aparezca en el 'nombre' debe aparecer también en la 'prep' con su cantidad, y la 'prep' " +
     "no debe incluir ingredientes principales que el 'nombre' no mencione. Ejemplo: si el nombre dice 'con yogurt', " +
@@ -1084,74 +1168,109 @@ function generarMenusIA_(body) {
     "(por ejemplo 'acompanar con 1/2 taza de frijoles' como plato al lado), o elige otro tipo de platillo que si integre " +
     "bien todos los grupos. Antes de devolver cada opcion, verifica que ningun ingrediente resulte extrano o desagradable " +
     "dentro de ese platillo; si algo no combina, corrigelo. Mezclar ingredientes que no combinan es un ERROR grave. " +
+    "APETECIBILIDAD: en colaciones y pre/post-entreno prefiere combinaciones ricas y reales que la gente sí come " +
+    "(fruta con yogurt, avena con fruta, pan con huevo o con crema de cacahuate, tortita de arroz con crema de cacahuate). " +
+    "Evita emparejar un cereal seco con una fruta suelta (p. ej. tortita de arroz + gajos de mandarina) solo para cuadrar " +
+    "los equivalentes: busca un platillo que de verdad se disfrute. " +
     "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
-  var datos = {
-    objetivo: body.objetivo || "",
-    totales_del_dia: body.totales || {},
-    n_opciones_por_tiempo: nOp,
-    tiempos: tiempos.map(function (t) {
-      return { nombre: t.nombre, hora: t.hora, indicacion_de_la_nutriologa: t.indicacion || "", equivalentes: t.equivalentes, objetivo_macros: t.objetivoMacros, evitar: t.evitar || [], candidatos_recetario: recetarioMuestra_(tiempoCategoria_(t.nombre), 22) };
-    })
-  };
+  // Llama al modelo con un conjunto de tiempos. Devuelve:
+  //   { ok:true, tiempos:[{opciones:[{nombre,prep}]}] }  (alineado al arreglo recibido)
+  //   { ok:false, err: json_(...) }
+  function pedirIA(tiemposArr, regenerar) {
+    var datos = { objetivo: body.objetivo || "", totales_del_dia: body.totales || {}, n_opciones_por_tiempo: nOp, tiempos: tiemposArr };
+    var instruccion = "Genera exactamente " + nOp + " opciones por cada tiempo, en el MISMO ORDEN recibido. " +
+      "Cada opción debe tener 'nombre' (nombre del platillo) y 'prep' (preparación breve de 1-2 frases con cantidades " +
+      "acordes a los equivalentes). El 'nombre' y la 'prep' deben ser coherentes: cada ingrediente nombrado en el título " +
+      "debe aparecer en la preparación con su cantidad, y la preparación no debe anunciar ingredientes ausentes del título. " +
+      "Respeta de forma ABSOLUTA la lista 'prohibidos' y las restricciones de 'indicacion_de_la_nutriologa' de cada tiempo: " +
+      "ninguna opción de ese tiempo puede contener un alimento vetado (ni en nombre, prep, acompañamiento, ni como derivado o disfraz). " +
+      "Responde SOLO con JSON con esta forma exacta: " +
+      "{\"tiempos\":[{\"opciones\":[{\"nombre\":\"\",\"prep\":\"\"}]}]}. " +
+      "Debe haber un elemento en 'tiempos' por cada tiempo recibido y en el mismo orden. " +
+      "Si un tiempo trae una lista 'evitar', NO repitas esos platillos ni variantes muy similares (misma proteína + mismo cereal + misma preparación); propón opciones claramente DISTINTAS entre sí y distintas a las de 'evitar', variando la proteína, el cereal, la verdura o la técnica de preparación. " +
+      (regenerar ? ("MODO REGENERACIÓN: la nutrióloga pidió CAMBIAR una opción que no le convenció. " +
+        "Es OBLIGATORIO que el platillo que devuelvas sea claramente DIFERENTE a todos los de 'evitar': " +
+        "distinto nombre y distinta preparación, cambiando al menos la proteína principal o la técnica de cocción. " +
+        "Devolver un platillo igual o casi igual a alguno de 'evitar' es un ERROR. Si el tiempo trae " +
+        "'indicacion_de_la_nutriologa', respétala pero resuélvela con una propuesta NUEVA. ") : "") +
+      "\n\nDatos:\n" + JSON.stringify(datos);
 
-  var instruccion = "Genera exactamente " + nOp + " opciones por cada tiempo, en el MISMO ORDEN recibido. " +
-    "Cada opción debe tener 'nombre' (nombre del platillo) y 'prep' (preparación breve de 1-2 frases con cantidades " +
-    "acordes a los equivalentes). El 'nombre' y la 'prep' deben ser coherentes: cada ingrediente nombrado en el título " +
-    "debe aparecer en la preparación con su cantidad, y la preparación no debe anunciar ingredientes ausentes del título. " +
-    "Responde SOLO con JSON con esta forma exacta: " +
-    "{\"tiempos\":[{\"opciones\":[{\"nombre\":\"\",\"prep\":\"\"}]}]}. " +
-    "Debe haber un elemento en 'tiempos' por cada tiempo recibido y en el mismo orden. " +
-    "Si un tiempo trae una lista 'evitar', NO repitas esos platillos ni variantes muy similares (misma proteína + mismo cereal + misma preparación); propón opciones claramente DISTINTAS entre sí y distintas a las de 'evitar', variando la proteína, el cereal, la verdura o la técnica de preparación. " +
-    (body.regenerar ? ("MODO REGENERACIÓN: la nutrióloga pidió CAMBIAR una opción que no le convenció. " +
-      "Es OBLIGATORIO que el platillo que devuelvas sea claramente DIFERENTE a todos los de 'evitar': " +
-      "distinto nombre y distinta preparación, cambiando al menos la proteína principal o la técnica de cocción. " +
-      "Devolver un platillo igual o casi igual a alguno de 'evitar' es un ERROR. Si el tiempo trae " +
-      "'indicacion_de_la_nutriologa', respétala pero resuélvela con una propuesta NUEVA. ") : "") +
-    "\n\nDatos:\n" + JSON.stringify(datos);
+    var payload = { model: IA_MODEL, max_tokens: IA_MAX_TOKENS, temperature: 1, system: sys, messages: [{ role: "user", content: instruccion }] };
+    var resp = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", {
+      method: "post", contentType: "application/json",
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
+      payload: JSON.stringify(payload), muteHttpExceptions: true
+    });
+    var code = resp.getResponseCode();
+    var raw = resp.getContentText();
+    if (code < 200 || code >= 300) return { ok: false, err: json_({ ok: false, error: "IA HTTP " + code + ": " + raw.slice(0, 300) }) };
+    var out;
+    try { out = JSON.parse(raw); } catch (e) { return { ok: false, err: json_({ ok: false, error: "Respuesta de IA no parseable." }) }; }
+    var texto = "";
+    if (out && out.content && out.content.length) {
+      for (var i = 0; i < out.content.length; i++) { if (out.content[i].type === "text") texto += out.content[i].text; }
+    }
+    texto = texto.replace(/```json/gi, "").replace(/```/g, "").trim();
+    var parsed = null;
+    try { parsed = JSON.parse(texto); } catch (e) {
+      var a = texto.indexOf("{"), b = texto.lastIndexOf("}");
+      if (a > -1 && b > a) { try { parsed = JSON.parse(texto.slice(a, b + 1)); } catch (e2) { parsed = null; } }
+    }
+    if (!parsed) return { ok: false, err: json_({ ok: false, error: "La IA no devolvió JSON válido." }) };
+    var limpios = (parsed.tiempos || []).map(function (t) {
+      var ops = (t && t.opciones) ? t.opciones : [];
+      return { opciones: ops.map(function (o) { return { nombre: limpiarColacion_(o && o.nombre), prep: limpiarColacion_(o && o.prep) }; }) };
+    });
+    return { ok: true, tiempos: limpios };
+  }
 
-  var payload = {
-    model: IA_MODEL,
-    max_tokens: IA_MAX_TOKENS,
-    temperature: 1,
-    system: sys,
-    messages: [{ role: "user", content: instruccion }]
-  };
-
-  var resp = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", {
-    method: "post",
-    contentType: "application/json",
-    headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
+  // Datos base (uno por tiempo) con la lista de prohibidos ya extraída.
+  var tiemposDatos = tiempos.map(function (t) {
+    return { nombre: t.nombre, hora: t.hora, indicacion_de_la_nutriologa: t.indicacion || "",
+      prohibidos: prohibidosDeIndicacion_(t.indicacion), equivalentes: t.equivalentes,
+      objetivo_macros: t.objetivoMacros, evitar: (t.evitar || []).slice(),
+      candidatos_recetario: recetarioMuestra_(tiempoCategoria_(t.nombre), 22) };
   });
+  var bannedPorTiempo = tiemposDatos.map(function (td) { return familiaProhibidos_(td.prohibidos); });
 
-  var code = resp.getResponseCode();
-  var raw = resp.getContentText();
-  if (code < 200 || code >= 300) return json_({ ok: false, error: "IA HTTP " + code + ": " + raw.slice(0, 300) });
+  // 1ª generación
+  var r1 = pedirIA(tiemposDatos, body.regenerar);
+  if (!r1.ok) return r1.err;
 
-  var out;
-  try { out = JSON.parse(raw); } catch (e) { return json_({ ok: false, error: "Respuesta de IA no parseable." }); }
+  // FILTRO DURO: elimina cualquier opción que contenga un alimento prohibido.
+  function limpiaOps(ops, banned) {
+    return (ops || []).filter(function (o) { return !textoViolaProhibido_((o.nombre || "") + " " + (o.prep || ""), banned); });
+  }
+  var finalTiempos = (r1.tiempos || []).map(function (t, i) { return { opciones: limpiaOps(t.opciones, bannedPorTiempo[i] || []) }; });
+  while (finalTiempos.length < tiemposDatos.length) finalTiempos.push({ opciones: [] });
 
-  var text = "";
-  if (out && out.content && out.content.length) {
-    for (var i = 0; i < out.content.length; i++) {
-      if (out.content[i].type === "text") text += out.content[i].text;
+  // ¿Faltan opciones en tiempos con restricción? Un intento de relleno (solo esos tiempos).
+  var deficientes = [];
+  finalTiempos.forEach(function (t, i) {
+    if ((bannedPorTiempo[i] || []).length && t.opciones.length < nOp) deficientes.push(i);
+  });
+  if (deficientes.length) {
+    var sub = deficientes.map(function (i) {
+      var td = tiemposDatos[i];
+      var yaNombres = finalTiempos[i].opciones.map(function (o) { return o.nombre; });
+      var copia = {};
+      for (var k in td) copia[k] = td[k];
+      copia.evitar = (td.evitar || []).concat(yaNombres);
+      return copia;
+    });
+    var r2 = pedirIA(sub, true);
+    if (r2.ok) {
+      deficientes.forEach(function (idx, j) {
+        var extra = limpiaOps((r2.tiempos[j] || {}).opciones, bannedPorTiempo[idx] || []);
+        for (var e = 0; e < extra.length && finalTiempos[idx].opciones.length < nOp; e++) {
+          finalTiempos[idx].opciones.push(extra[e]);
+        }
+      });
     }
   }
-  text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
 
-  var parsed;
-  try { parsed = JSON.parse(text); } catch (e) { return json_({ ok: false, error: "La IA no devolvió JSON válido." }); }
-
-  var tiemposLimpios = (parsed.tiempos || []).map(function (t) {
-    var ops = (t && t.opciones) ? t.opciones : [];
-    return { opciones: ops.map(function (o) {
-      return { nombre: limpiarColacion_(o && o.nombre), prep: limpiarColacion_(o && o.prep) };
-    }) };
-  });
-
-  return json_({ ok: true, tiempos: tiemposLimpios });
+  return json_({ ok: true, tiempos: finalTiempos });
 }
 
 // ── IA (Capa 2): genera la LISTA DEL SÚPER a partir de los menús ──
