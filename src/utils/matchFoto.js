@@ -91,7 +91,18 @@ export function matchFoto(nombre) {
     return { best: bestExact, score: 99, alts: scored.slice(0, 3).map(x => x.it) };
   }
   if (!scored.length) return { best: null, score: 0, alts: [] };
-  return { best: scored[0].it, score: scored[0].hit, alts: scored.slice(1, 4).map(x => x.it) };
+  // Candado de confianza: en platillos COMPUESTOS (3+ palabras de contenido) no
+  // autoasignamos una foto que solo coincide en UNA palabra suelta (p. ej.
+  // "tostada" o "arroz"): casi siempre es la foto de un ingrediente, no del
+  // platillo. Mejor dejar "Sin foto" para que la nutrióloga suba la correcta
+  // (que luego se re-empareja sola por su nombre).
+  const top = scored[0];
+  const contentCount = tokens(nombre).length;
+  const fuerte = top.hit >= 2 || top.labelOverlap >= 2 || top.custom === 1;
+  if (contentCount >= 3 && !fuerte) {
+    return { best: null, score: 0, alts: scored.slice(0, 4).map(x => x.it), lowConfidence: true };
+  }
+  return { best: top.it, score: top.hit, alts: scored.slice(1, 4).map(x => x.it) };
 }
 
 // Atajo: devuelve solo la clave de la mejor coincidencia (o '').
