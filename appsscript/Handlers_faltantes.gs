@@ -35,12 +35,7 @@ function iaJSON_(sys, instruccion, contenidoExtra) {
     model: model,
     max_tokens: maxTok,
     system: sys,
-    // "Prefill": forzamos que la respuesta del modelo comience en "{" para que
-    // devuelva JSON puro, sin preámbulos ni markdown.
-    messages: [
-      { role: "user", content: contenido },
-      { role: "assistant", content: "{" }
-    ]
+    messages: [{ role: "user", content: contenido }]
   };
 
   var resp = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", {
@@ -64,8 +59,7 @@ function iaJSON_(sys, instruccion, contenidoExtra) {
       if (out.content[i].type === "text") text += out.content[i].text;
     }
   }
-  // Como usamos "prefill", la respuesta CONTINÚA desde "{": lo reponemos al inicio.
-  text = ("{" + text).replace(/```json/gi, "").replace(/```/g, "").trim();
+  text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
 
   // 1) intento directo
   try { return JSON.parse(text); } catch (e) {}
