@@ -35,7 +35,12 @@ function iaJSON_(sys, instruccion, contenidoExtra) {
     model: model,
     max_tokens: maxTok,
     system: sys,
-    messages: [{ role: "user", content: contenido }]
+    // "Prefill": forzamos que la respuesta del modelo comience en "{" para que
+    // devuelva JSON puro, sin preámbulos ni markdown.
+    messages: [
+      { role: "user", content: contenido },
+      { role: "assistant", content: "{" }
+    ]
   };
 
   var resp = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", {
@@ -59,10 +64,17 @@ function iaJSON_(sys, instruccion, contenidoExtra) {
       if (out.content[i].type === "text") text += out.content[i].text;
     }
   }
-  text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  // Como usamos "prefill", la respuesta CONTINÚA desde "{": lo reponemos al inicio.
+  text = ("{" + text).replace(/```json/gi, "").replace(/```/g, "").trim();
 
-  try { return JSON.parse(text); }
-  catch (e) { throw new Error("La IA no devolvió JSON válido."); }
+  // 1) intento directo
+  try { return JSON.parse(text); } catch (e) {}
+  // 2) recuperar el objeto JSON aunque venga con texto alrededor
+  var a = text.indexOf("{"), b = text.lastIndexOf("}");
+  if (a > -1 && b > a) {
+    try { return JSON.parse(text.slice(a, b + 1)); } catch (e2) {}
+  }
+  throw new Error("La IA no devolvió JSON válido. Fin del texto: …" + text.slice(-140));
 }
 
 function num_(v) { var x = parseFloat(v); return isNaN(x) ? 0 : x; }
@@ -314,76 +326,6 @@ function analizarEstudio_(body) {
       valores: valores, fueraDeRango: fuera, dentroDeRango: dentro,
       generadoEn: new Date().toISOString()
     });
-  } catch (e) {
-    return json_({ ok: false, error: e.message });
-  }
-}
-
-
-/* =====================================================================
- *  Resumen del paciente (IA) · pone al día a la nutrióloga antes de la consulta
- *  Acción: { action:"resumenPacienteIA", contexto:{...expediente...} }
- * ===================================================================== */
-function resumenPacienteIA_(body) {
-  try {
-    var ctx = body.contexto || {};
-    var sys = "Eres asistente clínico de una nutrióloga mexicana. Recibes el EXPEDIENTE de un paciente " +
-      "(datos generales, objetivo, mediciones a lo largo del tiempo, historia clínica, notas de la nutrióloga, " +
-      "planes y recomendaciones previas). Tu tarea es hacer un RESUMEN BREVE para que la nutrióloga se ponga al día " +
-      "antes de la consulta (las consultas suelen ser mensuales). " +
-      "REGLAS: básate ÚNICAMENTE en los datos recibidos; NO inventes cifras, diagnósticos ni indicaciones que no estén. " +
-      "Si falta información para un punto, dilo con naturalidad ('sin datos'). Sé concreto, clínico y en español de México. " +
-      "Para la evolución compara la PRIMERA y la ÚLTIMA medición y di la tendencia (bajó/subió/estable) con las cifras y fechas. " +
-      "No des indicaciones médicas nuevas: resume lo que hay. " +
-      "Devuelve EXCLUSIVAMENTE JSON válido, sin markdown, con esta forma exacta: " +
-      "{\"estado\":\"\",\"evolucion\":\"\",\"adherencia\":\"\",\"clave\":[\"\"],\"ultimaConsulta\":\"\",\"revisar\":[\"\"]}. " +
-      "estado = 1-2 frases de cómo llega el paciente hoy. evolucion = peso/grasa/músculo con tendencia y cifras. " +
-      "adherencia = apego/constancia reportada (si hay). clave = 2 a 5 puntos relevantes de la historia clínica y las notas de la nutrióloga. " +
-      "ultimaConsulta = qué se hizo o indicó la última vez (plan/recomendaciones). revisar = 2 a 5 puntos a checar o preguntar en esta consulta.";
-    var instruccion = "Genera el resumen del paciente para la consulta de hoy.\n\nExpediente:\n" + JSON.stringify(ctx);
-    var r = iaJSON_(sys, instruccion, null);
-    return json_({ ok: true, resumen: {
-      estado: (r && r.estado) || "",
-      evolucion: (r && r.evolucion) || "",
-      adherencia: (r && r.adherencia) || "",
-      clave: (r && Array.isArray(r.clave)) ? r.clave : [],
-      ultimaConsulta: (r && r.ultimaConsulta) || "",
-      revisar: (r && Array.isArray(r.revisar)) ? r.revisar : []
-    }});
-  } catch (e) {
-    return json_({ ok: false, error: e.message });
-  }
-}
-
-/* =====================================================================
- *  Pregúntale a la IA sobre el paciente (chat del expediente)
- *  Acción: { action:"preguntarPacienteIA", contexto:{...}, pregunta:"", historial:[{rol,texto}] }
- * ===================================================================== */
-function preguntarPacienteIA_(body) {
-  try {
-    var ctx = body.contexto || {};
-    var pregunta = (body.pregunta || "").toString().trim();
-    if (!pregunta) return json_({ ok: false, error: "No se recibió la pregunta." });
-    var historial = Array.isArray(body.historial) ? body.historial : [];
-
-    var sys = "Eres asistente clínico de una nutrióloga mexicana. Respondes preguntas sobre UN paciente a partir de su " +
-      "EXPEDIENTE (datos generales, objetivo, mediciones, historia clínica, notas de la nutrióloga, planes y recomendaciones). " +
-      "REGLAS: responde ÚNICAMENTE con base en el expediente; NO inventes datos. Si la respuesta no está en el expediente, " +
-      "dilo claramente ('No hay ese dato en el expediente'). Sé breve, claro y en español de México. No des diagnósticos ni " +
-      "indicaciones médicas nuevas: informa lo que hay y, si acaso, sugiere qué revisar. " +
-      "Devuelve EXCLUSIVAMENTE JSON válido, sin markdown, con la forma: {\"respuesta\":\"\"}.";
-
-    var hist = historial.slice(-6).map(function (m) {
-      return ((m && m.rol) === "nutri" ? "Nutrióloga: " : "IA: ") + ((m && m.texto) || "");
-    }).join("\n");
-
-    var instruccion = "Expediente del paciente:\n" + JSON.stringify(ctx) +
-      (hist ? ("\n\nConversación previa:\n" + hist) : "") +
-      "\n\nPregunta de la nutrióloga: " + pregunta +
-      "\n\nResponde SOLO con JSON {\"respuesta\":\"...\"}.";
-
-    var r = iaJSON_(sys, instruccion, null);
-    return json_({ ok: true, respuesta: (r && r.respuesta) ? r.respuesta : "" });
   } catch (e) {
     return json_({ ok: false, error: e.message });
   }
