@@ -17,16 +17,6 @@ const LOGO = ES_ARETIA_R ? LOGO_ARETIA : LOGO_NF;
 // esc() y renderRich() viven en utils/richText.js (fuente única, compartida con la
 // vista en pantalla) para que el PDF y las pantallas nunca se separen.
 
-// En el PDF del paciente se imprime solo la fecha; la hora se conserva en el registro
-// interno (r.fecha) para mantener el orden, pero no aporta valor en el reporte.
-const fmtFechaReco = (ms) => {
-  try {
-    const d = new Date(ms);
-    if (isNaN(d.getTime())) return "";
-    return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
-  } catch (_) { return ""; }
-};
-
 const buildSupTable = (suplementacion) => {
   const items = (suplementacion && Array.isArray(suplementacion.items) ? suplementacion.items : [])
     .filter((it) => it && (it.nombre || it.marca || it.dosis || it.frecuencia || it.horario));
@@ -94,7 +84,6 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suple
     const cuerpo = (bloques || "") + buildAnalisisBlock(r.analisis);
     return `
       <div class="reco">
-        <div class="rdate">${esc(fmtFechaReco(r.fecha))}</div>
         ${cuerpo || `<div class="rtext">\u2014</div>`}
       </div>`;
   }).join("");
