@@ -263,6 +263,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const [segBusy, setSegBusy] = useState(false);
 
   // La IA "piensa" en cualquiera de estas acciones → mostramos la ventana de carga.
+  const iaPensando = iaBusy || segBusy || !!opBusy || listaBusy;
   const iaTrabajo =
     iaBusy ? { titulo: 'La IA está armando el menú…', sub: 'Genera todos los tiempos. Suele tardar entre 20 y 60 segundos.' }
     : segBusy ? { titulo: 'La IA está aplicando los cambios…', sub: 'Ajusta los platillos según tu nota de seguimiento. Suele tardar entre 15 y 45 segundos.' }
@@ -270,13 +271,12 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     : listaBusy ? { titulo: 'La IA está armando la lista del súper…', sub: 'Lee los menús y calcula los insumos para 5 días. Suele tardar entre 15 y 45 segundos.' }
     : null;
   useEffect(() => {
-    if (!iaTrabajo) { setIaMs(0); return; }
+    if (!iaPensando) { setIaMs(0); return; }
     setIaMs(0);
     const t0 = Date.now();
     const id = setInterval(() => setIaMs(Date.now() - t0), 200);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [iaBusy, segBusy, opBusy, listaBusy]);
+  }, [iaPensando]);
 
   // Ventana de configuración: aparece al abrir menús cuando aún no hay configuración guardada.
   const [showCfg, setShowCfg] = useState(!savedMenus);
