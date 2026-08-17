@@ -1127,6 +1127,16 @@ function nombrarRiceCake_(s) {
   return t;
 }
 
+// Renombra "tostada(s) horneada(s)" (galleta salada horneada) a "Salmas o similar" (nombre comercial).
+// Solo aplica cuando viene el calificativo "horneada" para NO tocar la tostada de maíz tradicional.
+function nombrarSalmas_(s) {
+  if (!s) return s;
+  var t = String(s);
+  t = t.replace(/\btostadas\s+(?:de\s+trigo\s+)?horneadas\b/gi, "Salmas o similar");
+  t = t.replace(/\btostada\s+(?:de\s+trigo\s+)?horneada\b/gi, "Salma o similar");
+  return t;
+}
+
 function generarMenusIA_(body) {
   var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!key) return json_({ ok: false, error: "Falta ANTHROPIC_API_KEY en las Propiedades del script." });
@@ -1150,6 +1160,11 @@ function generarMenusIA_(body) {
     "('40 g de queso panela'), jamás en onzas. " +
     "NOMBRE COMERCIAL: cuando propongas tortitas o tortas de arroz (los 'rice cakes'), nómbralas SIEMPRE como " +
     "'Rice Cake' en el 'nombre' y en la 'prep' (es el nombre que la gente reconoce). Ejemplo: '1 Rice Cake (15 g)'. " +
+    "Del mismo modo, cuando propongas galletas saladas horneadas tipo tostada de trigo, nómbralas SIEMPRE como " +
+    "'Salmas o similar' en el 'nombre' y en la 'prep'. Ejemplo: '4 Salmas o similar (20 g)'. " +
+    "VARIEDAD DE CEREALES EN COLACIONES: no abuses de un mismo cereal. Alterna entre varias fuentes según convenga " +
+    "(avena, pan integral, tortita de arroz/Rice Cake, galleta horneada/Salmas, granola, fruta, palomitas naturales, etc.); " +
+    "evita repetir Rice Cake en casi todas las colaciones del día. " +
     "INDICACIÓN DE LA NUTRIÓLOGA: cada tiempo puede traer 'indicacion_de_la_nutriologa'. Trátala como una GUÍA " +
     "(estilo, ingredientes deseados o restricciones) que debes respetar, NUNCA como el texto del platillo a copiar. " +
     "No la transcribas ni la repitas literalmente en el 'nombre'. Debes proponer un platillo CONCRETO Y DISTINTO que " +
@@ -1281,11 +1296,12 @@ function generarMenusIA_(body) {
     }
   }
 
-  // Normaliza el nombre comercial: "tortita de arroz" -> "Rice Cake" (al final, tras el filtro).
+  // Normaliza nombres comerciales (al final, tras el filtro):
+  //   "tortita de arroz" -> "Rice Cake" · "tostada horneada" -> "Salmas o similar".
   finalTiempos.forEach(function (t) {
     (t.opciones || []).forEach(function (o) {
-      o.nombre = nombrarRiceCake_(o.nombre);
-      o.prep = nombrarRiceCake_(o.prep);
+      o.nombre = nombrarSalmas_(nombrarRiceCake_(o.nombre));
+      o.prep = nombrarSalmas_(nombrarRiceCake_(o.prep));
     });
   });
 
