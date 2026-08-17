@@ -1118,6 +1118,15 @@ function textoViolaProhibido_(texto, banned) {
   return re.test(t);
 }
 
+// Renombra "tortita(s)/torta(s)/galleta(s) de arroz" a "Rice Cake(s)" (nombre comercial).
+function nombrarRiceCake_(s) {
+  if (!s) return s;
+  var t = String(s);
+  t = t.replace(/\b(?:tortitas|tortas|galletas)\s+de\s+arroz(?:\s+inflad(?:o|a|os|as))?/gi, "Rice Cakes");
+  t = t.replace(/\b(?:tortita|torta|galleta)\s+de\s+arroz(?:\s+inflad(?:o|a))?/gi, "Rice Cake");
+  return t;
+}
+
 function generarMenusIA_(body) {
   var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!key) return json_({ ok: false, error: "Falta ANTHROPIC_API_KEY en las Propiedades del script." });
@@ -1139,6 +1148,8 @@ function generarMenusIA_(body) {
     "gramos (g), mililitros (ml), litros (l), piezas, taza, cucharada (cda) y cucharadita (cdta). " +
     "NUNCA uses onzas (oz), libras (lb) ni 'cups' del sistema estadounidense. Ejemplo: el queso panela va en gramos " +
     "('40 g de queso panela'), jamás en onzas. " +
+    "NOMBRE COMERCIAL: cuando propongas tortitas o tortas de arroz (los 'rice cakes'), nómbralas SIEMPRE como " +
+    "'Rice Cake' en el 'nombre' y en la 'prep' (es el nombre que la gente reconoce). Ejemplo: '1 Rice Cake (15 g)'. " +
     "INDICACIÓN DE LA NUTRIÓLOGA: cada tiempo puede traer 'indicacion_de_la_nutriologa'. Trátala como una GUÍA " +
     "(estilo, ingredientes deseados o restricciones) que debes respetar, NUNCA como el texto del platillo a copiar. " +
     "No la transcribas ni la repitas literalmente en el 'nombre'. Debes proponer un platillo CONCRETO Y DISTINTO que " +
@@ -1269,6 +1280,14 @@ function generarMenusIA_(body) {
       });
     }
   }
+
+  // Normaliza el nombre comercial: "tortita de arroz" -> "Rice Cake" (al final, tras el filtro).
+  finalTiempos.forEach(function (t) {
+    (t.opciones || []).forEach(function (o) {
+      o.nombre = nombrarRiceCake_(o.nombre);
+      o.prep = nombrarRiceCake_(o.prep);
+    });
+  });
 
   return json_({ ok: true, tiempos: finalTiempos });
 }
