@@ -247,6 +247,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   }, [patient.id]);
   const [rep, setRep] = useState('');
   const [iaBusy, setIaBusy] = useState(false);
+  const [iaMs, setIaMs] = useState(0);   // ms transcurridos mientras la IA "piensa" (barra + contador)
   const [verHistoria, setVerHistoria] = useState(false);
   const [verNotas, setVerNotas] = useState(false);
   const [opBusy, setOpBusy] = useState(''); // "idx:oi" de la opción que se está generando
@@ -260,6 +261,22 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const [showSeg, setShowSeg] = useState(false);   // modal "Aplicar cambios de seguimiento"
   const [segNota, setSegNota] = useState('');
   const [segBusy, setSegBusy] = useState(false);
+
+  // La IA "piensa" en cualquiera de estas acciones → mostramos la ventana de carga.
+  const iaTrabajo =
+    iaBusy ? { titulo: 'La IA está armando el menú…', sub: 'Genera todos los tiempos. Suele tardar entre 20 y 60 segundos.' }
+    : segBusy ? { titulo: 'La IA está aplicando los cambios…', sub: 'Ajusta los platillos según tu nota de seguimiento. Suele tardar entre 15 y 45 segundos.' }
+    : opBusy ? { titulo: 'La IA está regenerando la opción…', sub: 'Prepara una nueva propuesta para este platillo. Suele tardar entre 10 y 30 segundos.' }
+    : listaBusy ? { titulo: 'La IA está armando la lista del súper…', sub: 'Lee los menús y calcula los insumos para 5 días. Suele tardar entre 15 y 45 segundos.' }
+    : null;
+  useEffect(() => {
+    if (!iaTrabajo) { setIaMs(0); return; }
+    setIaMs(0);
+    const t0 = Date.now();
+    const id = setInterval(() => setIaMs(Date.now() - t0), 200);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iaBusy, segBusy, opBusy, listaBusy]);
 
   // Ventana de configuración: aparece al abrir menús cuando aún no hay configuración guardada.
   const [showCfg, setShowCfg] = useState(!savedMenus);
@@ -856,6 +873,28 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         </div>
       )}
 
+      {iaTrabajo && (
+        <div style={S.iaOverlay}>
+          <style>{'@keyframes aretiaPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.82}}@keyframes aretiaShine{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}'}</style>
+          <div style={S.iaModal}>
+            <div style={S.iaLogoWrap}>
+              <svg width="60" height="60" viewBox="0 0 48 48" fill="none" style={{ animation: 'aretiaPulse 1.4s ease-in-out infinite' }}>
+                <path d="M24 5 L41 41 L31.5 41 L24 23 L16.5 41 L7 41 Z" fill="var(--pine)" />
+                <path d="M24 5 L28.7 14.8 L19.3 14.8 Z" fill="var(--gold)" />
+              </svg>
+            </div>
+            <div style={S.iaTitle}>{iaTrabajo.titulo}</div>
+            <div style={S.iaBar}>
+              <div style={{ ...S.iaBarFill, width: (92 * (1 - Math.exp(-iaMs / 22000))).toFixed(1) + '%' }}>
+                <span style={S.iaShine} />
+              </div>
+            </div>
+            <div style={S.iaCount}>{Math.floor(iaMs / 1000)} s</div>
+            <div style={S.iaSub}>{iaTrabajo.sub} No cierres esta ventana.</div>
+          </div>
+        </div>
+      )}
+
       <button style={S.back} onClick={() => requestExit(onBack)}>← {patient.nombre}</button>
       <div style={S.titleRow}>
         <div style={{ flex: 1 }}>
@@ -1185,6 +1224,15 @@ const styles = {
   balRowOk: { background: '#EDF4EF' },
   balSub: { fontSize: 12, fontWeight: 700, color: T.pine, margin: '2px 0 8px' },
   balHint: { marginTop: 10, fontSize: 11.5, color: T.inkSoft, lineHeight: 1.5 },
+  iaOverlay: { position: 'fixed', inset: 0, background: 'rgba(20,32,46,0.62)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1200 },
+  iaModal: { background: T.surface, borderRadius: 18, padding: '30px 30px 26px', width: '100%', maxWidth: 380, textAlign: 'center', boxShadow: '0 24px 60px rgba(0,0,0,0.35)' },
+  iaLogoWrap: { display: 'flex', justifyContent: 'center', marginBottom: 14 },
+  iaTitle: { fontSize: 16, fontWeight: 800, color: T.pine, marginBottom: 16, fontFamily: mono },
+  iaBar: { position: 'relative', height: 10, borderRadius: 999, background: 'var(--line-soft)', overflow: 'hidden', marginBottom: 10 },
+  iaBarFill: { position: 'relative', height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, var(--pine), var(--gold))', transition: 'width .2s linear', overflow: 'hidden' },
+  iaShine: { position: 'absolute', top: 0, left: 0, height: '100%', width: '40%', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)', animation: 'aretiaShine 1.3s ease-in-out infinite' },
+  iaCount: { fontSize: 22, fontWeight: 800, color: T.amber, fontFamily: mono, letterSpacing: 0.5 },
+  iaSub: { fontSize: 12, color: T.inkSoft, lineHeight: 1.5, marginTop: 8, fontFamily: mono },
   modalWrap: { position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 50 },
   modalCard: { background: T.surface, borderRadius: 16, padding: '22px 22px 20px', width: '100%', maxWidth: 460, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' },
   exitTitle: { fontSize: 18, fontWeight: 800, color: T.pine, marginBottom: 8 },
