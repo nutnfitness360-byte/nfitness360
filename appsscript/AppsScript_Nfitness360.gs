@@ -1062,6 +1062,29 @@ function limpiarColacion_(str) {
   return t;
 }
 
+// ── Nombres comerciales ──
+// Renombra "tortita(s)/torta(s)/galleta(s) de arroz" a "Rice Cake(s)" (nombre comercial reconocido).
+function nombrarRiceCake_(s) {
+  if (!s) return s;
+  var t = String(s);
+  t = t.replace(/\b(?:tortitas|tortas|galletas)\s+de\s+arroz(?:\s+inflad(?:o|a|os|as))?/gi, "Rice Cakes");
+  t = t.replace(/\b(?:tortita|torta|galleta)\s+de\s+arroz(?:\s+inflad(?:o|a))?/gi, "Rice Cake");
+  return t;
+}
+// Renombra "tostada(s) horneada(s)" (galleta salada horneada, tipo Susalia) a "Salmas o similar".
+// Solo aplica con el calificativo "horneada" para NO tocar la tostada de maíz tradicional.
+function nombrarSalmas_(s) {
+  if (!s) return s;
+  var t = String(s);
+  t = t.replace(/\btostadas\s+(?:de\s+trigo\s+)?horneadas\b/gi, "Salmas o similar");
+  t = t.replace(/\btostada\s+(?:de\s+trigo\s+)?horneada\b/gi, "Salma o similar");
+  return t;
+}
+// Aplica todos los nombres comerciales a un texto (nombre o preparación).
+function nombreComercial_(s) {
+  return nombrarSalmas_(nombrarRiceCake_(s));
+}
+
 function generarMenusIA_(body) {
   var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!key) return json_({ ok: false, error: "Falta ANTHROPIC_API_KEY en las Propiedades del script." });
@@ -1183,7 +1206,10 @@ function generarMenusIA_(body) {
   var tiemposLimpios = (parsed.tiempos || []).map(function (t) {
     var ops = (t && t.opciones) ? t.opciones : [];
     return { opciones: ops.map(function (o) {
-      return { nombre: limpiarColacion_(o && o.nombre), prep: limpiarColacion_(o && o.prep) };
+      return {
+        nombre: nombreComercial_(limpiarColacion_(o && o.nombre)),
+        prep: nombreComercial_(limpiarColacion_(o && o.prep))
+      };
     }) };
   });
 
