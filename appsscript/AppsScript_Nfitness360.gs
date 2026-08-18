@@ -135,7 +135,7 @@ function doPost(e) {
       var analisisFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, ANALISIS_NAME]);
       var fileA = analisisFolder.createFile(blobA);
       compartirConPaciente_(fileA, body.correo);
-      enviarPdfPaciente_(body.correo, patient, "analisis", blobA);
+      // Correo al paciente DESACTIVADO para análisis de estudios (a pedido): solo se archiva y queda visible en el portal.
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileA.getId(), link: fileA.getUrl(),
@@ -162,7 +162,7 @@ function doPost(e) {
       var histFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, HISTORIAL_NAME]);
       var fileH = histFolder.createFile(blobH);
       compartirConPaciente_(fileH, body.correo);
-      enviarPdfPaciente_(body.correo, patient, "historial", blobH);
+      // Correo al paciente DESACTIVADO para historial clínico (a pedido): solo se archiva y queda visible en el portal.
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileH.getId(), link: fileH.getUrl(),
@@ -181,7 +181,7 @@ function doPost(e) {
       var inbodyFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, INBODY_NAME]);
       var fileIB = inbodyFolder.createFile(blobIB);
       compartirConPaciente_(fileIB, body.correo);
-      enviarPdfPaciente_(body.correo, patient, "inbody", blobIB);
+      // Correo al paciente DESACTIVADO para InBody (a pedido): solo se archiva y queda visible en el portal.
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileIB.getId(), link: fileIB.getUrl(),
@@ -200,7 +200,7 @@ function doPost(e) {
       var isakFolder = ensurePath_([ROOT_NAME, PACIENTES_NAME, patient, ISAK_NAME]);
       var fileIS = isakFolder.createFile(blobIS);
       compartirConPaciente_(fileIS, body.correo);
-      enviarPdfPaciente_(body.correo, patient, "isak", blobIS);
+      // Correo al paciente DESACTIVADO para ISAK (a pedido): solo se archiva y queda visible en el portal. Cubre también cuando el paciente lo sube (usa esta misma acción).
 
       return json_({ ok: true, action: action, patient: patient,
                      fileId: fileIS.getId(), link: fileIS.getUrl(),
