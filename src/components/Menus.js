@@ -675,7 +675,24 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (data.ok && data.link) {
         const nuevo = { nombre: baseNombre, fecha: new Date().toISOString().slice(0, 10), link: data.link };
-        await updateDoc(doc(db, 'pacientes', patient.id), { planes: [...(patient.planes || []), nuevo] });
+        const archivosNuevos = [nuevo];
+        // Documento adicional: SOLO la tabla de equivalencias, visible para nutrióloga y paciente
+        // en "Mis archivos". Reusa 'savePlan' con enviarCorreo:false → no manda correo ni reprograma seguimiento.
+        const hayEq = tiempos.some(t => (t.eq || []).some(v => num(v) > 0));
+        if (hayEq) {
+          try {
+            setRep('Generando la tabla de equivalencias…');
+            const htmlEq = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos, incluirMenus: false, incluirEquivalencias: true, listas: null, fotoData: {} });
+            const baseEq = 'Tabla de equivalencias ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt;
+            const resEq = await fetch(url, {
+              method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'savePlan', patient: patient.nombre, correo: (patient.correo || ''), filename: baseEq + '.pdf', html: htmlEq, enviarCorreo: false }), redirect: 'follow',
+            });
+            let dEq; try { dEq = JSON.parse(await resEq.text()); } catch (_) { dEq = { ok: false }; }
+            if (dEq.ok && dEq.link) archivosNuevos.push({ nombre: baseEq, fecha: new Date().toISOString().slice(0, 10), link: dEq.link });
+          } catch (e) { /* la tabla de equivalencias es adicional; no bloquea el guardado del plan */ }
+        }
+        await updateDoc(doc(db, 'pacientes', patient.id), { planes: [...(patient.planes || []), ...archivosNuevos] });
         // Archiva este menú (contenido editable + PDF) en el historial para poder reabrirlo después.
         try {
           const tiemposSnap = tiempos.map(t => ({ ...t, foto: '' })); // las imágenes viven en 'menuFotos', no en el historial
@@ -684,7 +701,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           await updateDoc(doc(db, 'pacientes', patient.id), { menusHistorial: hist });
         } catch (e) { /* el historial es secundario; no debe bloquear el guardado */ }
         const faltoLista = incluirMenus && (!listasReporte || !listasReporte.length);
-        setRep('Menús guardados y reporte subido a Drive (registrado en Planes) ✓' + (faltoLista ? (' — nota: no se incluyó la lista del súper (' + (listaReason || 'motivo desconocido') + ').') : ''));
+        setRep('Menús guardados; reporte y tabla de equivalencias en "Mis archivos" ✓' + (faltoLista ? (' — nota: no se incluyó la lista del súper (' + (listaReason || 'motivo desconocido') + ').') : ''));
       } else {
         setRep('Menús guardados ✓, pero el PDF no se pudo subir: ' + (data.error || 'no se recibió enlace.'));
       }
