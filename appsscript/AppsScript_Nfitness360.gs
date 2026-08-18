@@ -76,9 +76,13 @@ function doPost(e) {
       var file = planes.createFile(blob);
       var compartidoPlan = compartirConPaciente_(file, body.correo);
       // Entrega al paciente por correo con el PDF adjunto (sin enlace de Drive).
-      enviarPdfPaciente_(body.correo, patient, "plan", blob);
-      // Programa el seguimiento a 15 días (anota fecha del plan en la bitácora).
-      registrarSeguimiento15_(patient, body.correo);
+      // enviarCorreo:false => documento adicional que solo se archiva en "Mis archivos"
+      // (p. ej. la tabla de equivalencias): NO se envía correo ni se reprograma el seguimiento.
+      if (body.enviarCorreo !== false) {
+        enviarPdfPaciente_(body.correo, patient, "plan", blob);
+        // Programa el seguimiento a 15 días (anota fecha del plan en la bitácora).
+        registrarSeguimiento15_(patient, body.correo);
+      }
       // NOTA DE PRIVACIDAD: por defecto el archivo NO se hace público.
       // Queda en tu Drive y lo abres con tu cuenta. Si quieres compartirlo por
       // enlace, descomenta la línea siguiente bajo tu propio criterio:
