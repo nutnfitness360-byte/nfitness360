@@ -252,8 +252,6 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const [verHistoria, setVerHistoria] = useState(false);
   const [verNotas, setVerNotas] = useState(false);
   const [opBusy, setOpBusy] = useState(''); // "idx:oi" de la opción que se está generando
-  const [dragOver, setDragOver] = useState(null); // idx del tiempo sobre el que se arrastra una imagen
-  const [subiendoFoto, setSubiendoFoto] = useState(null); // idx del tiempo cuya imagen se está subiendo
   const [listas, setListas] = useState(null);
   const [listaBusy, setListaBusy] = useState(false);
   const [showLista, setShowLista] = useState(false);
@@ -390,30 +388,6 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     setShowCfg(false); setStatus('nuevo'); setRep('');
   };
 
-  const procesarFoto = async (idx, file) => {
-    if (!file || !(file.type || '').startsWith('image/')) return;
-    setSubiendoFoto(idx);
-    const conTiempo = (p, ms) => Promise.race([
-      p,
-      new Promise((_, rej) => setTimeout(() => rej(new Error('tiempo de espera agotado al procesar la imagen')), ms)),
-    ]);
-    try {
-      const data = await conTiempo(compressImage(file), 15000); // JPEG comprimido (data URL)
-      setT(idx, { foto: data }); // se guarda aparte (en Firestore) al pulsar "Guardar borrador"
-    } catch (e) {
-      setStatus('error');
-      setRep('No se pudo procesar la imagen: ' + (e.code || e.message) + '. Prueba con otra imagen (JPG o PNG).');
-    } finally {
-      setSubiendoFoto(null);
-    }
-  };
-  const onFoto = (idx, e) => { procesarFoto(idx, e.target.files && e.target.files[0]); };
-  const onDropFoto = (idx, e) => {
-    e.preventDefault(); setDragOver(null);
-    const dt = e.dataTransfer;
-    const file = dt && dt.files && dt.files[0];
-    procesarFoto(idx, file);
-  };
 
   const generarIA = async () => {
     const url = process.env.REACT_APP_APPSCRIPT_URL;
@@ -715,6 +689,9 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const cuadra = planEq ? usados.every(g => Math.abs(sumaPorGrupo(g) - num(planEq[g])) < 0.01) : false;
 
   const S = styles;
+  // Mostrar la ventana de carga mientras la IA trabaja o se guarda el plan (incluida la tabla de equivalencias).
+  const cargando = iaBusy || listaBusy || status === 'guardando';
+  const cargaTexto = (rep && rep.trim()) ? rep : 'Trabajando…';
 
   if (!planEq || usados.length === 0) {
     return (
@@ -731,6 +708,16 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   return (
     <div style={S.root}>
       <style>{css}</style>
+
+      {cargando && (
+        <div style={S.cargaOverlay}>
+          <div style={S.cargaCard}>
+            <div style={S.cargaSpin} />
+            <div style={S.cargaMsg}>{cargaTexto}</div>
+            <div style={S.cargaSub}>Esto puede tardar unos segundos. No cierres ni recargues la ventana.</div>
+          </div>
+        </div>
+      )}
 
       {showCfg && (
         <div style={S.modalWrap}>
@@ -1057,24 +1044,6 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                   </div>
                 ))}
               </div>
-              <div
-                style={{ ...S.photoCol, ...(dragOver === idx ? S.photoColDrag : null) }}
-                onDragOver={e => { e.preventDefault(); if (dragOver !== idx) setDragOver(idx); }}
-                onDragLeave={() => setDragOver(d => (d === idx ? null : d))}
-                onDrop={e => onDropFoto(idx, e)}
-              >
-                <div style={S.photoLabel}>Foto ejemplo</div>
-                {subiendoFoto === idx
-                  ? <div style={S.photoEmpty}>Procesando imagen…</div>
-                  : t.foto
-                    ? <img src={t.foto} alt="" style={S.photo} />
-                    : <div style={S.photoEmpty}>{dragOver === idx ? 'Suelta la imagen' : 'Sin foto · arrastra una imagen aquí'}</div>}
-                <label style={S.photoBtn}>
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => onFoto(idx, e)} />
-                  {t.foto ? 'Cambiar' : 'Cargar imagen'}
-                </label>
-                {t.foto && <button style={S.photoRm} onClick={() => setT(idx, { foto: '' })}>Quitar</button>}
-              </div>
             </div>
           </div>
         );
@@ -1186,6 +1155,12 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
 
 const styles = {
   root: { fontFamily: mono, color: T.ink },
+  // Ventana de carga (overlay) mientras la IA genera o se guarda el plan.
+  cargaOverlay: { position: 'fixed', inset: 0, zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(20,32,46,0.45)' },
+  cargaCard: { background: 'var(--card)', borderRadius: 16, padding: '30px 34px', width: 'min(340px, 88vw)', textAlign: 'center', boxShadow: '0 18px 50px rgba(20,40,63,0.30)', fontFamily: mono },
+  cargaSpin: { width: 42, height: 42, margin: '0 auto 16px', borderRadius: '50%', border: '4px solid var(--line)', borderTopColor: 'var(--gold)', animation: 'nfspin 0.8s linear infinite' },
+  cargaMsg: { fontSize: 14, fontWeight: 700, color: 'var(--pine)', lineHeight: 1.5 },
+  cargaSub: { fontSize: 12, color: 'var(--stone)', marginTop: 8, lineHeight: 1.5 },
   // Foto por opción
   optFotoRow: { display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 },
   optFotoThumb: { width: 120, height: 120, borderRadius: 12, objectFit: 'cover', border: '2px solid ' + T.amber, flexShrink: 0, boxShadow: '0 4px 14px rgba(0,0,0,0.12)' },
@@ -1286,6 +1261,7 @@ const styles = {
 };
 
 const css = `
+@keyframes nfspin { to { transform: rotate(360deg); } }
 .nf-primary:hover { background: #C0986F; }
 input:focus, textarea:focus { outline: none; border-color: ${T.amber} !important; box-shadow: 0 0 0 3px rgba(205,167,136,0.25); }
 `;
