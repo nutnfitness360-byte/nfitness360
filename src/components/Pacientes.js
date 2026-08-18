@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, query, orderBy } from 'firebase/firestore';
 import { PAQUETES_DEFAULT, FAMILIAS, familiaLabel, resumenSaldo, venceDeLote, nuevoLote } from '../utils/creditos';
@@ -189,18 +189,44 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const navRef = useRef({});
   navRef.current = { nuevo, selId, sub };
 
+  // Guard de "cambios sin guardar" del hijo activo (Plan/Menús/Historia/Deportivo).
+  // El hijo lo registra vía onGuardChange; lo guardamos aquí para poder consultarlo
+  // también cuando el usuario regresa con el GESTO del trackpad o el botón del navegador
+  // (no solo con el botón "Atrás" dentro de la app).
+  const childGuardRef = useRef(null);
+  const bypassGuardRef = useRef(false);
+  const registerGuard = useCallback((fn) => {
+    childGuardRef.current = fn || null;
+    if (onRegisterExitGuard) onRegisterExitGuard(fn); // sigue avisando a NutriDashboard (cambio de pestaña)
+  }, [onRegisterExitGuard]);
+
   // Empuja una entrada al historial al entrar a una vista más profunda
   const pushNav = () => { try { window.history.pushState({ nf: true }, ''); } catch (e) {} };
-  // "Atrás": deja que el navegador haga el popstate (sincroniza mouse/gesto/botón)
-  const volver = () => { try { window.history.back(); } catch (e) {} };
+  // "Atrás" programático (botón de la app o "Salir" del modal): ya pasó por el guard,
+  // así que marca bypass para que el popstate resultante NO vuelva a preguntar.
+  const volver = () => { bypassGuardRef.current = true; try { window.history.back(); } catch (e) { bypassGuardRef.current = false; } };
 
   useEffect(() => {
     const onPop = () => {
-      const s = navRef.current;
-      if (s.nuevo) { setNuevo(false); }
-      else if (s.selId && s.sub && s.sub !== 'dash') { setSub('dash'); }
-      else if (s.selId) { setSelId(null); }
-      setMenuId(null); setErr('');
+      const doNav = () => {
+        const s = navRef.current;
+        if (s.nuevo) { setNuevo(false); }
+        else if (s.selId && s.sub && s.sub !== 'dash') { setSub('dash'); }
+        else if (s.selId) { setSelId(null); }
+        setMenuId(null); setErr('');
+      };
+      const guard = childGuardRef.current;
+      // Gesto del trackpad / botón del navegador: si hay un hijo con posibles cambios,
+      // cancelamos este "atrás" (re-empujando la entrada) y lo enrutamos por el guard.
+      // Si el hijo no tiene cambios, el guard ejecuta la salida de inmediato; si los tiene,
+      // muestra el modal de "guardar antes de salir" y solo sale al confirmar.
+      if (guard && !bypassGuardRef.current) {
+        try { window.history.pushState({ nf: true }, ''); } catch (e) {}
+        guard(volver);
+      } else {
+        bypassGuardRef.current = false;
+        doNav();
+      }
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -831,11 +857,11 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
 
   /* ----- VISTA: historia clínica (alta de paciente nuevo) ----- */
   if (nuevo) {
-    return <HistoriaClinica codigo={nextCodigo()} onSave={guardarHistoriaNueva} onBack={volver} onGuardChange={onRegisterExitGuard} />;
+    return <HistoriaClinica codigo={nextCodigo()} onSave={guardarHistoriaNueva} onBack={volver} onGuardChange={registerGuard} />;
   }
   /* ----- VISTA: historia clínica de un paciente existente ----- */
   if (sel && sub === 'historia') {
-    return <HistoriaClinica initial={sel.historia} codigo={sel.codigo} onSave={guardarHistoriaExistente} onBack={volver} onGuardChange={onRegisterExitGuard} />;
+    return <HistoriaClinica initial={sel.historia} codigo={sel.codigo} onSave={guardarHistoriaExistente} onBack={volver} onGuardChange={registerGuard} />;
   }
 
   /* ----- VISTA: dashboard de un paciente ----- */
@@ -860,13 +886,13 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       const pdata = inbody
         ? { peso: inbody.peso || (m ? m.peso : ''), talla: tallaFb, edad: edadFb, sexo: sexoFb, grasa: inbody.grasa || (m ? m.grasa : ''), tmb: inbody.tmb || '' }
         : { peso: m ? m.peso : '', talla: tallaFb, edad: edadFb, sexo: sexoFb, grasa: m ? m.grasa : '', tmb: (m && m.tmb) || '' };
-      return <Plan patient={sel} pdata={pdata} onBack={volver} onGuardChange={onRegisterExitGuard} />;
+      return <Plan patient={sel} pdata={pdata} onBack={volver} onGuardChange={registerGuard} />;
     }
     if (sub === 'menus') {
-      return <Menus key={menuReabrir ? ('h-' + (menuReabrir.fecha || '') + (menuReabrir.nombre || '')) : 'actual'} patient={sel} onBack={volver} initialMenus={menuReabrir} onGuardChange={onRegisterExitGuard} />;
+      return <Menus key={menuReabrir ? ('h-' + (menuReabrir.fecha || '') + (menuReabrir.nombre || '')) : 'actual'} patient={sel} onBack={volver} initialMenus={menuReabrir} onGuardChange={registerGuard} />;
     }
     if (sub === 'deportivo') {
-      return <PlanDeportivo patient={sel} onBack={volver} onGuardChange={onRegisterExitGuard} />;
+      return <PlanDeportivo patient={sel} onBack={volver} onGuardChange={registerGuard} />;
     }
     return (
       <div>
