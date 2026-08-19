@@ -61,14 +61,8 @@ function iaJSON_(sys, instruccion, contenidoExtra) {
   }
   text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
 
-  // 1) intento directo
-  try { return JSON.parse(text); } catch (e) {}
-  // 2) recuperar el objeto JSON aunque venga con texto alrededor
-  var a = text.indexOf("{"), b = text.lastIndexOf("}");
-  if (a > -1 && b > a) {
-    try { return JSON.parse(text.slice(a, b + 1)); } catch (e2) {}
-  }
-  throw new Error("La IA no devolvió JSON válido. Fin del texto: …" + text.slice(-140));
+  try { return JSON.parse(text); }
+  catch (e) { throw new Error("La IA no devolvió JSON válido."); }
 }
 
 function num_(v) { var x = parseFloat(v); return isNaN(x) ? 0 : x; }
@@ -192,18 +186,28 @@ function ajustarMenuIA_(body) {
     if (!nota) return json_({ ok: false, error: "No se recibió la nota de seguimiento." });
 
     var sys = "Eres asistente de una nutrióloga mexicana. Recibes un MENÚ ya armado (tiempos con sus opciones) y una " +
-      "NOTA DE SEGUIMIENTO con los cambios que pide la nutrióloga o el paciente. Tu tarea es AJUSTAR el menú aplicando " +
-      "SOLO lo que pide la nota.\n" +
+      "NOTA DE SEGUIMIENTO con preferencias y cambios que pide la nutrióloga o el paciente. Tu tarea es AJUSTAR el menú " +
+      "para que REFLEJE esas preferencias.\n" +
       "REGLAS:\n" +
-      "1) Cambia ÚNICAMENTE lo que la nota indica. Todo lo demás debe quedar IGUAL (mismo platillo, misma redacción).\n" +
-      "2) NO cambies las cantidades ni los gramajes, salvo que la nota lo pida expresamente: los equivalentes del plan " +
-      "deben respetarse.\n" +
-      "3) Cada platillo debe seguir siendo APROPIADO para su tiempo de comida (desayuno con comida de desayuno, etc.) " +
-      "y de la cocina mexicana.\n" +
-      "4) Devuelve TODOS los tiempos y TODAS las opciones recibidas, en el MISMO ORDEN y en la misma cantidad.\n" +
-      "5) UNIDADES: estás en México. Usa SIEMPRE sistema métrico y medidas caseras mexicanas (g, ml, l, piezas, taza, " +
+      "1) APLICA A FONDO lo que la nota diga sobre la COMIDA. Haz cambios reales y visibles, no cosméticos:\n" +
+      "   • Si menciona platillos o ingredientes que le GUSTAN (p. ej. avo toast, quesadillas, tacos de bistec, smoothies), " +
+      "incorpóralos en una o varias opciones donde encajen por tiempo de comida.\n" +
+      "   • Si pide más VARIEDAD o 'no comer lo mismo', reemplaza platillos repetidos o monótonos por alternativas distintas " +
+      "entre sí.\n" +
+      "   • Si menciona alimentos o ingredientes que NO le gustan o debe EVITAR (p. ej. 'no jícama'), quítalos de TODAS las " +
+      "opciones donde aparezcan y sustitúyelos por algo equivalente.\n" +
+      "   • Si sugiere frutas o alimentos a 'considerar' (p. ej. naranja, tunas, kiwi, fresas), úsalos en las opciones donde " +
+      "encajen.\n" +
+      "2) IGNORA las partes de la nota que NO son del menú (ejercicio, suplementos, medidas corporales, logística, citas): " +
+      "no cambian los platillos.\n" +
+      "3) NO cambies las cantidades ni los gramajes ni el NÚMERO de opciones por tiempo: los equivalentes del plan se " +
+      "respetan. Cambias platillos e ingredientes, NUNCA las porciones.\n" +
+      "4) Lo que la nota NO toque, déjalo igual. Cada platillo debe seguir siendo APROPIADO para su tiempo de comida " +
+      "(desayuno con comida de desayuno, etc.) y de la cocina mexicana.\n" +
+      "5) Devuelve TODOS los tiempos y TODAS las opciones recibidas, en el MISMO ORDEN y en la misma cantidad.\n" +
+      "6) UNIDADES: estás en México. Usa SIEMPRE sistema métrico y medidas caseras mexicanas (g, ml, l, piezas, taza, " +
       "cda, cdta). NUNCA uses onzas (oz), libras (lb) ni 'cups'. El queso panela va en gramos, jamás en onzas.\n" +
-      "6) COHERENCIA nombre↔preparación: tras el ajuste, cada 'nombre' y su 'prep' deben describir el mismo platillo. " +
+      "7) COHERENCIA nombre↔preparación: tras el ajuste, cada 'nombre' y su 'prep' deben describir el mismo platillo. " +
       "Todo ingrediente del nombre debe estar en la preparación con su cantidad, y la preparación no debe llevar " +
       "ingredientes principales ausentes del nombre. Si cambias un ingrediente en la preparación, ajusta el nombre " +
       "en consecuencia (y viceversa).\n" +
@@ -211,10 +215,12 @@ function ajustarMenuIA_(body) {
 
     var datos = { objetivo: body.objetivo || "", nota_de_seguimiento: nota, menu_actual: tiempos };
 
-    var instruccion = "Aplica la nota de seguimiento al menú. Responde SOLO con JSON con esta forma exacta: " +
+    var instruccion = "Aplica A FONDO las preferencias de la nota al menú (incorpora lo que le gusta, quita lo que evita, " +
+      "agrega variedad, usa las frutas/alimentos sugeridos), respetando equivalencias, gramajes y el número de opciones. " +
+      "Responde SOLO con JSON con esta forma exacta: " +
       "{\"tiempos\":[{\"opciones\":[{\"nombre\":\"\",\"prep\":\"\"}]}]}. " +
       "Debe haber un elemento en 'tiempos' por cada tiempo recibido, en el mismo orden, y la misma cantidad de opciones " +
-      "por tiempo. Conserva sin cambios lo que la nota no pida modificar.\n\nDatos:\n" + JSON.stringify(datos);
+      "por tiempo. Conserva solo lo que la nota no toque.\n\nDatos:\n" + JSON.stringify(datos);
 
     var p = iaJSON_(sys, instruccion, null);
     return json_({ ok: true, tiempos: (p.tiempos || []) });
@@ -320,6 +326,76 @@ function analizarEstudio_(body) {
       valores: valores, fueraDeRango: fuera, dentroDeRango: dentro,
       generadoEn: new Date().toISOString()
     });
+  } catch (e) {
+    return json_({ ok: false, error: e.message });
+  }
+}
+
+
+/* =====================================================================
+ *  Resumen del paciente (IA) · pone al día a la nutrióloga antes de la consulta
+ *  Acción: { action:"resumenPacienteIA", contexto:{...expediente...} }
+ * ===================================================================== */
+function resumenPacienteIA_(body) {
+  try {
+    var ctx = body.contexto || {};
+    var sys = "Eres asistente clínico de una nutrióloga mexicana. Recibes el EXPEDIENTE de un paciente " +
+      "(datos generales, objetivo, mediciones a lo largo del tiempo, historia clínica, notas de la nutrióloga, " +
+      "planes y recomendaciones previas). Tu tarea es hacer un RESUMEN BREVE para que la nutrióloga se ponga al día " +
+      "antes de la consulta (las consultas suelen ser mensuales). " +
+      "REGLAS: básate ÚNICAMENTE en los datos recibidos; NO inventes cifras, diagnósticos ni indicaciones que no estén. " +
+      "Si falta información para un punto, dilo con naturalidad ('sin datos'). Sé concreto, clínico y en español de México. " +
+      "Para la evolución compara la PRIMERA y la ÚLTIMA medición y di la tendencia (bajó/subió/estable) con las cifras y fechas. " +
+      "No des indicaciones médicas nuevas: resume lo que hay. " +
+      "Devuelve EXCLUSIVAMENTE JSON válido, sin markdown, con esta forma exacta: " +
+      "{\"estado\":\"\",\"evolucion\":\"\",\"adherencia\":\"\",\"clave\":[\"\"],\"ultimaConsulta\":\"\",\"revisar\":[\"\"]}. " +
+      "estado = 1-2 frases de cómo llega el paciente hoy. evolucion = peso/grasa/músculo con tendencia y cifras. " +
+      "adherencia = apego/constancia reportada (si hay). clave = 2 a 5 puntos relevantes de la historia clínica y las notas de la nutrióloga. " +
+      "ultimaConsulta = qué se hizo o indicó la última vez (plan/recomendaciones). revisar = 2 a 5 puntos a checar o preguntar en esta consulta.";
+    var instruccion = "Genera el resumen del paciente para la consulta de hoy.\n\nExpediente:\n" + JSON.stringify(ctx);
+    var r = iaJSON_(sys, instruccion, null);
+    return json_({ ok: true, resumen: {
+      estado: (r && r.estado) || "",
+      evolucion: (r && r.evolucion) || "",
+      adherencia: (r && r.adherencia) || "",
+      clave: (r && Array.isArray(r.clave)) ? r.clave : [],
+      ultimaConsulta: (r && r.ultimaConsulta) || "",
+      revisar: (r && Array.isArray(r.revisar)) ? r.revisar : []
+    }});
+  } catch (e) {
+    return json_({ ok: false, error: e.message });
+  }
+}
+
+/* =====================================================================
+ *  Pregúntale a la IA sobre el paciente (chat del expediente)
+ *  Acción: { action:"preguntarPacienteIA", contexto:{...}, pregunta:"", historial:[{rol,texto}] }
+ * ===================================================================== */
+function preguntarPacienteIA_(body) {
+  try {
+    var ctx = body.contexto || {};
+    var pregunta = (body.pregunta || "").toString().trim();
+    if (!pregunta) return json_({ ok: false, error: "No se recibió la pregunta." });
+    var historial = Array.isArray(body.historial) ? body.historial : [];
+
+    var sys = "Eres asistente clínico de una nutrióloga mexicana. Respondes preguntas sobre UN paciente a partir de su " +
+      "EXPEDIENTE (datos generales, objetivo, mediciones, historia clínica, notas de la nutrióloga, planes y recomendaciones). " +
+      "REGLAS: responde ÚNICAMENTE con base en el expediente; NO inventes datos. Si la respuesta no está en el expediente, " +
+      "dilo claramente ('No hay ese dato en el expediente'). Sé breve, claro y en español de México. No des diagnósticos ni " +
+      "indicaciones médicas nuevas: informa lo que hay y, si acaso, sugiere qué revisar. " +
+      "Devuelve EXCLUSIVAMENTE JSON válido, sin markdown, con la forma: {\"respuesta\":\"\"}.";
+
+    var hist = historial.slice(-6).map(function (m) {
+      return ((m && m.rol) === "nutri" ? "Nutrióloga: " : "IA: ") + ((m && m.texto) || "");
+    }).join("\n");
+
+    var instruccion = "Expediente del paciente:\n" + JSON.stringify(ctx) +
+      (hist ? ("\n\nConversación previa:\n" + hist) : "") +
+      "\n\nPregunta de la nutrióloga: " + pregunta +
+      "\n\nResponde SOLO con JSON {\"respuesta\":\"...\"}.";
+
+    var r = iaJSON_(sys, instruccion, null);
+    return json_({ ok: true, respuesta: (r && r.respuesta) ? r.respuesta : "" });
   } catch (e) {
     return json_({ ok: false, error: e.message });
   }
