@@ -1036,14 +1036,8 @@ function PRUEBA_encuesta() {
 // ── IA (Capa 2): genera opciones de platillos por tiempo de comida ──
 // Requiere una Propiedad del script llamada ANTHROPIC_API_KEY.
 // (Apps Script → Configuración del proyecto → Propiedades del script → Agregar)
-// Categoría del recetario según el nombre del tiempo (solo desayuno/comida/cena; colaciones no usan recetario).
-function tiempoCategoria_(nombre) {
-  var n = (nombre || '').toLowerCase();
-  if (n.indexOf('desayuno') > -1) return 'desayuno';
-  if (n.indexOf('comida') > -1) return 'comida';
-  if (n.indexOf('cena') > -1) return 'cena';
-  return '';
-}
+// tiempoCategoria_ SE MOVIÓ al archivo del Recetario (.gs), donde ahora incluye
+// el reconocimiento de colaciones. Se quitó de aquí para no duplicar la función.
 
 // Muestra aleatoria de platillos del recetario para una categoría (variedad + cambia en cada refresh).
 function recetarioMuestra_(cat, n) {
