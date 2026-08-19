@@ -1,4 +1,4 @@
-// Banco de fotos de platillos (139). Índice MEJORADO + 11 platillos nuevos
+// Banco de fotos de platillos (175). +36 fotos nuevas de Pexels (ago 2026): rollitos, molletes, tostadas, alambre, tacos, ensaladas, ceviche, etc. Índice MEJORADO + 11 platillos nuevos
 // (chilaquiles, sopes, tlacoyos, crepa, pasta boloñesa, pizza, hamburguesa, plato mediterráneo,
 // frijoles, cereal, bisquet) tomados del recetario. Cada entrada: { file, label, keys }.
 // Las imágenes viven en public/menu-images/.
@@ -1484,6 +1484,347 @@ const BANCO_FOTOS = [
    "bisquet",
    "bagel",
    "huevo"
+  ]
+ },
+ {
+  "file": "rollitos-de-pavo.jpg",
+  "label": "Rollitos de pavo",
+  "keys": [
+   "rollitos",
+   "rollito",
+   "rollo",
+   "pavo",
+   "jamon"
+  ]
+ },
+ {
+  "file": "molletes.jpg",
+  "label": "Molletes",
+  "keys": [
+   "molletes",
+   "mollete"
+  ]
+ },
+ {
+  "file": "claras-con-verduras.jpg",
+  "label": "Claras con verduras",
+  "keys": [
+   "claras",
+   "clara",
+   "verduras",
+   "verdura",
+   "huevo",
+   "huevos"
+  ]
+ },
+ {
+  "file": "tostadas-de-pavo-con-aguacate.jpg",
+  "label": "Tostadas de pavo con aguacate",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "pavo",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "pescado-a-la-plancha.jpg",
+  "label": "Pescado a la plancha",
+  "keys": [
+   "pescado",
+   "filete",
+   "plancha"
+  ]
+ },
+ {
+  "file": "brochetas-de-panela.jpg",
+  "label": "Brochetas de panela",
+  "keys": [
+   "panela",
+   "queso",
+   "brochetas",
+   "brocheta"
+  ]
+ },
+ {
+  "file": "enchiladas.jpg",
+  "label": "Enchiladas",
+  "keys": [
+   "enchiladas",
+   "enchilada"
+  ]
+ },
+ {
+  "file": "salmon-con-arroz.jpg",
+  "label": "Salmon con arroz",
+  "keys": [
+   "salmon",
+   "arroz"
+  ]
+ },
+ {
+  "file": "sopes-o-chalupas.jpg",
+  "label": "Sopes o chalupas",
+  "keys": [
+   "sopes",
+   "sope",
+   "chalupas",
+   "chalupa",
+   "chalupitas"
+  ]
+ },
+ {
+  "file": "tostadas-de-pavo-con-salmas.jpg",
+  "label": "Tostadas de pavo con salmas",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "pavo",
+   "salmas",
+   "jamon"
+  ]
+ },
+ {
+  "file": "alambre-de-pollo.jpg",
+  "label": "Alambre de pollo",
+  "keys": [
+   "alambre",
+   "pollo"
+  ]
+ },
+ {
+  "file": "quesadillas.jpg",
+  "label": "Quesadillas",
+  "keys": [
+   "quesadillas",
+   "quesadilla",
+   "sincronizada",
+   "sincronizadas"
+  ]
+ },
+ {
+  "file": "quesadilla-con-aguacate.jpg",
+  "label": "Quesadilla con aguacate",
+  "keys": [
+   "quesadilla",
+   "quesadillas",
+   "aguacate",
+   "sincronizada"
+  ]
+ },
+ {
+  "file": "alambre-de-pollo-con-verduras.jpg",
+  "label": "Alambre de pollo con verduras",
+  "keys": [
+   "alambre",
+   "pollo",
+   "verduras",
+   "fajitas"
+  ]
+ },
+ {
+  "file": "tacos-de-pollo.jpg",
+  "label": "Tacos de pollo",
+  "keys": [
+   "tacos",
+   "taco",
+   "pollo"
+  ]
+ },
+ {
+  "file": "tostada-de-atun.jpg",
+  "label": "Tostada de atun",
+  "keys": [
+   "tostada",
+   "tostadas",
+   "atun"
+  ]
+ },
+ {
+  "file": "bowl-de-yogurt-con-fruta.jpg",
+  "label": "Bowl de yogurt con fruta",
+  "keys": [
+   "yogurt",
+   "bowl",
+   "fruta",
+   "granola"
+  ]
+ },
+ {
+  "file": "avena-con-fruta.jpg",
+  "label": "Avena con fruta",
+  "keys": [
+   "avena",
+   "fruta"
+  ]
+ },
+ {
+  "file": "ensalada-de-atun.jpg",
+  "label": "Ensalada de atun",
+  "keys": [
+   "ensalada",
+   "atun",
+   "bowl"
+  ]
+ },
+ {
+  "file": "wrap-de-pollo.jpg",
+  "label": "Wrap de pollo",
+  "keys": [
+   "wrap",
+   "pollo"
+  ]
+ },
+ {
+  "file": "tacos-de-bistec.jpg",
+  "label": "Tacos de bistec",
+  "keys": [
+   "tacos",
+   "taco",
+   "bistec",
+   "carne"
+  ]
+ },
+ {
+  "file": "ensalada-de-quinoa-con-pavo.jpg",
+  "label": "Ensalada de quinoa con pavo",
+  "keys": [
+   "ensalada",
+   "quinoa",
+   "pavo"
+  ]
+ },
+ {
+  "file": "aguacate.jpg",
+  "label": "Aguacate",
+  "keys": [
+   "aguacate"
+  ]
+ },
+ {
+  "file": "bowl-de-cottage.jpg",
+  "label": "Bowl de cottage",
+  "keys": [
+   "cottage",
+   "requeson",
+   "bowl"
+  ]
+ },
+ {
+  "file": "hot-cakes-con-fruta.jpg",
+  "label": "Hot cakes con fruta",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "hotcake",
+   "pancakes",
+   "fruta"
+  ]
+ },
+ {
+  "file": "rice-cakes.jpg",
+  "label": "Rice cakes",
+  "keys": [
+   "rice",
+   "cake",
+   "cakes"
+  ]
+ },
+ {
+  "file": "huevos-revueltos.jpg",
+  "label": "Huevos revueltos",
+  "keys": [
+   "huevos",
+   "huevo",
+   "revueltos",
+   "revuelto",
+   "claras",
+   "clara"
+  ]
+ },
+ {
+  "file": "sandwich-de-atun.jpg",
+  "label": "Sandwich de atun",
+  "keys": [
+   "sandwich",
+   "atun"
+  ]
+ },
+ {
+  "file": "huevos-estrellados.jpg",
+  "label": "Huevos estrellados",
+  "keys": [
+   "huevos",
+   "huevo",
+   "estrellados",
+   "estrellado",
+   "claras"
+  ]
+ },
+ {
+  "file": "pasta-integral.jpg",
+  "label": "Pasta integral",
+  "keys": [
+   "pasta",
+   "spaghetti",
+   "espagueti"
+  ]
+ },
+ {
+  "file": "sandwich-de-pavo.jpg",
+  "label": "Sandwich de pavo",
+  "keys": [
+   "sandwich",
+   "pavo"
+  ]
+ },
+ {
+  "file": "avo-toast-con-huevo.jpg",
+  "label": "Avo toast con huevo",
+  "keys": [
+   "avo",
+   "toast",
+   "aguacate",
+   "huevo",
+   "pan"
+  ]
+ },
+ {
+  "file": "ensalada-de-pollo.jpg",
+  "label": "Ensalada de pollo",
+  "keys": [
+   "ensalada",
+   "pollo"
+  ]
+ },
+ {
+  "file": "ceviche-de-pescado.jpg",
+  "label": "Ceviche de pescado",
+  "keys": [
+   "ceviche",
+   "pescado",
+   "tostada"
+  ]
+ },
+ {
+  "file": "ensalada-de-pollo-con-verduras.jpg",
+  "label": "Ensalada de pollo con verduras",
+  "keys": [
+   "ensalada",
+   "pollo",
+   "verduras"
+  ]
+ },
+ {
+  "file": "omelette.jpg",
+  "label": "Omelette",
+  "keys": [
+   "omelette",
+   "omelet",
+   "omellete",
+   "huevo",
+   "claras"
   ]
  }
 ];
