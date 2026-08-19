@@ -1,4 +1,4 @@
-// Banco de fotos de platillos (175). +36 fotos nuevas de Pexels (ago 2026): rollitos, molletes, tostadas, alambre, tacos, ensaladas, ceviche, etc. Índice MEJORADO + 11 platillos nuevos
+// Banco de fotos de platillos (183). +8 fotos nuevas (nopal/frijol, huevo-ejote, huevo-salsa verde, melón, quesadilla rajas, smoothie mango, poke bowl, granola). +36 fotos nuevas de Pexels (ago 2026): rollitos, molletes, tostadas, alambre, tacos, ensaladas, ceviche, etc. Índice MEJORADO + 11 platillos nuevos
 // (chilaquiles, sopes, tlacoyos, crepa, pasta boloñesa, pizza, hamburguesa, plato mediterráneo,
 // frijoles, cereal, bisquet) tomados del recetario. Cada entrada: { file, label, keys }.
 // Las imágenes viven en public/menu-images/.
@@ -1825,6 +1825,96 @@ const BANCO_FOTOS = [
    "omellete",
    "huevo",
    "claras"
+  ]
+ },
+ {
+  "file": "nopales-con-frijol.jpg",
+  "label": "Nopales con frijol",
+  "keys": [
+   "nopal",
+   "nopales",
+   "frijol",
+   "frijoles",
+   "huarache",
+   "huaraches"
+  ]
+ },
+ {
+  "file": "huevos-con-ejote.jpg",
+  "label": "Huevos con ejote",
+  "keys": [
+   "huevo",
+   "huevos",
+   "ejote",
+   "ejotes",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "huevos-en-salsa-verde.jpg",
+  "label": "Huevos en salsa verde",
+  "keys": [
+   "huevo",
+   "huevos",
+   "salsa",
+   "verde",
+   "ahogados",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "melon-con-almendra.jpg",
+  "label": "Melón con almendra",
+  "keys": [
+   "melon",
+   "almendra",
+   "almendras",
+   "fruta"
+  ]
+ },
+ {
+  "file": "quesadillas-de-rajas.jpg",
+  "label": "Quesadillas de rajas",
+  "keys": [
+   "quesadilla",
+   "quesadillas",
+   "rajas",
+   "poblano",
+   "sincronizada"
+  ]
+ },
+ {
+  "file": "smoothie-de-mango.jpg",
+  "label": "Smoothie de mango",
+  "keys": [
+   "smoothie",
+   "batido",
+   "mango",
+   "licuado"
+  ]
+ },
+ {
+  "file": "poke-bowl-de-tofu.jpg",
+  "label": "Poke bowl de tofu",
+  "keys": [
+   "poke",
+   "bowl",
+   "tofu",
+   "arroz",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "granola-con-arandano.jpg",
+  "label": "Granola con arándano",
+  "keys": [
+   "granola",
+   "avena",
+   "arandano",
+   "arandanos",
+   "barrita"
   ]
  }
 ];
