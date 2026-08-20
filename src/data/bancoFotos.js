@@ -1,4 +1,4 @@
-// Banco de fotos de platillos (183). +8 fotos nuevas (nopal/frijol, huevo-ejote, huevo-salsa verde, melón, quesadilla rajas, smoothie mango, poke bowl, granola). +36 fotos nuevas de Pexels (ago 2026): rollitos, molletes, tostadas, alambre, tacos, ensaladas, ceviche, etc. Índice MEJORADO + 11 platillos nuevos
+// Banco de fotos de platillos (216). +33 fotos nuevas de Pexels (guisados, bowls, sopas, huevos, antojitos) ago 2026
 // (chilaquiles, sopes, tlacoyos, crepa, pasta boloñesa, pizza, hamburguesa, plato mediterráneo,
 // frijoles, cereal, bisquet) tomados del recetario. Cada entrada: { file, label, keys }.
 // Las imágenes viven en public/menu-images/.
@@ -1915,6 +1915,334 @@ const BANCO_FOTOS = [
    "arandano",
    "arandanos",
    "barrita"
+  ]
+ },
+ {
+  "file": "milanesa-de-pollo.jpg",
+  "label": "Milanesa de pollo",
+  "keys": [
+   "pollo",
+   "milanesa",
+   "pechuga",
+   "empanizado"
+  ]
+ },
+ {
+  "file": "cecina-con-panela.jpg",
+  "label": "Cecina con panela",
+  "keys": [
+   "cecina",
+   "bistec",
+   "carne",
+   "panela",
+   "queso"
+  ]
+ },
+ {
+  "file": "papa-horneada-rellena.jpg",
+  "label": "Papa horneada rellena",
+  "keys": [
+   "papa",
+   "papas"
+  ]
+ },
+ {
+  "file": "huevos-con-brocoli.jpg",
+  "label": "Huevos con brocoli",
+  "keys": [
+   "huevo",
+   "huevos",
+   "brocoli",
+   "claras"
+  ]
+ },
+ {
+  "file": "enchiladas-divorciadas.jpg",
+  "label": "Enchiladas divorciadas",
+  "keys": [
+   "enchiladas",
+   "divorciadas",
+   "enchilada"
+  ]
+ },
+ {
+  "file": "rice-cake-con-pepino.jpg",
+  "label": "Rice cake con pepino",
+  "keys": [
+   "rice",
+   "cake",
+   "pepino",
+   "galletas"
+  ]
+ },
+ {
+  "file": "salmon-teriyaki.jpg",
+  "label": "Salmón teriyaki",
+  "keys": [
+   "salmon",
+   "teriyaki",
+   "arroz",
+   "edamame"
+  ]
+ },
+ {
+  "file": "poke-bowl-de-salmon.jpg",
+  "label": "Poke bowl de salmón",
+  "keys": [
+   "poke",
+   "bowl",
+   "salmon",
+   "mango",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "pasta-con-pollo.jpg",
+  "label": "Pasta con pollo",
+  "keys": [
+   "pasta",
+   "spaghetti",
+   "espagueti",
+   "pollo",
+   "alfredo"
+  ]
+ },
+ {
+  "file": "sopa-de-verduras.jpg",
+  "label": "Sopa de verduras",
+  "keys": [
+   "sopa",
+   "caldo",
+   "verduras",
+   "minestrone"
+  ]
+ },
+ {
+  "file": "tinga-deshebrada.jpg",
+  "label": "Tinga deshebrada",
+  "keys": [
+   "cochinita",
+   "tinga",
+   "deshebrada",
+   "pollo",
+   "barbacoa"
+  ]
+ },
+ {
+  "file": "verduras-rostizadas-con-pollo.jpg",
+  "label": "Verduras rostizadas con pollo",
+  "keys": [
+   "pollo",
+   "coles",
+   "verduras",
+   "rostizadas"
+  ]
+ },
+ {
+  "file": "pure-de-camote.jpg",
+  "label": "Puré de camote",
+  "keys": [
+   "camote",
+   "pure",
+   "calabaza"
+  ]
+ },
+ {
+  "file": "bolitas-de-avena.jpg",
+  "label": "Bolitas de avena",
+  "keys": [
+   "bolitas",
+   "avena",
+   "cacahuate",
+   "barrita",
+   "proteina"
+  ]
+ },
+ {
+  "file": "tortilla-espanola.jpg",
+  "label": "Tortilla española",
+  "keys": [
+   "tortilla",
+   "espanola",
+   "huevo",
+   "papa",
+   "frittata"
+  ]
+ },
+ {
+  "file": "res-a-la-plancha.jpg",
+  "label": "Res a la plancha",
+  "keys": [
+   "res",
+   "bistec",
+   "arrachera",
+   "carne",
+   "plancha"
+  ]
+ },
+ {
+  "file": "huevos-en-salsa-roja.jpg",
+  "label": "Huevos en salsa roja",
+  "keys": [
+   "huevo",
+   "huevos",
+   "salsa",
+   "roja",
+   "rancheros"
+  ]
+ },
+ {
+  "file": "chuleta-a-la-parrilla.jpg",
+  "label": "Chuleta a la parrilla",
+  "keys": [
+   "chuleta",
+   "costilla",
+   "cerdo",
+   "res",
+   "parrilla"
+  ]
+ },
+ {
+  "file": "edamames.jpg",
+  "label": "Edamames",
+  "keys": [
+   "edamame",
+   "edamames"
+  ]
+ },
+ {
+  "file": "smoothie-de-fresa.jpg",
+  "label": "Smoothie de fresa",
+  "keys": [
+   "smoothie",
+   "fresa",
+   "batido"
+  ]
+ },
+ {
+  "file": "frijoles-charros.jpg",
+  "label": "Frijoles charros",
+  "keys": [
+   "frijol",
+   "frijoles",
+   "charros",
+   "caldo"
+  ]
+ },
+ {
+  "file": "bowl-de-camaron.jpg",
+  "label": "Bowl de camarón",
+  "keys": [
+   "camaron",
+   "camarones",
+   "bowl",
+   "brocoli"
+  ]
+ },
+ {
+  "file": "bowl-de-res-con-brocoli.jpg",
+  "label": "Bowl de res con brocoli",
+  "keys": [
+   "bowl",
+   "res",
+   "brocoli",
+   "carne"
+  ]
+ },
+ {
+  "file": "guisado-de-res.jpg",
+  "label": "Guisado de res",
+  "keys": [
+   "res",
+   "guisado",
+   "curry",
+   "carne"
+  ]
+ },
+ {
+  "file": "omelette-con-frijol.jpg",
+  "label": "Omelette con frijol",
+  "keys": [
+   "omelette",
+   "huevo",
+   "frijol",
+   "elote"
+  ]
+ },
+ {
+  "file": "brochetas-de-pollo.jpg",
+  "label": "Brochetas de pollo",
+  "keys": [
+   "brochetas",
+   "pollo",
+   "teriyaki",
+   "alambre"
+  ]
+ },
+ {
+  "file": "crema-de-champinones.jpg",
+  "label": "Crema de champiñones",
+  "keys": [
+   "crema",
+   "champinones",
+   "sopa"
+  ]
+ },
+ {
+  "file": "salteado-de-pollo.jpg",
+  "label": "Salteado de pollo",
+  "keys": [
+   "salteado",
+   "pollo",
+   "verduras",
+   "chop"
+  ]
+ },
+ {
+  "file": "tacos-de-lechuga-con-atun.jpg",
+  "label": "Tacos de lechuga con atun",
+  "keys": [
+   "tacos",
+   "lechuga",
+   "atun"
+  ]
+ },
+ {
+  "file": "tacos-de-rajas.jpg",
+  "label": "Tacos de rajas",
+  "keys": [
+   "tacos",
+   "rajas",
+   "poblano"
+  ]
+ },
+ {
+  "file": "nopal-asado.jpg",
+  "label": "Nopal asado",
+  "keys": [
+   "nopal",
+   "nopales",
+   "asado"
+  ]
+ },
+ {
+  "file": "quesadillas-de-champinones.jpg",
+  "label": "Quesadillas de champiñones",
+  "keys": [
+   "quesadilla",
+   "quesadillas",
+   "champinones",
+   "hongos"
+  ]
+ },
+ {
+  "file": "tlacoyos-con-nopal.jpg",
+  "label": "Tlacoyos con nopal",
+  "keys": [
+   "tlacoyo",
+   "tlacoyos",
+   "frijol",
+   "nopal"
   ]
  }
 ];
