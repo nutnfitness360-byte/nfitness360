@@ -211,6 +211,11 @@ function ajustarMenuIA_(body) {
       "Todo ingrediente del nombre debe estar en la preparación con su cantidad, y la preparación no debe llevar " +
       "ingredientes principales ausentes del nombre. Si cambias un ingrediente en la preparación, ajusta el nombre " +
       "en consecuencia (y viceversa).\n" +
+      "8) CONJUNCIÓN DEL TÍTULO ('y' vs 'con'): si el platillo son DOS alimentos que se comen juntos pero por SEPARADO " +
+      "(una base —galletas, tostadas, pan, rice cakes— o un alimento principal + una fruta o acompañamiento aparte), " +
+      "únelos con 'y', NUNCA con 'con'. CORRECTO: 'Tostadas de arroz y durazno', 'Galletas habaneras y mandarina'. " +
+      "Usa 'con' SOLO cuando un ingrediente va DENTRO, ENCIMA o MEZCLADO con el otro (relleno, topping, salsa, mezcla): " +
+      "p. ej. 'Omelette con champiñones', 'Yogurt con granola'.\n" +
       "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
     var datos = { objetivo: body.objetivo || "", nota_de_seguimiento: nota, menu_actual: tiempos };
