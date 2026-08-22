@@ -1036,8 +1036,14 @@ function PRUEBA_encuesta() {
 // ── IA (Capa 2): genera opciones de platillos por tiempo de comida ──
 // Requiere una Propiedad del script llamada ANTHROPIC_API_KEY.
 // (Apps Script → Configuración del proyecto → Propiedades del script → Agregar)
-// tiempoCategoria_ SE MOVIÓ al archivo del Recetario (.gs), donde ahora incluye
-// el reconocimiento de colaciones. Se quitó de aquí para no duplicar la función.
+// Categoría del recetario según el nombre del tiempo (solo desayuno/comida/cena; colaciones no usan recetario).
+function tiempoCategoria_(nombre) {
+  var n = (nombre || '').toLowerCase();
+  if (n.indexOf('desayuno') > -1) return 'desayuno';
+  if (n.indexOf('comida') > -1) return 'comida';
+  if (n.indexOf('cena') > -1) return 'cena';
+  return '';
+}
 
 // Muestra aleatoria de platillos del recetario para una categoría (variedad + cambia en cada refresh).
 function recetarioMuestra_(cat, n) {
@@ -1054,29 +1060,6 @@ function limpiarColacion_(str) {
   t = t.replace(/[\s.;,\-\u2013\u2014]*\b(?:para\s+)?cons(?:u|\u00fa)m(?:ir|ase|elo|ela|elos|elas|e)?\s+como\s+colaci(?:o|\u00f3)n\b\.?/gi, "");
   t = t.replace(/\s{2,}/g, " ").replace(/[\s.;,]+$/, "").trim();
   return t;
-}
-
-// ── Nombres comerciales ──
-// Renombra "tortita(s)/torta(s)/galleta(s) de arroz" a "Rice Cake(s)" (nombre comercial reconocido).
-function nombrarRiceCake_(s) {
-  if (!s) return s;
-  var t = String(s);
-  t = t.replace(/\b(?:tortitas|tortas|galletas)\s+de\s+arroz(?:\s+inflad(?:o|a|os|as))?/gi, "Rice Cakes");
-  t = t.replace(/\b(?:tortita|torta|galleta)\s+de\s+arroz(?:\s+inflad(?:o|a))?/gi, "Rice Cake");
-  return t;
-}
-// Renombra "tostada(s) horneada(s)" (galleta salada horneada, tipo Susalia) a "Salmas o similar".
-// Solo aplica con el calificativo "horneada" para NO tocar la tostada de maíz tradicional.
-function nombrarSalmas_(s) {
-  if (!s) return s;
-  var t = String(s);
-  t = t.replace(/\btostadas\s+(?:de\s+trigo\s+)?horneadas\b/gi, "Salmas o similar");
-  t = t.replace(/\btostada\s+(?:de\s+trigo\s+)?horneada\b/gi, "Salma o similar");
-  return t;
-}
-// Aplica todos los nombres comerciales a un texto (nombre o preparación).
-function nombreComercial_(s) {
-  return nombrarSalmas_(nombrarRiceCake_(s));
 }
 
 function generarMenusIA_(body) {
@@ -1112,6 +1095,7 @@ function generarMenusIA_(body) {
     "NO agregues frases redundantes como 'consumir como colación' al cierre de las opciones: el nombre del tiempo ya indica que es colación. " +
     "EL NOMBRE SE DERIVA DE LA PREPARACIÓN: primero define la preparación concreta; luego escribe el 'nombre' usando ÚNICAMENTE 2 o 3 de los ingredientes PRINCIPALES que aparecen en esa preparación. " +
     "Está PROHIBIDO nombrar en el título cualquier ingrediente que NO esté en la preparación. Ejemplo de ERROR: titular 'Pan con miel y fruta' cuando la preparación lleva mantequilla de cacahuate y naranja (no lleva miel); el título debe reflejar lo que realmente se come. " +
+    "CONJUNCIÓN DEL TÍTULO ('y' vs 'con'): cuando el platillo son DOS (o más) alimentos que se comen JUNTOS pero por SEPARADO —una base (galletas, tostadas, pan, rice cakes) o un alimento principal + una fruta o acompañamiento aparte, típico de colaciones— únelos con la conjunción 'y', NUNCA con 'con'. CORRECTO: 'Tostadas de arroz y durazno', 'Galletas habaneras y mandarina', 'Manzana y nueces', 'Pechuga y ensalada'. INCORRECTO: 'Tostadas de arroz con durazno', 'Galletas habaneras con mandarina'. Usa 'con' SOLO cuando un ingrediente va DENTRO, ENCIMA o MEZCLADO con el otro como parte de la MISMA preparación (relleno, topping, salsa, mezcla, guiso): p. ej. 'Omelette con champiñones', 'Yogurt con granola', 'Quesadilla con pollo', 'Avena con fresas'. " +
     "COHERENCIA CULINARIA (muy importante): cada platillo debe ser algo que una persona realmente prepararía y comería; " +
     "combina solo ingredientes que tengan sentido juntos según la cocina mexicana y el sentido común. " +
     "NUNCA mezcles en una misma preparación ingredientes incompatibles. Un LICUADO, SMOOTHIE o BEBIDA solo admite " +
@@ -1200,10 +1184,7 @@ function generarMenusIA_(body) {
   var tiemposLimpios = (parsed.tiempos || []).map(function (t) {
     var ops = (t && t.opciones) ? t.opciones : [];
     return { opciones: ops.map(function (o) {
-      return {
-        nombre: nombreComercial_(limpiarColacion_(o && o.nombre)),
-        prep: nombreComercial_(limpiarColacion_(o && o.prep))
-      };
+      return { nombre: limpiarColacion_(o && o.nombre), prep: limpiarColacion_(o && o.prep) };
     }) };
   });
 
