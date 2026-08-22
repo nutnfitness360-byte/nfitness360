@@ -28,7 +28,7 @@ export default function Topbar({ role, user, onPerfil }) {
     <div className="topbar">
       <div>
         {logoSrc ? <img src={logoSrc} alt="" className="topbar-logo-img" /> : null}
-        <div className="topbar-role">{role === 'nutriologa' ? 'Panel nutriologa' : 'Mi cuenta'}</div>
+        <div className="topbar-role">{role === 'nutriologa' ? 'Panel de nutrición' : 'Mi cuenta'}</div>
       </div>
 
       <div className="avatar-wrapper" ref={menuRef}>
