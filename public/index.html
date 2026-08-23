@@ -13,6 +13,37 @@
     <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon-32.png" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <script>
+      /* Ícono/manifest por instancia: SOLO en el dominio de Aretia (sistemanutricio) se
+         cambian el manifest, el apple-touch-icon, el favicon, el theme-color y el título.
+         En el dominio de Natalia este bloque NO hace nada → su ícono e identidad quedan
+         EXACTAMENTE igual. */
+      (function () {
+        try {
+          if (location.hostname.indexOf('sistemanutricio') === -1) return;
+          function setLink(rel, href, type, sizes) {
+            var sel = 'link[rel="' + rel + '"]' + (sizes ? '[sizes="' + sizes + '"]' : '');
+            var l = document.querySelector(sel);
+            if (!l) {
+              l = document.createElement('link');
+              l.setAttribute('rel', rel);
+              if (type) l.setAttribute('type', type);
+              if (sizes) l.setAttribute('sizes', sizes);
+              document.head.appendChild(l);
+            }
+            l.setAttribute('href', href);
+          }
+          setLink('manifest', '/manifest-aretia.json');
+          setLink('apple-touch-icon', '/aretia-apple-touch-icon.png');
+          setLink('icon', '/aretia-favicon-32.png', 'image/png', '32x32');
+          var tc = document.querySelector('meta[name="theme-color"]');
+          if (tc) tc.setAttribute('content', '#1E3A5F');
+          var at = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+          if (at) at.setAttribute('content', 'Aretia');
+          document.title = 'Aretia';
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <noscript>Necesitas JavaScript para usar esta app.</noscript>
