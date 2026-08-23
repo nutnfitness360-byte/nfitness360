@@ -2,6 +2,29 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useBranding } from "../context/BrandingContext";
 import { LOGO_ARETIA } from "../report/logoAretia";
 
+/* Textarea que crece con su contenido para que el texto no se corte dentro de la
+   celda (p. ej. la dieta habitual). Se ajusta al montar, al cambiar el valor y al
+   escribir. Usa JS porque Safari (iPhone) aún no soporta CSS field-sizing. */
+function GrowArea({ style, value, onChange, ...rest }) {
+  const ref = useRef(null);
+  const fit = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = (el.scrollHeight + 2) + "px";
+  };
+  useEffect(() => { fit(); }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      style={{ overflow: "hidden", ...style }}
+      value={value}
+      onChange={(e) => { if (onChange) onChange(e); fit(); }}
+      {...rest}
+    />
+  );
+}
+
 /* ============================================================
    NFITNESS 360 — Historia Clínico-Nutriológica
    Formulario editable para el panel de la nutrióloga.
@@ -876,7 +899,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
                 onChange={(e) => setField("bioquimica", "fecha", e.target.value)} />
             </Field>
           </Grid>
-          <div style={styles.tableWrap}>
+          <div style={styles.tableWrapScroll}>
             <div style={{ ...styles.bioRow, ...styles.bioHead }}>
               <div>Parámetro</div><div>Resultado</div><div>Referencia</div><div></div>
             </div>
@@ -927,7 +950,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
         {/* 6. SUPLEMENTACIÓN */}
         <Section reg={reg("suplementacion")} sid="suplementacion" title="Suplementación" n="6"
           hint="Suplementos que consume actualmente con dosis y frecuencia.">
-          <div style={styles.tableWrap}>
+          <div style={styles.tableWrapScroll}>
             <div style={{ ...styles.supRow, ...styles.bioHead }}>
               <div>Suplemento</div><div>Marca</div><div>Dosis</div><div>Frecuencia</div><div>Horario</div><div></div>
             </div>
@@ -995,7 +1018,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
               <div key={i} style={styles.dietRow}>
                 <input style={styles.dietMomentoInput} value={r.momento} placeholder="Tiempo"
                   onChange={(e) => setDietaCampo(i, "momento", e.target.value)} />
-                <textarea style={styles.dietCell} rows={1} value={r.alimentos}
+                <GrowArea style={styles.dietCell} rows={1} value={r.alimentos}
                   placeholder="Alimentos y bebidas…" onChange={(e) => setDietaCampo(i, "alimentos", e.target.value)} />
                 <button style={styles.dietDel} title="Quitar tiempo"
                   onClick={() => removeRow("dietetica", "dieta", i)}>×</button>
@@ -1305,8 +1328,8 @@ const styles = {
   tabOn: { color: T.pine, borderBottomColor: T.amber },
   tabNum: { width: 20, height: 20, borderRadius: 6, display: "grid", placeItems: "center", fontSize: 11.5, fontWeight: 700, background: T.lineSoft, color: T.inkSoft },
   tabNumOn: { background: T.amber, color: "var(--dark)" },
-  main: { padding: "22px 24px 12px", display: "flex", flexDirection: "column", gap: 16 },
-  card: { background: T.surface, border: `1px solid ${T.line}`, borderRadius: 16, padding: "22px 22px 24px", boxShadow: "0 1px 2px rgba(22,34,30,0.03)", scrollMarginTop: 132 },
+  main: { padding: "20px 16px 12px", display: "flex", flexDirection: "column", gap: 16 },
+  card: { background: T.surface, border: `1px solid ${T.line}`, borderRadius: 16, padding: "20px 16px 22px", boxShadow: "0 1px 2px rgba(22,34,30,0.03)", scrollMarginTop: 132 },
   cardHead: { display: "flex", gap: 14, marginBottom: 20, alignItems: "flex-start" },
   cardNum: { minWidth: 30, height: 30, borderRadius: 9, background: T.amber, color: "var(--dark)", display: "grid", placeItems: "center", fontWeight: 800, fontSize: 14, marginTop: 1 },
   h2: { fontSize: 18, fontWeight: 750, margin: 0, letterSpacing: -0.3, color: T.ink },
@@ -1325,8 +1348,11 @@ const styles = {
   likeNo: { borderLeft: `3px solid ${T.danger}` },
   note: { marginTop: 16, fontSize: 12.5, color: T.pineSoft, background: T.mint, borderRadius: 10, padding: "10px 13px", lineHeight: 1.5 },
   tableWrap: { border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" },
-  bioRow: { display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 40px", borderBottom: `1px solid ${T.lineSoft}` },
-  supRow: { display: "grid", gridTemplateColumns: "1.4fr 1fr 0.9fr 1fr 1.1fr 40px", borderBottom: `1px solid ${T.lineSoft}` },
+  bioRow: { display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 40px", borderBottom: `1px solid ${T.lineSoft}`, minWidth: 360 },
+  supRow: { display: "grid", gridTemplateColumns: "1.4fr 1fr 0.9fr 1fr 1.1fr 40px", borderBottom: `1px solid ${T.lineSoft}`, minWidth: 560 },
+  // Envoltura con scroll horizontal para las tablas anchas (bioquímica y
+  // suplementación) — en móvil se desliza en lugar de amontonar las columnas.
+  tableWrapScroll: { border: `1px solid ${T.line}`, borderRadius: 12, overflowX: "auto", WebkitOverflowScrolling: "touch" },
   bioHead: { background: T.mint, fontSize: 11, fontWeight: 700, color: T.pine, textTransform: "uppercase", letterSpacing: 0.4 },
   cellInput: { border: "none", borderRight: `1px solid ${T.lineSoft}`, padding: "10px 12px", fontSize: 13.5, background: "transparent", fontFamily: "inherit", color: T.ink, width: "100%", boxSizing: "border-box" },
   rowDel: { border: "none", background: "transparent", color: T.inkSoft, fontSize: 18, cursor: "pointer", lineHeight: 1 },
@@ -1336,7 +1362,7 @@ const styles = {
   anaList: { marginTop: 10, display: "flex", flexDirection: "column", gap: 6 },
   anaItem: { display: "flex", alignItems: "center", gap: 10, background: "var(--mint)", border: `1px solid ${T.lineSoft}`, borderRadius: 8, padding: "8px 12px" },
   anaLink: { background: T.amber, color: "var(--dark)", textDecoration: "none", padding: "5px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700 },
-  dietRow: { display: "grid", gridTemplateColumns: "150px 1fr 34px", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "stretch" },
+  dietRow: { display: "grid", gridTemplateColumns: "108px 1fr 32px", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "stretch" },
   dietMomento: { background: "var(--mint)", padding: "12px 14px", fontSize: 13, fontWeight: 700, color: T.pine, borderRight: `1px solid ${T.lineSoft}`, display: "flex", alignItems: "center" },
   dietMomentoInput: { background: "var(--mint)", padding: "12px 14px", fontSize: 13, fontWeight: 700, color: T.pine, borderRight: `1px solid ${T.lineSoft}`, border: "none", borderRadius: 0, fontFamily: "inherit", boxSizing: "border-box", width: "100%" },
   dietDel: { border: "none", background: "transparent", color: T.inkSoft, fontSize: 18, cursor: "pointer", lineHeight: 1, alignSelf: "center" },
