@@ -312,6 +312,10 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const [bancoCustom, setBancoCustomState] = useState([]);
   const [subiendoBanco, setSubiendoBanco] = useState(false);
   const [dragBanco, setDragBanco] = useState(false);
+  // Autocompletado del banco de fotos al escribir el nombre del platillo:
+  // guarda { idx, oi } de la opción cuyo input está enfocado (para mostrar
+  // el desplegable de sugerencias solo en esa opción).
+  const [sugerFoto, setSugerFoto] = useState(null);
   // Banco de fotos DINÁMICO (fotos que sube la nutrióloga), guardado en Firestore.
   useEffect(() => onSnapshot(collection(db, 'bancoFotos'), snap => {
     const arr = snap.docs.map(d => d.data());
@@ -1026,7 +1030,28 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                       <span style={S.optTag}>Opción {oi + 1}</span>
                       <button style={S.optIaBtn} onClick={() => generarOpcionIA(idx, oi)} disabled={iaBusy || opBusy === (idx + ':' + oi)}>{opBusy === (idx + ':' + oi) ? 'Generando…' : 'IA ✦'}</button>
                     </div>
-                    <input style={S.optName} placeholder="Nombre del platillo" value={o.nombre} onChange={e => setOpcionNombre(idx, oi, e.target.value)} />
+                    <div style={{ position: 'relative' }}>
+                      <input style={S.optName} placeholder="Nombre del platillo" value={o.nombre}
+                        onChange={e => setOpcionNombre(idx, oi, e.target.value)}
+                        onFocus={() => setSugerFoto({ idx, oi })}
+                        onBlur={() => setTimeout(() => setSugerFoto(s => (s && s.idx === idx && s.oi === oi) ? null : s), 150)} />
+                      {sugerFoto && sugerFoto.idx === idx && sugerFoto.oi === oi && (o.nombre || '').trim().length >= 2 && (() => {
+                        const sug = buscarFotos(o.nombre, 6);
+                        if (!sug.length) return null;
+                        return (
+                          <div style={S.sugBox}>
+                            <div style={S.sugHint}>Fotos del banco que coinciden — toca una para usarla</div>
+                            {sug.map(f => (
+                              <button key={f.file} type="button" style={S.sugItem}
+                                onMouseDown={e => { e.preventDefault(); setOpcionFoto(idx, oi, f.file); setSugerFoto(null); }}>
+                                <img src={fotoUrl(f.file)} alt="" style={S.sugImg} />
+                                <span style={S.sugLabel}>{f.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
                     <textarea style={S.optPrep} rows={2} placeholder="Preparación y gramajes" value={o.prep} onChange={e => setOpcion(idx, oi, { prep: e.target.value })} />
                     <div style={S.optFotoRow}>
                       {o.fotoKey
@@ -1242,6 +1267,12 @@ const styles = {
   optIaBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, borderRadius: 7, padding: '3px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: mono, whiteSpace: 'nowrap' },
   optTag: { fontSize: 10, fontWeight: 800, color: T.amber, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 },
   optName: { width: '100%', border: `1px solid ${T.line}`, borderRadius: 7, padding: '8px 10px', fontSize: 13, fontWeight: 600, color: T.pine, fontFamily: mono, background: '#FCFDFC', marginBottom: 6, boxSizing: 'border-box' },
+  // Desplegable de sugerencias de foto del banco (autocompletar por nombre).
+  sugBox: { position: 'absolute', top: 'calc(100% - 2px)', left: 0, right: 0, zIndex: 40, background: '#fff', border: `1px solid ${T.line}`, borderRadius: 10, boxShadow: '0 10px 28px rgba(0,0,0,0.16)', padding: 5, maxHeight: 272, overflowY: 'auto' },
+  sugHint: { fontSize: 10.5, color: T.inkSoft, padding: '4px 6px 6px', lineHeight: 1.3 },
+  sugItem: { display: 'flex', alignItems: 'center', gap: 10, width: '100%', border: 'none', background: 'transparent', borderRadius: 8, padding: '5px 6px', cursor: 'pointer', textAlign: 'left', fontFamily: mono },
+  sugImg: { width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: `1px solid ${T.line}` },
+  sugLabel: { fontSize: 12.5, fontWeight: 600, color: T.ink, lineHeight: 1.25 },
   optPrep: { width: '100%', border: `1px solid ${T.line}`, borderRadius: 7, padding: '8px 10px', fontSize: 12.5, color: T.ink, fontFamily: mono, background: '#FCFDFC', resize: 'vertical', boxSizing: 'border-box' },
   photoCol: { width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, borderRadius: 12, padding: 6, transition: 'background .15s' },
   photoColDrag: { background: T.mint, outline: `2px dashed ${T.amber}` },
