@@ -127,19 +127,28 @@ export function buscarFotos(q, limit = 40) {
   const banco = [...customEntries(), ...BANCO_FOTOS];
   if (!f) return banco.slice(0, limit);
   const qToks = tokens(q);
-  return banco.filter(it => {
+  // Puntúa cada foto por relevancia para que la MEJOR salga primero:
+  // igual exacto > empieza con > contiene la frase > palabras sueltas > claves.
+  // (Antes solo filtraba sin ordenar, y "hot cakes" mostraba "rice cake" arriba.)
+  const scored = [];
+  banco.forEach(it => {
     const lab = norm(it.label);
     const labJoin = lab.replace(/[^a-z0-9]/g, '');
-    // Coincidencia por texto directo o por forma pegada (ignora espacios/acentos).
-    if (lab.indexOf(f) !== -1 || (fJoin && labJoin.indexOf(fJoin) !== -1)) return true;
-    // Coincidencia por palabra suelta (≥3 letras) contra el nombre o las claves.
-    if (qToks.some(t => t.length >= 3 && labJoin.indexOf(t) !== -1)) return true;
-    return (it.keys || []).some(k => {
-      const nk = norm(k);
-      return nk.indexOf(f) !== -1 || (fJoin && (nk.indexOf(fJoin) !== -1 || fJoin.indexOf(nk) !== -1)) ||
-        qToks.some(t => t.length >= 3 && (nk.indexOf(t) !== -1 || t.indexOf(nk) !== -1));
-    });
-  }).slice(0, limit);
+    const keys = (it.keys || []).map(norm);
+    let score = 0;
+    if (fJoin && labJoin === fJoin) score += 1000;
+    else if (fJoin && labJoin.indexOf(fJoin) === 0) score += 400;
+    else if (fJoin && labJoin.indexOf(fJoin) !== -1) score += 250;
+    else if (lab.indexOf(f) !== -1) score += 220;
+    qToks.forEach(t => { if (t.length >= 3 && labJoin.indexOf(t) !== -1) score += 40; });
+    if (fJoin && keys.some(k => k.indexOf(fJoin) !== -1 || fJoin.indexOf(k) !== -1)) score += 60;
+    qToks.forEach(t => { if (t.length >= 3 && keys.some(k => k.indexOf(t) !== -1 || t.indexOf(k) !== -1)) score += 20; });
+    if (it._custom) score += 15;      // preferir fotos subidas por la nutrióloga
+    if (it.receta) score += 5;        // leve preferencia a las que traen receta
+    if (score > 0) scored.push({ it, score });
+  });
+  scored.sort((a, b) => b.score - a.score || (a.it.label || '').length - (b.it.label || '').length);
+  return scored.slice(0, limit).map(x => x.it);
 }
 
 // ---- Para el PDF: convierte una foto a data URL (base64) ----
