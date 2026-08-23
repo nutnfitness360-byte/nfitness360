@@ -69,6 +69,9 @@ export function fotoUrl(file) {
 export function matchFoto(nombre) {
   const toks = new Set(tokens(nombre));
   if (!toks.size) return { best: null, score: 0, alts: [] };
+  // Forma "pegada" del nombre (sin espacios ni acentos): "Hot cakes" → "hotcakes".
+  // Permite emparejar palabras que en el banco vienen unidas (keys como "hotcakes").
+  const joined = norm(nombre).replace(/[^a-z0-9]/g, '');
   // 1) Si hay una foto subida con EXACTAMENTE el mismo nombre, se prefiere.
   const sl = slugPlatillo(nombre);
   const exacto = CUSTOM.find(x => x.slug === sl);
@@ -76,11 +79,17 @@ export function matchFoto(nombre) {
   const scored = banco
     .map(it => {
       let hit = 0;
-      (it.keys || []).forEach(k => { if (toks.has(norm(k))) hit++; });
+      (it.keys || []).forEach(k => {
+        const nk = norm(k);
+        // Coincide si el token es idéntico a la clave, o si la clave (unida) aparece
+        // dentro del nombre pegado — así "hot cakes" encuentra la clave "hotcakes".
+        if (toks.has(nk) || (nk.length >= 4 && joined.indexOf(nk) !== -1)) hit++;
+      });
       // Señal secundaria: cuántas palabras del platillo aparecen en el NOMBRE de la foto.
       const labelToks = new Set(tokens(it.label));
+      const labelJoin = norm(it.label).replace(/[^a-z0-9]/g, '');
       let labelOverlap = 0;
-      toks.forEach(t => { if (labelToks.has(t)) labelOverlap++; });
+      toks.forEach(t => { if (labelToks.has(t) || (t.length >= 4 && labelJoin.indexOf(t) !== -1)) labelOverlap++; });
       return { it, hit, labelOverlap, custom: it._custom ? 1 : 0 };
     })
     .filter(x => x.hit > 0)
@@ -114,9 +123,23 @@ export function matchFotoKey(nombre) {
 // Búsqueda para el selector manual: filtra el banco (dinámico + estático) por texto.
 export function buscarFotos(q, limit = 40) {
   const f = norm(q);
+  const fJoin = f.replace(/[^a-z0-9]/g, '');   // forma pegada del texto buscado
   const banco = [...customEntries(), ...BANCO_FOTOS];
   if (!f) return banco.slice(0, limit);
-  return banco.filter(it => norm(it.label).includes(f) || (it.keys || []).some(k => norm(k).includes(f))).slice(0, limit);
+  const qToks = tokens(q);
+  return banco.filter(it => {
+    const lab = norm(it.label);
+    const labJoin = lab.replace(/[^a-z0-9]/g, '');
+    // Coincidencia por texto directo o por forma pegada (ignora espacios/acentos).
+    if (lab.indexOf(f) !== -1 || (fJoin && labJoin.indexOf(fJoin) !== -1)) return true;
+    // Coincidencia por palabra suelta (≥3 letras) contra el nombre o las claves.
+    if (qToks.some(t => t.length >= 3 && labJoin.indexOf(t) !== -1)) return true;
+    return (it.keys || []).some(k => {
+      const nk = norm(k);
+      return nk.indexOf(f) !== -1 || (fJoin && (nk.indexOf(fJoin) !== -1 || fJoin.indexOf(nk) !== -1)) ||
+        qToks.some(t => t.length >= 3 && (nk.indexOf(t) !== -1 || t.indexOf(nk) !== -1));
+    });
+  }).slice(0, limit);
 }
 
 // ---- Para el PDF: convierte una foto a data URL (base64) ----
