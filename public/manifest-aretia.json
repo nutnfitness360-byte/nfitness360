@@ -1,0 +1,13 @@
+{
+  "short_name": "Aretia",
+  "name": "Aretia — Del plan al resultado",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1E3A5F",
+  "background_color": "#EEF2F7",
+  "icons": [
+    { "src": "aretia-icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "aretia-icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "aretia-icon-maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}
