@@ -240,7 +240,7 @@ export default function LoginPage() {
 
   if (vista === 'inicio') {
     return (
-      <div style={S.wrap}>
+      <div style={{ ...S.wrap, alignItems: 'flex-start', paddingTop: 'clamp(1.5rem, 5vh, 3.5rem)', paddingBottom: '2.5rem' }}>
         <div style={S.landingBox}>
           <div style={S.grid2}>
 
