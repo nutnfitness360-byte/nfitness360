@@ -1,29 +1,52 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Marca en la pestaña POR DOMINIO — SEGURO PARA NATALIA.
-// El repo es compartido (un código → dos sitios). Por eso NO se cambia el favicon
-// en public/index.html (eso afectaría a Natalia). Aquí solo el dominio de Aretia
-// ('sistemanutricio') cambia su icono y título; cualquier otro dominio (incluido
-// el de Natalia) NO se toca: la función se sale de inmediato.
-// ─────────────────────────────────────────────────────────────────────────────
-(function () {
-  try {
-    if (window.location.hostname.indexOf('sistemanutricio') === -1) return; // ← Natalia: no tocar
-    // Favicon de Aretia (teja marino + "A" + punta ámbar), auto-contenido:
-    var ICON = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjI0IiBmaWxsPSIjMUUzQTVGIi8+CiAgPHBhdGggZD0iTTI5IDc0IEw1MCAzMCBMNzEgNzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0Y0RjFFQSIgc3Ryb2tlLXdpZHRoPSI5IiBzdHJva2UtbGluZWpvaW49Im1pdGVyIi8+CiAgPHBhdGggZD0iTTQwLjUgNTAgTDUwIDMwIEw1OS41IDUwIiBmaWxsPSJub25lIiBzdHJva2U9IiNFMDkxM0YiIHN0cm9rZS13aWR0aD0iOSIgc3Ryb2tlLWxpbmVqb2luPSJtaXRlciIvPgo8L3N2Zz4K';
-    document.querySelectorAll("link[rel~='icon']").forEach(function (l) { l.parentNode.removeChild(l); });
-    var link = document.createElement('link');
-    link.rel = 'icon';
-    link.type = 'image/svg+xml';
-    link.href = ICON;
-    document.head.appendChild(link);
-    // (Opcional) Título de la pestaña para Aretia. Si NO lo quieres, borra esta línea:
-    document.title = 'Aretia — Del plan al resultado';
-  } catch (e) { /* si algo fallara, se queda lo por defecto; nunca rompe el build */ }
-})();
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<React.StrictMode><App /></React.StrictMode>);
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="theme-color" content="#211C17" />
+    <meta name="description" content="Nfitness 360 — Nutrición y bienestar" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Nfitness 360" />
+    <title>Nfitness 360®</title>
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon-32.png" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <script>
+      /* Ícono/manifest por instancia: SOLO en el dominio de Aretia (sistemanutricio) se
+         cambian el manifest, el apple-touch-icon, el favicon, el theme-color y el título.
+         En el dominio de Natalia este bloque NO hace nada → su ícono e identidad quedan
+         EXACTAMENTE igual. */
+      (function () {
+        try {
+          if (location.hostname.indexOf('sistemanutricio') === -1) return;
+          function setLink(rel, href, type, sizes) {
+            var sel = 'link[rel="' + rel + '"]' + (sizes ? '[sizes="' + sizes + '"]' : '');
+            var l = document.querySelector(sel);
+            if (!l) {
+              l = document.createElement('link');
+              l.setAttribute('rel', rel);
+              if (type) l.setAttribute('type', type);
+              if (sizes) l.setAttribute('sizes', sizes);
+              document.head.appendChild(l);
+            }
+            l.setAttribute('href', href);
+          }
+          setLink('manifest', '/manifest-aretia.json');
+          setLink('apple-touch-icon', '/aretia-apple-touch-icon.png');
+          setLink('icon', '/aretia-favicon-32.png', 'image/png', '32x32');
+          var tc = document.querySelector('meta[name="theme-color"]');
+          if (tc) tc.setAttribute('content', '#1E3A5F');
+          var at = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+          if (at) at.setAttribute('content', 'Aretia');
+          document.title = 'Aretia';
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <noscript>Necesitas JavaScript para usar esta app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
