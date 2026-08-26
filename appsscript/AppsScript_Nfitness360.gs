@@ -1036,14 +1036,9 @@ function PRUEBA_encuesta() {
 // ── IA (Capa 2): genera opciones de platillos por tiempo de comida ──
 // Requiere una Propiedad del script llamada ANTHROPIC_API_KEY.
 // (Apps Script → Configuración del proyecto → Propiedades del script → Agregar)
-// Categoría del recetario según el nombre del tiempo (solo desayuno/comida/cena; colaciones no usan recetario).
-function tiempoCategoria_(nombre) {
-  var n = (nombre || '').toLowerCase();
-  if (n.indexOf('desayuno') > -1) return 'desayuno';
-  if (n.indexOf('comida') > -1) return 'comida';
-  if (n.indexOf('cena') > -1) return 'cena';
-  return '';
-}
+// tiempoCategoria_ vive en Recetario.gs (versión que SÍ reconoce colaciones/snack/refrigerio/
+// media mañana/media tarde). Se eliminó la copia vieja que había aquí para evitar funciones
+// duplicadas (ganaba la última cargada y podía dejar las colaciones sin recetario).
 
 // Muestra aleatoria de platillos del recetario para una categoría (variedad + cambia en cada refresh).
 function recetarioMuestra_(cat, n) {
@@ -1106,11 +1101,13 @@ function generarMenusIA_(body) {
     "en un tiempo con licuado), NO los metas dentro de esa preparación: ubícalos en un acompañamiento APARTE y sólido " +
     "(por ejemplo 'acompañar con 1/2 taza de frijoles' como plato al lado), o elige otro tipo de platillo que sí integre " +
     "bien todos los grupos. " +
-    "COBERTURA OBLIGATORIA DE EQUIVALENTES: cada opción DEBE incluir TODOS los grupos de 'equivalentes' con cantidad mayor a 0; " +
-    "ninguno puede faltar. Si un grupo no embona en la preparación principal (típico de la FRUTA, la leche o una leguminosa), " +
-    "agrégalo como ACOMPAÑAMIENTO explícito dentro de la misma 'prep', con su cantidad (p. ej. 'acompaña con 1 fruta: 1 manzana chica' " +
-    "o 'de fruta: 1 taza de papaya picada'). LA FRUTA ES LA QUE MÁS SE OLVIDA: si el tiempo trae fruta (>0), la opción SIEMPRE debe " +
-    "incluir una fruta con su porción, y el 'nombre' puede mencionarla (p. ej. '… y fruta'). " +
+    "CULTURA CULINARIA MEXICANA (muy importante): piensa como se come en México a lo largo del día y propón platillos que un mexicano reconozca y disfrute. " +
+    "DESAYUNO: huevos al gusto (a la mexicana, revueltos con verdura, con nopales), chilaquiles fit, molletes, sincronizadas, avena, yogurt con fruta, licuados, avo toast o pan integral con crema de cacahuate. " +
+    "COMIDA (tiempo fuerte): una proteína guisada o en salsa (pollo en salsa verde, tinga, bistec a la mexicana, pescado a la veracruzana, atún a la mexicana) con guarnición de arroz, frijoles, tortilla, pasta, papa o camote y verdura; también caldos, sopas, guisados y ensaladas completas. " +
+    "CENA (ligera): quesadillas, gringas, volcanes, tostadas, sincronizadas, ensaladas, huevo o atún preparado. " +
+    "COLACIONES: fruta con yogurt griego, jícama/pepino/zanahoria con limón y tajín, oleaginosas, o rice cakes/galletas con un acompañamiento. " +
+    "Aprovecha ingredientes mexicanos accesibles y de temporada (nopal, calabaza, chayote, jitomate, chile, cilantro, aguacate, limón, frijol, tortilla de maíz, salsas verdes y rojas) y hierbas (epazote, cilantro) para dar sabor sin exceso de grasa. Varía las técnicas: asado, a la plancha, al comal, guisado, al vapor, empapelado u horneado. " +
+    "NO caigas en un estilo 'fitness gringo' genérico y repetitivo (pollo hervido con brócoli una y otra vez); busca sabor mexicano real y variedad entre tiempos y entre opciones. " +
     "PREFERENCIAS DEL PACIENTE (muy importante): recibirás 'preferencias_paciente' con 'le_gusta', 'no_le_gusta' y 'alergias'. " +
     "Es OBLIGATORIO: NUNCA incluyas ningún alimento —ni sus ingredientes o derivados— que aparezca en 'no_le_gusta' ni en 'alergias'. " +
     "Las ALERGIAS son de SEGURIDAD: por ningún motivo las uses ni las escondas dentro de un platillo (revisa también acompañamientos y salsas). " +
@@ -1119,7 +1116,14 @@ function generarMenusIA_(body) {
     "CONSIDERACIONES GENERALES DEL PLAN (muy importante): puedes recibir 'consideraciones_generales', una instrucción de la nutrióloga que aplica a TODO el plan (todos los tiempos y todas las opciones), no a un tiempo puntual. " +
     "Es OBLIGATORIO respetarla en cada opción que generes (por ejemplo: 'plan bajo en FODMAPs', 'sin lácteos', 'sin fritura', 'preparaciones económicas', 'cocción máx. 20 min'). " +
     "Trátala como una GUÍA de estilo/restricciones que se suma a las preferencias del paciente y a la indicación de cada tiempo; NO la transcribas literal en el 'nombre'. Si entra en conflicto con las alergias del paciente, las alergias SIEMPRE tienen prioridad. " +
-    "REVISIÓN FINAL OBLIGATORIA: antes de responder, revisa CADA opción y confirma que (1) todos los ingredientes del nombre están en la preparación; (2) ningún ingrediente principal de la preparación falta en el nombre; (3) la combinación tiene sentido y es algo que alguien realmente comería; (4) las porciones son realistas; (5) NO aparece nada de 'no_le_gusta' ni 'alergias'; (6) se cumplen las 'consideraciones_generales'; (7) TODOS los grupos de 'equivalentes' con cantidad > 0 están representados en la opción (en la preparación o como acompañamiento explícito), EN ESPECIAL la FRUTA. Corrige cualquier opción que falle. Un título que no corresponde a la preparación, mezclar ingredientes que no combinan, incluir un alimento prohibido, ignorar las consideraciones generales, u OMITIR un grupo de equivalentes asignado (sobre todo la fruta), son ERRORES graves. " +
+    "REVISIÓN FINAL OBLIGATORIA: antes de responder, revisa CADA opción y confirma que (1) todos los ingredientes del nombre están en la preparación; (2) ningún ingrediente principal de la preparación falta en el nombre; (3) la combinación tiene sentido y es algo que alguien realmente comería; (4) las porciones son realistas; (5) NO aparece nada de 'no_le_gusta' ni 'alergias'; (6) se cumplen las 'consideraciones_generales'. Corrige cualquier opción que falle. Un título que no corresponde a la preparación, mezclar ingredientes que no combinan, incluir un alimento prohibido, o ignorar las consideraciones generales, son ERRORES graves. " +
+    "EJEMPLO DE MENÚ BIEN ARMADO (referencia REAL de la nutrióloga; objetivo 'baja de grasa / cuidar músculo', ~1400 kcal). Es una GUÍA de estilo, coherencia, forma de nombrar y nivel de detalle de la preparación; NO copies estos platillos textualmente: propón los tuyos con el MISMO nivel. " +
+    "DESAYUNO — 'Huevos revueltos con verduras': revuelve 2 huevos + 120 ml de claras con champiñones y espinacas usando spray; acompaña con 2 rebanadas de pan de caja cero cero (o 2 tortillas) y 1 taza de papaya. | 'Sándwich de pavo': 2 rebanadas de pan de caja cero cero con 60 g de pechuga de pavo, 80 g de queso panela bajo en grasa, lechuga, jitomate, pepino y germen de alfalfa, 1 cda de mayonesa de aguacate (o 30 g de aguacate untado) y 1 taza de melón. | 'Chilaquiles fit': 60 g de totopos horneados con salsa verde o roja, 90 g de pollo deshebrado (o 3 huevos) y 40 g de queso panela; 1 cda de crema light o 30 g de aguacate; acompaña con pimientos o nopales y 1 taza de sandía. " +
+    "COLACIÓN 1 — 'Yogurt griego con fruta y almendras': 100 g de yogurt griego sin azúcar con 1 fruta a elegir (1 taza de fresas, 100 g de berries, 1 manzana o 1/2 plátano) y 10 almendras (o 1 cda de crema de cacahuate). " +
+    "COMIDA — 'Pollo en salsa verde con arroz y verduras': 150 g de pollo cocido en salsa verde (nada frito ni empanizado) con verduras al vapor y 1/2 taza de arroz; 60 g de aguacate o 2 cdtas de aceite de oliva. " +
+    "COLACIÓN 2 — 'Jícama con limón y tajín': 1 taza de jícama (o pepino o zanahoria) con limón y tajín. " +
+    "CENA — 'Atún a la mexicana con salmas': 100 g de atún en agua preparado a la mexicana (jitomate, cebolla, chile y cilantro) con ensalada de lechuga, pepino, jitomate y apio, 1 cdta de aceite de oliva, limón, sal y pimienta, y 2 paquetes de galletas salmas. | 'Gringa de bistec': 2 tortillas de maíz con 60 g de bistec, 20 g de queso Oaxaca y 20 g de aguacate o guacamole; agrega champiñones, espinacas o pimientos. | 'Volcán de pollo': 2 paquetes de galletas salmas gratinadas en el comal con 60 g de pollo y 40 g de queso, 1/2 taza de champiñones y 30 g de aguacate. " +
+    "Para objetivos de AUMENTO DE MASA se mantiene el MISMO estilo mexicano pero con porciones mayores y más carbohidrato (p. ej. 'Huevo con verdura y tortillas', 'Chilaquiles con pollo y avena', 'Pescado asado con papas y arroz', 'Sándwiches de atún a la mexicana'), ajustando siempre las cantidades a los equivalentes del plan. " +
     "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
   var datos = {
