@@ -29,6 +29,41 @@ function tokens(s) {
   return norm(s).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w && !FILLERS.has(w));
 }
 
+// ─── Fruta predominante como imagen ──────────────────────────────────────────
+// Para platillos que la IA propone con una fruta (p. ej. "Tostadas de maíz con
+// durazno") y que NO tienen una foto propia clara, se usa la foto de la FRUTA.
+// Cada fruta usa una foto DEDICADA del banco: una entrada marcada { fruta: true }
+// en bancoFotos.js (archivo sugerido: fruta-<canon>.jpg). Mientras esa foto no
+// exista en el banco, el fallback simplemente no encuentra nada y todo se
+// comporta como antes (no rompe imágenes).
+const FRUTAS = [
+  ['fresa', ['fresa', 'fresas']], ['platano', ['platano', 'banana']], ['papaya', ['papaya']],
+  ['manzana', ['manzana']], ['mango', ['mango']], ['pina', ['pina']],
+  ['frutos-rojos', ['frutos rojos', 'berries', 'mix de berries']], ['arandano', ['arandano', 'arandanos', 'blueberr']],
+  ['melon', ['melon']], ['durazno', ['durazno']], ['kiwi', ['kiwi']], ['uva', ['uva', 'uvas']],
+  ['pera', ['pera']], ['toronja', ['toronja']], ['guayaba', ['guayaba']], ['ciruela', ['ciruela']],
+  ['tuna', ['tuna']], ['mandarina', ['mandarina']], ['sandia', ['sandia']], ['coco', ['coco']],
+  ['frambuesa', ['frambuesa']], ['zarzamora', ['zarzamora']], ['granada', ['granada']],
+  ['higo', ['higo']], ['cereza', ['cereza', 'cerezas']], ['guanabana', ['guanabana']],
+];
+// Detecta la fruta predominante mencionada en el nombre del platillo.
+function frutaEnNombre(nombre) {
+  const n = norm(nombre);
+  for (const [canon, syn] of FRUTAS) {
+    for (const s of syn) { if (n.indexOf(norm(s)) !== -1) return canon; }
+  }
+  return null;
+}
+// Busca en el banco la foto DEDICADA de una fruta (entrada marcada fruta:true).
+function fotoDeFruta(canon) {
+  const syn = (FRUTAS.find(f => f[0] === canon) || [null, []])[1].map(norm);
+  const banco = [...customEntries(), ...BANCO_FOTOS];
+  const hit = banco.find(it => it.fruta === true && (
+    syn.some(s => norm(it.label).indexOf(s) !== -1 || (it.keys || []).some(k => norm(k).indexOf(s) !== -1))
+  ));
+  return hit ? { file: hit.file, label: hit.label, keys: hit.keys || [] } : null;
+}
+
 // ---- Banco dinámico (fotos subidas por la nutrióloga) ----
 // Cada entrada: { slug, label, keys:[], dataUri }
 let CUSTOM = [];
@@ -99,7 +134,12 @@ export function matchFoto(nombre) {
     const bestExact = { file: 'custom:' + exacto.slug, label: exacto.label, keys: exacto.keys || [] };
     return { best: bestExact, score: 99, alts: scored.slice(0, 3).map(x => x.it) };
   }
-  if (!scored.length) return { best: null, score: 0, alts: [] };
+  // Fruta predominante del nombre y su foto dedicada (si existe en el banco).
+  const fruta = frutaEnNombre(nombre);
+  const fotoFruta = fruta ? fotoDeFruta(fruta) : null;
+  if (!scored.length) return fotoFruta
+    ? { best: fotoFruta, score: 1, alts: [], porFruta: true }
+    : { best: null, score: 0, alts: [] };
   // Candado de confianza: en platillos COMPUESTOS (3+ palabras de contenido) no
   // autoasignamos una foto que solo coincide en UNA palabra suelta (p. ej.
   // "tostada" o "arroz"): casi siempre es la foto de un ingrediente, no del
@@ -109,6 +149,9 @@ export function matchFoto(nombre) {
   const contentCount = tokens(nombre).length;
   const fuerte = top.hit >= 2 || top.labelOverlap >= 2 || top.custom === 1;
   if (contentCount >= 3 && !fuerte) {
+    // Sin foto propia clara: si el platillo lleva una fruta y existe su foto
+    // dedicada, se usa la FRUTA como imagen; si no, se deja "Sin foto".
+    if (fotoFruta) return { best: fotoFruta, score: 1, alts: scored.slice(0, 4).map(x => x.it), porFruta: true };
     return { best: null, score: 0, alts: scored.slice(0, 4).map(x => x.it), lowConfidence: true };
   }
   return { best: top.it, score: top.hit, alts: scored.slice(1, 4).map(x => x.it) };
