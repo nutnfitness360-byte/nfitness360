@@ -20,6 +20,18 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Móvil: ningún control de formulario debe exceder el ancho de su contenedor (evita scroll horizontal). */
+input, select, textarea { max-width: 100%; }
+
+/* Rejilla de 2 columnas en escritorio que COLAPSA a 1 columna en el teléfono
+   (así las barras de texto y campos no se salen de la pantalla en móvil). */
+.grid-2up { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 14px; }
+@media (min-width: 640px) { .grid-2up { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.form-2up { display: grid; grid-template-columns: 1fr; gap: 12px 16px; max-width: 640px; }
+@media (min-width: 560px) { .form-2up { grid-template-columns: 1fr 1fr; } }
+.form-2up input, .form-2up select, .form-2up textarea { width: 100%; }
+
 body {
   font-family: 'Montserrat', sans-serif !important;
   background: var(--cream);
