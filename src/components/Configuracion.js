@@ -582,7 +582,7 @@ export default function Configuracion() {
             </label>
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', maxWidth: 640 }}>
+        <div className="form-2up">
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <span style={B.label}>Clave producto/servicio (SAT)</span>
             <input value={cfdi.claveProdServ} onChange={e => setCfdiCampo('claveProdServ', e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
