@@ -1106,6 +1106,11 @@ function generarMenusIA_(body) {
     "en un tiempo con licuado), NO los metas dentro de esa preparación: ubícalos en un acompañamiento APARTE y sólido " +
     "(por ejemplo 'acompañar con 1/2 taza de frijoles' como plato al lado), o elige otro tipo de platillo que sí integre " +
     "bien todos los grupos. " +
+    "COBERTURA OBLIGATORIA DE EQUIVALENTES: cada opción DEBE incluir TODOS los grupos de 'equivalentes' con cantidad mayor a 0; " +
+    "ninguno puede faltar. Si un grupo no embona en la preparación principal (típico de la FRUTA, la leche o una leguminosa), " +
+    "agrégalo como ACOMPAÑAMIENTO explícito dentro de la misma 'prep', con su cantidad (p. ej. 'acompaña con 1 fruta: 1 manzana chica' " +
+    "o 'de fruta: 1 taza de papaya picada'). LA FRUTA ES LA QUE MÁS SE OLVIDA: si el tiempo trae fruta (>0), la opción SIEMPRE debe " +
+    "incluir una fruta con su porción, y el 'nombre' puede mencionarla (p. ej. '… y fruta'). " +
     "PREFERENCIAS DEL PACIENTE (muy importante): recibirás 'preferencias_paciente' con 'le_gusta', 'no_le_gusta' y 'alergias'. " +
     "Es OBLIGATORIO: NUNCA incluyas ningún alimento —ni sus ingredientes o derivados— que aparezca en 'no_le_gusta' ni en 'alergias'. " +
     "Las ALERGIAS son de SEGURIDAD: por ningún motivo las uses ni las escondas dentro de un platillo (revisa también acompañamientos y salsas). " +
@@ -1114,7 +1119,7 @@ function generarMenusIA_(body) {
     "CONSIDERACIONES GENERALES DEL PLAN (muy importante): puedes recibir 'consideraciones_generales', una instrucción de la nutrióloga que aplica a TODO el plan (todos los tiempos y todas las opciones), no a un tiempo puntual. " +
     "Es OBLIGATORIO respetarla en cada opción que generes (por ejemplo: 'plan bajo en FODMAPs', 'sin lácteos', 'sin fritura', 'preparaciones económicas', 'cocción máx. 20 min'). " +
     "Trátala como una GUÍA de estilo/restricciones que se suma a las preferencias del paciente y a la indicación de cada tiempo; NO la transcribas literal en el 'nombre'. Si entra en conflicto con las alergias del paciente, las alergias SIEMPRE tienen prioridad. " +
-    "REVISIÓN FINAL OBLIGATORIA: antes de responder, revisa CADA opción y confirma que (1) todos los ingredientes del nombre están en la preparación; (2) ningún ingrediente principal de la preparación falta en el nombre; (3) la combinación tiene sentido y es algo que alguien realmente comería; (4) las porciones son realistas; (5) NO aparece nada de 'no_le_gusta' ni 'alergias'; (6) se cumplen las 'consideraciones_generales'. Corrige cualquier opción que falle. Un título que no corresponde a la preparación, mezclar ingredientes que no combinan, incluir un alimento prohibido, o ignorar las consideraciones generales, son ERRORES graves. " +
+    "REVISIÓN FINAL OBLIGATORIA: antes de responder, revisa CADA opción y confirma que (1) todos los ingredientes del nombre están en la preparación; (2) ningún ingrediente principal de la preparación falta en el nombre; (3) la combinación tiene sentido y es algo que alguien realmente comería; (4) las porciones son realistas; (5) NO aparece nada de 'no_le_gusta' ni 'alergias'; (6) se cumplen las 'consideraciones_generales'; (7) TODOS los grupos de 'equivalentes' con cantidad > 0 están representados en la opción (en la preparación o como acompañamiento explícito), EN ESPECIAL la FRUTA. Corrige cualquier opción que falle. Un título que no corresponde a la preparación, mezclar ingredientes que no combinan, incluir un alimento prohibido, ignorar las consideraciones generales, u OMITIR un grupo de equivalentes asignado (sobre todo la fruta), son ERRORES graves. " +
     "Devuelve EXCLUSIVAMENTE JSON válido, sin texto adicional ni markdown.";
 
   var datos = {
