@@ -259,12 +259,15 @@ function FacturacionView({ email, citas, creditos }) {
     }
     const ids = items.filter(x => x.tipo === 'lote').map(x => x.id);
     if (ids.length) {
+      // El backend marca los lotes como facturados (el navegador ya no escribe créditos).
       try {
-        const snap = await getDoc(doc(db, 'creditosConsultas', correo));
-        const data = snap.exists() ? snap.data() : { lotes: [], usos: [] };
-        const setIds = {}; ids.forEach(id => { setIds[id] = true; });
-        const lotes = (data.lotes || []).map(l => setIds[l.id] ? { ...l, facturaUUID: uuid } : l);
-        await setDoc(doc(db, 'creditosConsultas', correo), { correo, lotes, usos: data.usos || [] }, { merge: true });
+        const url = process.env.REACT_APP_APPSCRIPT_URL;
+        if (url) {
+          await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'marcarLoteFacturado', correo, loteIds: ids, uuid }), redirect: 'follow',
+          });
+        }
       } catch (e) { /* noop */ }
     }
   };
