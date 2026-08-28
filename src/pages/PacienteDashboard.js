@@ -11,7 +11,7 @@ import { apegoPorPeriodo } from '../utils/apego';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import { renderRich } from '../utils/richText';
 import { parseDriveLink } from '../utils/drive';
-import { resumenSaldo, venceDeLote, familiaLabel, nuevoLote, PAQUETES_DEFAULT } from '../utils/creditos';
+import { resumenSaldo, venceDeLote, familiaLabel, PAQUETES_DEFAULT } from '../utils/creditos';
 import { REGIMENES_FISCALES, USOS_CFDI, CFDI_DEFAULT } from '../data/catalogosCFDI';
 
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
@@ -447,30 +447,19 @@ export default function PacienteDashboard() {
     (async () => {
       try {
         if (compra === 'paquete') {
-          const paqueteId = params.get('paquete');
           const correoC = (user?.email || '').toLowerCase();
-          if (paqueteId && session && url && correoC) {
+          if (session && url && correoC) {
+            // El BACKEND verifica el pago con Stripe y ACREDITA el crédito.
+            // El navegador del paciente ya NO escribe créditos (evita fraude).
             const rv = await fetch(url, {
               method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ action: 'verificarPagoStripe', sessionId: session }), redirect: 'follow',
+              body: JSON.stringify({ action: 'confirmarPagoStripe', sessionId: session }), redirect: 'follow',
             });
             let dv; try { dv = JSON.parse(await rv.text()); } catch (_) { dv = null; }
-            if (dv && dv.ok && dv.pagado) {
-              let pkgs = PAQUETES_DEFAULT;
-              try { const cs = await getDoc(doc(db, 'config', 'dashboard')); const cd = cs.exists() ? cs.data() : {}; if (Array.isArray(cd.paquetes) && cd.paquetes.length) pkgs = cd.paquetes; } catch (e) {}
-              const pkg = pkgs.find(p => p.id === paqueteId);
-              if (pkg) {
-                const cc = await getDoc(doc(db, 'creditosConsultas', correoC));
-                const cur = cc.exists() ? { lotes: [], usos: [], ...cc.data() } : { lotes: [], usos: [] };
-                // Idempotencia: no acreditar dos veces la misma sesión de pago (p. ej. si recarga la página).
-                if (!(cur.lotes || []).some(l => l.stripeSession === session)) {
-                  const lote = { ...nuevoLote({ familia: pkg.familia, consultas: pkg.consultas, monto: pkg.precio, vigenciaMeses: pkg.vigenciaMeses, origen: 'stripe', paqueteId: pkg.id, paqueteNombre: pkg.nombre }), stripeSession: session };
-                  await setDoc(doc(db, 'creditosConsultas', correoC), { correo: correoC, lotes: [...(cur.lotes || []), lote], usos: cur.usos || [] }, { merge: true });
-                }
-                setPagoMsg('¡Pago confirmado! Se agregaron ' + pkg.consultas + ' consultas a tu saldo. Ya puedes agendarlas.');
-              } else {
-                setPagoMsg('Tu pago se recibió, pero no encontramos el paquete. Avísale a la nutrióloga para acreditarlo.');
-              }
+            if (dv && dv.ok && dv.pagado && dv.acreditado) {
+              setPagoMsg('¡Pago confirmado! Tus consultas ya se agregaron a tu saldo. Ya puedes agendarlas.');
+            } else if (dv && dv.ok && dv.pagado) {
+              setPagoMsg('Tu pago se recibió. Si tu saldo no aparece en un momento, avísale a la nutrióloga para acreditarlo.');
             } else {
               setPagoMsg('Recibimos tu regreso del pago, pero aún no podemos confirmar el cobro. Si el cargo se realizó, tu saldo se reflejará en breve.');
             }
@@ -585,7 +574,7 @@ export default function PacienteDashboard() {
       const cancelUrl = base + '/?compra=cancelada';
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'crearCheckoutStripe', montoCentavos: Math.round(pkg.precio * 100), descripcion: 'Paquete ' + pkg.nombre, correo, citaId: 'pkg_' + pkg.id + '_' + Date.now(), successUrl, cancelUrl }), redirect: 'follow',
+        body: JSON.stringify({ action: 'crearCheckoutStripe', montoCentavos: Math.round(pkg.precio * 100), descripcion: 'Paquete ' + pkg.nombre, correo, citaId: 'pkg_' + pkg.id + '_' + Date.now(), successUrl, cancelUrl, meta: { tipo: 'paquete', correo, paqueteId: pkg.id, consultas: pkg.consultas, familia: pkg.familia, vigenciaMeses: pkg.vigenciaMeses, monto: pkg.precio, paqueteNombre: pkg.nombre } }), redirect: 'follow',
       });
       let dp; try { dp = JSON.parse(await res.text()); } catch (_) { dp = null; }
       if (dp && dp.ok && dp.url) { window.location.href = dp.url; return; }
