@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, query, onSnapshot, addDoc, updateDoc, setDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
-import { familiaDeServicio, saldoDisponible, consumirCredito } from '../utils/creditos';
+import { familiaDeServicio, saldoDisponible } from '../utils/creditos';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DIAS = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
@@ -293,11 +293,18 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
       });
       // Descontar 1 consulta del saldo de paquete (si aplica). Si algo falla, la cita ya quedó confirmada.
       if (usarPaquete) {
+        // El BACKEND descuenta el crédito (el navegador ya no escribe créditos).
         try {
-          const res = consumirCredito(saldoCred, familia, nowISO, ref.id);
-          if (res) {
-            await setDoc(doc(db, 'creditosConsultas', correo), { correo, lotes: res.cred.lotes, usos: res.cred.usos }, { merge: true });
-            try { await updateDoc(doc(db, 'citas', ref.id), { loteId: res.loteId }); } catch (e) {}
+          const urlC = process.env.REACT_APP_APPSCRIPT_URL;
+          if (urlC) {
+            const rc = await fetch(urlC, {
+              method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'consumirCreditoCita', correo, familia, citaId: ref.id }), redirect: 'follow',
+            });
+            let dc; try { dc = JSON.parse(await rc.text()); } catch (_) { dc = null; }
+            if (dc && dc.ok && dc.loteId) {
+              try { await updateDoc(doc(db, 'citas', ref.id), { loteId: dc.loteId }); } catch (e) {}
+            }
           }
         } catch (e) { /* el saldo es secundario; la cita ya quedó */ }
       }
