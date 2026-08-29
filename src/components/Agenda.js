@@ -317,7 +317,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
           const cancelUrl = base + '/?pago=cancelado&cita=' + ref.id;
           const res = await fetch(urlAS, {
             method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'crearCheckoutStripe', montoCentavos: Math.round(precio * 100), descripcion: 'Consulta ' + servSel.nombre, correo: correo, citaId: ref.id, successUrl: successUrl, cancelUrl: cancelUrl }), redirect: 'follow',
+            body: JSON.stringify({ action: 'crearCheckoutStripe', montoCentavos: Math.round(precio * 100), descripcion: 'Consulta ' + servSel.nombre, correo: correo, citaId: ref.id, successUrl: successUrl, cancelUrl: cancelUrl, fbProjectId: FB_PROJECT_ID }), redirect: 'follow',
           });
           let dp; try { dp = JSON.parse(await res.text()); } catch (_) { dp = null; }
           if (dp && dp.ok && dp.url) { window.location.href = dp.url; return; }
