@@ -92,6 +92,7 @@ const RECO_KEYS = RECO_SECCIONES.map(s => s.key);
 
 export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [pacientes, setPacientes] = useState([]);
+  const [historias, setHistorias] = useState({}); // { [pacienteId]: historiaClinica }
   const [selId, setSelId] = useState(null);
   const [sub, setSub] = useState('dash');
   const [nuevo, setNuevo] = useState(false);
@@ -154,6 +155,15 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       e => setErr('No se pudieron cargar los pacientes: ' + e.message));
   }, []);
 
+  // Historias clínicas: viven en la colección aparte 'historias' (reglas: SOLO nutrióloga),
+  // para que los datos clínicos y las notas profesionales NO viajen al navegador del paciente
+  // dentro de su documento de 'pacientes'. Se cargan aquí y se adjuntan al paciente en 'sel'.
+  useEffect(() => {
+    return onSnapshot(collection(db, 'historias'),
+      snap => { const m = {}; snap.docs.forEach(d => { m[d.id] = d.data(); }); setHistorias(m); },
+      () => { /* si las reglas aún no permiten leer historias/, no rompas la vista */ });
+  }, []);
+
   // Enlaces rápidos personalizados de recomendaciones (compartidos entre todos los pacientes).
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'recomendaciones'), snap => {
@@ -180,7 +190,11 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     setVerNotas(false);
   }, [selId, pacientes]);
 
-  const sel = pacientes.find(p => p.id === selId);
+  const selBase = pacientes.find(p => p.id === selId);
+  // Adjuntamos la historia (de la colección aparte) al paciente seleccionado, para que
+  // Plan, Menús y la vista de historia sigan usando sel.historia igual que antes.
+  // Respaldo: si un paciente aún no está migrado, usa el campo embebido antiguo.
+  const sel = selBase ? { ...selBase, historia: historias[selBase.id] || selBase.historia || null } : undefined;
 
   // Al cambiar de paciente, limpia el chat y los mensajes del resumen.
   useEffect(() => { setChatMsgs([]); setChatInput(''); setResumenMsg(''); }, [selId]);
@@ -275,17 +289,23 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const guardarHistoriaNueva = async (h) => {
     const der = derivar(h);
     if (!der.nombre) { setErr('Escribe el nombre en "Datos generales".'); throw new Error('sin nombre'); }
+    // El expediente del paciente NO guarda la historia clínica embebida (así no llega a su navegador).
     const ref = await addDoc(collection(db, 'pacientes'), {
       codigo: (h.datos && h.datos.pacienteNo) || nextCodigo(), ...der,
-      historia: h, inicio: hoyISO(), mediciones: [], planes: [], creado: Date.now(),
+      inicio: hoyISO(), mediciones: [], planes: [], creado: Date.now(),
     });
+    // La historia clínica va en la colección aparte 'historias' (solo-nutrióloga).
+    await setDoc(doc(db, 'historias', ref.id), h);
     mirrorSuscriptor(der.correo, der.sexo, der.nombre);
     setNuevo(false); setErr(''); setSelId(ref.id); setSub('dash');
   };
 
   const guardarHistoriaExistente = async (h) => {
     const der = derivar(h);
-    await updateDoc(doc(db, 'pacientes', sel.id), { ...der, historia: h });
+    // Datos derivados (nombre, edad, correo…) sí van en pacientes/; la historia clínica, no.
+    await updateDoc(doc(db, 'pacientes', sel.id), { ...der });
+    // La historia clínica va en la colección aparte 'historias' (solo-nutrióloga).
+    await setDoc(doc(db, 'historias', sel.id), h);
     mirrorSuscriptor(der.correo, der.sexo, der.nombre);
     setErr('');
   };
@@ -302,6 +322,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     if (!ok) return;
     try {
       await deleteDoc(doc(db, 'pacientes', p.id));
+      // Borra también la historia clínica de la colección aparte (best-effort).
+      try { await deleteDoc(doc(db, 'historias', p.id)); } catch (e2) { /* si no existe, se ignora */ }
       if (selId === p.id) { setSelId(null); setSub('dash'); }
       setErr('');
     } catch (e) { setErr('No se pudo eliminar: ' + e.message); }
