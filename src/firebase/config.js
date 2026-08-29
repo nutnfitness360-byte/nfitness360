@@ -19,6 +19,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+// ID del proyecto Firebase de ESTA instancia. El frontend lo manda al backend en
+// las operaciones de créditos, para que el backend escriba en la base correcta.
+export const FB_PROJECT_ID = firebaseConfig.projectId;
 export const googleProvider = new GoogleAuthProvider();
 // Forzar que Google pregunte SIEMPRE qué cuenta usar (evita reutilizar la sesión
 // anterior del navegador; importante para la confidencialidad entre nutrióloga y paciente).
