@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase/config';
+import { db, FB_PROJECT_ID } from '../firebase/config';
 import { collection, query, onSnapshot, addDoc, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { familiaDeServicio, saldoDisponible } from '../utils/creditos';
@@ -299,7 +299,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
           if (urlC) {
             const rc = await fetch(urlC, {
               method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ action: 'consumirCreditoCita', correo, familia, citaId: ref.id }), redirect: 'follow',
+              body: JSON.stringify({ action: 'consumirCreditoCita', correo, familia, citaId: ref.id, fbProjectId: FB_PROJECT_ID }), redirect: 'follow',
             });
             let dc; try { dc = JSON.parse(await rc.text()); } catch (_) { dc = null; }
             if (dc && dc.ok && dc.loteId) {
