@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../firebase/config';
+import { db, FB_PROJECT_ID } from '../firebase/config';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { useBranding, aplicarColores } from '../context/BrandingContext';
@@ -265,7 +265,7 @@ function FacturacionView({ email, citas, creditos }) {
         if (url) {
           await fetch(url, {
             method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'marcarLoteFacturado', correo, loteIds: ids, uuid }), redirect: 'follow',
+            body: JSON.stringify({ action: 'marcarLoteFacturado', correo, loteIds: ids, uuid, fbProjectId: FB_PROJECT_ID }), redirect: 'follow',
           });
         }
       } catch (e) { /* noop */ }
@@ -456,7 +456,7 @@ export default function PacienteDashboard() {
             // El navegador del paciente ya NO escribe créditos (evita fraude).
             const rv = await fetch(url, {
               method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ action: 'confirmarPagoStripe', sessionId: session }), redirect: 'follow',
+              body: JSON.stringify({ action: 'confirmarPagoStripe', sessionId: session, fbProjectId: FB_PROJECT_ID }), redirect: 'follow',
             });
             let dv; try { dv = JSON.parse(await rv.text()); } catch (_) { dv = null; }
             if (dv && dv.ok && dv.pagado && dv.acreditado) {
