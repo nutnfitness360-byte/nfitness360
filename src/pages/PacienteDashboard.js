@@ -577,7 +577,7 @@ export default function PacienteDashboard() {
       const cancelUrl = base + '/?compra=cancelada';
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'crearCheckoutStripe', montoCentavos: Math.round(pkg.precio * 100), descripcion: 'Paquete ' + pkg.nombre, correo, citaId: 'pkg_' + pkg.id + '_' + Date.now(), successUrl, cancelUrl, meta: { tipo: 'paquete', correo, paqueteId: pkg.id, consultas: pkg.consultas, familia: pkg.familia, vigenciaMeses: pkg.vigenciaMeses, monto: pkg.precio, paqueteNombre: pkg.nombre } }), redirect: 'follow',
+        body: JSON.stringify({ action: 'crearCheckoutStripe', montoCentavos: Math.round(pkg.precio * 100), descripcion: 'Paquete ' + pkg.nombre, correo, citaId: 'pkg_' + pkg.id + '_' + Date.now(), successUrl, cancelUrl, fbProjectId: FB_PROJECT_ID, meta: { tipo: 'paquete', correo, paqueteId: pkg.id, consultas: pkg.consultas, familia: pkg.familia, vigenciaMeses: pkg.vigenciaMeses, monto: pkg.precio, paqueteNombre: pkg.nombre } }), redirect: 'follow',
       });
       let dp; try { dp = JSON.parse(await res.text()); } catch (_) { dp = null; }
       if (dp && dp.ok && dp.url) { window.location.href = dp.url; return; }
