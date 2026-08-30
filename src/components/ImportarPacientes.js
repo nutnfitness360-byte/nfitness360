@@ -9,6 +9,8 @@ const hoyISO = () => {
 };
 
 const sinId = (p) => { const o = { ...p }; delete o.id; return o; };
+// Normaliza un nombre para comparar (sin mayúsculas ni espacios de más).
+const normNombre = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 export default function ImportarPacientes({ open, onClose, pacientes, prefix = 'NF-' }) {
   const [raws, setRaws] = useState(null);      // array de registros crudos del archivo
@@ -40,13 +42,26 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
 
   const conteo = useMemo(() => {
     if (!raws) return null;
+    // Nombres de pacientes que YA existen (para detectar posibles duplicados sin correo).
+    const nombresExistentes = new Set((pacientes || []).map(p => normNombre(p.nombre)).filter(Boolean));
     let nuevos = 0, actualiza = 0;
+    const vistos = {};   // nombre normalizado -> veces que aparece entre los "nuevos" del archivo
+    const dupes = [];    // descripciones de posibles duplicados
     raws.forEach(r => {
-      const correo = String((r.campos && r.campos.Email) || '').trim().toLowerCase();
-      if (correo && porCorreo.has(correo)) actualiza++; else nuevos++;
+      const rec = mapearPaciente(r, hoyISO());
+      const correo = (rec.correo || '').toLowerCase();
+      if (correo && porCorreo.has(correo)) { actualiza++; return; } // se empareja por correo: no es duplicado
+      nuevos++;
+      const nn = normNombre(rec.nombre);
+      if (!nn) return;
+      // Sin correo para emparejar: si el nombre ya existe, es un posible duplicado.
+      if (nombresExistentes.has(nn)) dupes.push((rec.nombre || nn) + ' — ya existe un paciente con ese nombre');
+      vistos[nn] = (vistos[nn] || 0) + 1;
     });
-    return { total: raws.length, nuevos, actualiza };
-  }, [raws, porCorreo]);
+    // Nombres repetidos dentro del mismo archivo.
+    Object.keys(vistos).forEach(nn => { if (vistos[nn] > 1) dupes.push(nn + ' — aparece ' + vistos[nn] + ' veces en el archivo'); });
+    return { total: raws.length, nuevos, actualiza, dupes };
+  }, [raws, porCorreo, pacientes]);
 
   if (!open) return null;
 
@@ -71,6 +86,17 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
 
   const importar = async () => {
     if (!raws) return;
+    // Advertencia de posibles duplicados (pacientes sin correo que coinciden por nombre).
+    if (conteo && conteo.dupes && conteo.dupes.length) {
+      const lista = conteo.dupes.slice(0, 8).map(d => '• ' + d).join('\n');
+      const extra = conteo.dupes.length > 8 ? ('\n… y ' + (conteo.dupes.length - 8) + ' más') : '';
+      const ok = window.confirm(
+        '⚠️ Se encontraron ' + conteo.dupes.length + ' posibles duplicados:\n\n' + lista + extra +
+        '\n\nEstos NO se pueden emparejar por correo, así que se crearían como pacientes NUEVOS. ' +
+        '¿Importar de todos modos?'
+      );
+      if (!ok) return;
+    }
     setBusy(true); setError(''); setResultado(null);
     setProgreso({ hecho: 0, total: raws.length });
 
@@ -87,6 +113,11 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
         rec.loteId = loteId;
         rec.importadoEn = importadoEn;
 
+        // La historia clínica NO se guarda dentro de pacientes/ (Paso 3: no debe llegar
+        // al navegador del paciente). Se separa aquí y se guarda en historias/.
+        const historia = rec.historia;
+        delete rec.historia;
+
         const correo = rec.correo;
         const existente = correo ? porCorreo.get(correo) : null;
 
@@ -99,11 +130,16 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
           rec.planes = existente.planes || [];
           rec.creado = existente.creado || rec.creado;
           await updateDoc(doc(db, 'pacientes', existente.id), rec);
+          // NO pisamos la historia de un paciente que ya existe (la nutrióloga pudo
+          // haberle hecho una más completa). Solo se escribe historia en pacientes NUEVOS.
           actualizados++;
         } else {
           rec.importCreado = true;
           rec.codigo = prefix + String(++mx).padStart(4, '0');
-          await addDoc(collection(db, 'pacientes'), rec);
+          const ref = await addDoc(collection(db, 'pacientes'), rec);
+          if (historia) {
+            try { await setDoc(doc(db, 'historias', ref.id), historia); } catch (e) { /* la historia es secundaria; el paciente ya quedó */ }
+          }
           creados++;
         }
         setProgreso({ hecho: i + 1, total: raws.length });
@@ -168,6 +204,19 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
               </div>
             )}
 
+            {conteo && conteo.dupes && conteo.dupes.length > 0 && (
+              <div style={S.warn}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠️ {conteo.dupes.length} posibles duplicados</div>
+                <div style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+                  Estos pacientes no tienen correo para emparejarlos, pero su nombre coincide con alguien que ya existe (o se repite en el archivo). Se crearían como <b>nuevos</b>. Revísalos antes de importar; al dar “Importar” te pediremos confirmación.
+                </div>
+                <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12.5, color: 'var(--dark)' }}>
+                  {conteo.dupes.slice(0, 6).map((d, i) => <li key={i}>{d}</li>)}
+                  {conteo.dupes.length > 6 && <li>… y {conteo.dupes.length - 6} más</li>}
+                </ul>
+              </div>
+            )}
+
             {busy && progreso.total > 0 && (
               <div style={S.info}>Cargando… {progreso.hecho} de {progreso.total}</div>
             )}
@@ -221,4 +270,5 @@ const S = {
   danger: { background: '#fff', color: 'var(--danger)', border: '0.5px solid var(--danger)', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', marginTop: 8 },
   undo: { marginTop: 18, paddingTop: 14, borderTop: '0.5px solid var(--border)' },
   err: { marginTop: 14, background: '#fdecec', color: '#a12', padding: '10px 12px', borderRadius: 8, fontSize: 13 },
+  warn: { marginTop: 12, background: '#fff7e6', border: '0.5px solid #f0c36d', color: '#8a5a00', padding: '10px 12px', borderRadius: 8, fontSize: 13 },
 };
