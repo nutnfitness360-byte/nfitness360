@@ -46,6 +46,7 @@ export default function NutriDashboard() {
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [suscriptores, setSuscriptores] = useState([]);
+  const [creditos, setCreditos] = useState([]); // saldos/compras de paquetes (creditosConsultas)
   const [cfg, setCfg] = useState({ pendientes: [], pendientesPago: [], pendientesPlan: [], precios: {}, servicios: [] });
   const [filtroRet, setFiltroRet] = useState(null);
   const [nuevoPend, setNuevoPend] = useState('');
@@ -73,6 +74,13 @@ export default function NutriDashboard() {
     return onSnapshot(collection(db, 'suscriptores'),
       snap => setSuscriptores(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       () => setSuscriptores([]));
+  }, []);
+
+  // Compras de paquetes / saldos (colección `creditosConsultas`): para el ingreso REAL cobrado.
+  useEffect(() => {
+    return onSnapshot(collection(db, 'creditosConsultas'),
+      snap => setCreditos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      () => setCreditos([]));
   }, []);
 
   useEffect(() => {
@@ -163,17 +171,43 @@ export default function NutriDashboard() {
     );
   };
 
-  // ---- Financiero (mes actual) ----
+  // ---- Financiero (mes actual) — SOLO lo COBRADO de verdad ----
+  // Antes se contaba TODA cita agendada × precio, lo que inflaba (incluía no pagadas
+  // y las cubiertas por paquete, que ya se cobraron aparte). Ahora el ingreso = paquetes
+  // vendidos en el mes (su monto real) + consultas SUELTAS realmente pagadas en línea.
   const citasMes = citas.filter(c => (c.fecha || '').slice(0, 7) === mesKey && c.estado !== 'cancelada');
   const conteoTipo = {};
   citasMes.forEach(c => { const t = c.tipoNombre || c.motivo || 'Otro'; conteoTipo[t] = (conteoTipo[t] || 0) + 1; });
   const precios = cfg.precios || {};
   const serviciosNombres = (cfg.servicios && cfg.servicios.length) ? cfg.servicios.map(s => s.nombre) : SERVICIOS_NOMBRES_DEFAULT;
-  const porServicio = Object.keys(conteoTipo).map(t => ({ tipo: t, n: conteoTipo[t], ingreso: conteoTipo[t] * (precios[t] || 0) }))
-    .sort((a, b) => b.ingreso - a.ingreso);
-  const ingresoMes = porServicio.reduce((a, s) => a + s.ingreso, 0);
+
+  // Consultas sueltas pagadas en línea (estadoPago 'pagado' y SIN paquete): ingreso real por tipo.
+  const ingresoTipo = {};
+  let nCitasSueltas = 0, ingresoCitasSueltas = 0;
+  citasMes.forEach(c => {
+    if (c.estadoPago !== 'pagado' || c.loteId) return; // solo pagos individuales confirmados
+    const t = c.tipoNombre || c.motivo || 'Otro';
+    const p = precios[t] || 0;
+    ingresoTipo[t] = (ingresoTipo[t] || 0) + p;
+    ingresoCitasSueltas += p; nCitasSueltas++;
+  });
+  // Paquetes vendidos este mes: monto real de cada lote comprado dentro del mes (cualquier origen).
+  let nPaquetes = 0, ingresoPaquetes = 0;
+  (creditos || []).forEach(cr => {
+    (cr.lotes || []).forEach(l => {
+      if (!l || String(l.fecha || '').slice(0, 7) !== mesKey) return;
+      nPaquetes++;
+      const m = Number(l.monto);
+      if (isFinite(m) && m > 0) ingresoPaquetes += m;
+    });
+  });
+  const ingresoMes = ingresoCitasSueltas + ingresoPaquetes;
+  // Tabla por tipo: la actividad (n citas) y el ingreso REAL de consultas sueltas de ese tipo.
+  const porServicio = Object.keys(conteoTipo).map(t => ({ tipo: t, n: conteoTipo[t], ingreso: ingresoTipo[t] || 0 }))
+    .sort((a, b) => b.n - a.n);
   const masVende = Object.keys(conteoTipo).sort((a, b) => conteoTipo[b] - conteoTipo[a])[0];
   const hayPrecios = serviciosNombres.some(s => (precios[s] || 0) > 0);
+  const hayDatosFin = hayPrecios || ingresoPaquetes > 0 || nPaquetes > 0;
 
   // ---- Retención (semáforo por fecha del último PLAN generado) ----
   // El reloj de "regreso a consulta" arranca el día en que se generó el plan completo
@@ -291,7 +325,7 @@ export default function NutriDashboard() {
               </div>
             </div>
 
-            <div className="grid-2up">
+            <div style={{ ...D.grid2, gridTemplateColumns: 'repeat(2, minmax(0,1fr))' }}>
               {/* Citas de hoy */}
               <div className="card">
                 <div className="card-title">Citas de hoy</div>
@@ -351,7 +385,7 @@ export default function NutriDashboard() {
 
               {editaPrecios && (
                 <div style={D.preciosBox}>
-                  <div style={{ fontSize: 12, color: 'var(--stone)', marginBottom: 8 }}>Precio por tipo de consulta (MXN). El ingreso se calcula como citas × precio.</div>
+                  <div style={{ fontSize: 12, color: 'var(--stone)', marginBottom: 8 }}>Precio por tipo de consulta (MXN). Los ingresos cuentan solo lo cobrado: paquetes vendidos + consultas sueltas pagadas.</div>
                   {serviciosNombres.map(s => (
                     <div key={s} style={D.precioRow}>
                       <span style={{ flex: 1, fontSize: 13, color: 'var(--dark)' }}>{s}</span>
@@ -363,19 +397,23 @@ export default function NutriDashboard() {
                 </div>
               )}
 
-              {!hayPrecios && !editaPrecios ? (
+              {!hayDatosFin && !editaPrecios ? (
                 <div className="empty-state">Define el precio de cada consulta (botón “Editar precios”) para ver tus ingresos.</div>
               ) : (
                 <>
                   <div style={D.finTop}>
                     <div style={D.finBig}>
                       <div style={D.finBigNum}>{money(ingresoMes)}</div>
-                      <div style={D.finBigLbl}>Ingresos del mes</div>
+                      <div style={D.finBigLbl}>Ingresos del mes (cobrado)</div>
                     </div>
                     <div style={D.finBig}>
                       <div style={D.finBigNum}>{masVende || '—'}</div>
-                      <div style={D.finBigLbl}>Consulta que más vende{masVende ? ` (${conteoTipo[masVende]})` : ''}</div>
+                      <div style={D.finBigLbl}>Consulta más frecuente{masVende ? ` (${conteoTipo[masVende]})` : ''}</div>
                     </div>
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5 }}>
+                    Paquetes vendidos: <b style={{ color: 'var(--dark)' }}>{nPaquetes}</b> · {money(ingresoPaquetes)}
+                    &nbsp;·&nbsp; Consultas sueltas pagadas: <b style={{ color: 'var(--dark)' }}>{nCitasSueltas}</b> · {money(ingresoCitasSueltas)}
                   </div>
                   <div style={{ marginTop: 6 }}>
                     {porServicio.length === 0
