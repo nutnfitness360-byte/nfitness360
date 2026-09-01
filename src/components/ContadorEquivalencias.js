@@ -72,10 +72,35 @@ export default function ContadorEquivalencias({ expedienteId, plan, seguimiento 
   const diasRef = useRef(Array.isArray(seguimiento && seguimiento.dias) ? seguimiento.dias : []);
   useEffect(() => { if (Array.isArray(seguimiento && seguimiento.dias)) diasRef.current = seguimiento.dias; }, [seguimiento]);
 
+  // Estado de guardado visible para el paciente: 'idle' | 'saving' | 'saved' | 'error'
+  const [guardState, setGuardState] = useState('idle');
+  const [errMsg, setErrMsg] = useState('');
+  const savedTimerRef = useRef(null);
+  const lastSavedRef = useRef('');       // firma del último objeto guardado con éxito
+
+  // Guarda en Firestore y REFLEJA el resultado (sin silenciar errores).
   const persistRaw = useCallback((segObj) => {
-    if (!expedienteId) return;
-    updateDoc(doc(db, 'pacientes', expedienteId), { seguimientoEq: segObj }).catch(() => {});
+    if (!expedienteId) return Promise.resolve(false);
+    setGuardState('saving');
+    setErrMsg('');
+    return updateDoc(doc(db, 'pacientes', expedienteId), { seguimientoEq: segObj })
+      .then(() => {
+        lastSavedRef.current = JSON.stringify(segObj.consumo || {});
+        setGuardState('saved');
+        if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = setTimeout(() => setGuardState((s) => (s === 'saved' ? 'idle' : s)), 2600);
+        return true;
+      })
+      .catch((e) => {
+        setGuardState('error');
+        const code = (e && (e.code || e.message)) || '';
+        setErrMsg(/permission|insufficient/i.test(String(code))
+          ? 'No se pudo guardar: falta permiso en la base de datos. Avísale a tu nutrióloga.'
+          : 'No se pudo guardar tu avance. Revisa tu conexión e inténtalo de nuevo.');
+        return false;
+      });
   }, [expedienteId]);
+  useEffect(() => () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); }, []);
 
   const calc = useCallback((cons) => {
     const porGrupo = Array(18).fill(0);
@@ -110,6 +135,20 @@ export default function ContadorEquivalencias({ expedienteId, plan, seguimiento 
     const t = setTimeout(() => persistRaw(seg), 700);
     return () => clearTimeout(t);
   }, [consumo, calc, planTotal, planGrupo, today, persistRaw]);
+
+  /* --- Guardado manual (botón "Guardar") --- */
+  const buildSeg = useCallback((cons) => {
+    const { total } = calc(cons);
+    const pct = planTotal > 0 ? Math.round(total / planTotal * 100) : 0;
+    return { fecha: today, consumo: cons, tocado: true, pctHoy: pct, consumidoHoy: Math.round(total * 100) / 100, planTotal, planGrupo, dias: diasRef.current };
+  }, [calc, planTotal, planGrupo, today]);
+  const guardarAhora = useCallback(() => {
+    touchedRef.current = true;
+    persistRaw(buildSeg(consumo));
+  }, [buildSeg, consumo, persistRaw]);
+
+  // ¿Hay cambios sin guardar respecto a lo último confirmado?
+  const sinGuardar = useMemo(() => guardState !== 'saving' && JSON.stringify(consumo) !== lastSavedRef.current && (touchedRef.current || Object.keys(consumo).length > 0), [consumo, guardState]);
 
   /* --- Mutadores --- */
   const mutate = (updater) => { touchedRef.current = true; setConsumo(updater); };
@@ -155,6 +194,21 @@ export default function ContadorEquivalencias({ expedienteId, plan, seguimiento 
     return n;
   }, [seguimiento, today, pctDia]);
 
+  // Progreso acumulado (todos los días cerrados registrados)
+  const resumen = useMemo(() => {
+    const arr = (Array.isArray(seguimiento && seguimiento.dias) ? seguimiento.dias : [])
+      .filter((d) => d && d.fecha && d.fecha !== today);
+    const n = arr.length;
+    const prom = n ? Math.round(arr.reduce((a, d) => a + clampPct(d.pct), 0) / n) : 0;
+    const buenos = arr.filter((d) => clampPct(d.pct) >= 70).length;
+    // Mejor racha histórica (días consecutivos ≥70%)
+    const map = {}; arr.forEach((d) => { map[d.fecha] = clampPct(d.pct); });
+    const fechas = Object.keys(map).sort();
+    let mejor = 0, run = 0, prev = null;
+    fechas.forEach((f) => { if (map[f] >= 70) { run = (prev && addDaysISO(prev, 1) === f) ? run + 1 : 1; if (run > mejor) mejor = run; } else run = 0; prev = f; });
+    return { n, prom, buenos, mejor };
+  }, [seguimiento, today]);
+
   if (secciones.length === 0) return null;
 
   return (
@@ -171,6 +225,26 @@ export default function ContadorEquivalencias({ expedienteId, plan, seguimiento 
       </div>
 
       <div style={{ padding: '4px 16px 16px' }}>
+        {/* BARRA DE GUARDADO */}
+        <div style={S.saveBar}>
+          <button
+            onClick={guardarAhora}
+            disabled={guardState === 'saving'}
+            style={{ ...S.saveBtn, ...(guardState === 'saving' ? S.saveBtnBusy : null) }}
+          >
+            {guardState === 'saving' ? 'Guardando…' : 'Guardar mi avance'}
+          </button>
+          <span style={S.saveMsg}>
+            {guardState === 'error'
+              ? <span style={{ color: '#B4462F', fontWeight: 700 }}>{errMsg}</span>
+              : guardState === 'saved'
+                ? <span style={{ color: 'var(--sage)', fontWeight: 700 }}>✓ Avance guardado</span>
+                : sinGuardar
+                  ? <span style={{ color: 'var(--gold)', fontWeight: 700 }}>Cambios sin guardar</span>
+                  : <span>Tu avance se guarda solo, o pulsa Guardar.</span>}
+          </span>
+        </div>
+
         {/* TIEMPOS */}
         <div style={S.blockTitle}>Tus tiempos de hoy</div>
         <div style={S.blockHint}>Marca cada grupo que sí consumiste. Usa + / − si comiste solo una parte. Se guarda solo.</div>
@@ -222,6 +296,20 @@ export default function ContadorEquivalencias({ expedienteId, plan, seguimiento 
           );
         })}
         <div style={S.legend}><span>Consumido: <b style={{ color: 'var(--dark)' }}>{fmtN(total)}</b></span><span>Te falta: <b style={{ color: 'var(--dark)' }}>{fmtN(Math.max(0, planTotal - total))}</b></span><span>Plan del día: <b style={{ color: 'var(--dark)' }}>{fmtN(planTotal)}</b></span></div>
+
+        {/* RESUMEN ACUMULADO */}
+        {resumen.n > 0 && (
+          <>
+            <div style={{ ...S.blockTitle, marginTop: 18 }}>Tu progreso acumulado</div>
+            <div style={S.blockHint}>Lo que llevas registrado desde que empezaste a usar tu contador.</div>
+            <div style={S.statRow}>
+              <div style={S.stat}><div style={S.statNum}>{resumen.n}</div><div style={S.statLbl}>días registrados</div></div>
+              <div style={S.stat}><div style={S.statNum}>{resumen.prom}%</div><div style={S.statLbl}>apego promedio</div></div>
+              <div style={S.stat}><div style={S.statNum}>{resumen.buenos}</div><div style={S.statLbl}>días ≥ 70%</div></div>
+              <div style={S.stat}><div style={S.statNum}>{resumen.mejor}</div><div style={S.statLbl}>mejor racha</div></div>
+            </div>
+          </>
+        )}
 
         {/* HISTORIAL 7 DÍAS */}
         <div style={{ ...S.blockTitle, marginTop: 18 }}>Tu progreso · últimos días</div>
@@ -280,6 +368,16 @@ const S = {
   grpNums: { fontSize: 12, fontWeight: 700, color: 'var(--dark)' },
   bar: { height: 9, borderRadius: 999, background: 'var(--soft, var(--line-soft))', overflow: 'hidden' },
   legend: { display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 11, color: 'var(--stone)', marginTop: 2 },
+
+  saveBar: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 0 12px', marginBottom: 6, borderBottom: '1px solid var(--soft, var(--line-soft))' },
+  saveBtn: { flexShrink: 0, border: 'none', background: 'var(--gold)', color: '#fff', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap' },
+  saveBtnBusy: { opacity: .6, cursor: 'default' },
+  saveMsg: { fontSize: 11.5, color: 'var(--stone)', flex: 1, minWidth: 120, lineHeight: 1.4 },
+
+  statRow: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 8, marginBottom: 4 },
+  stat: { background: '#FCFAF7', border: '1px solid var(--border)', borderRadius: 11, padding: '10px 6px', textAlign: 'center' },
+  statNum: { fontSize: 19, fontWeight: 800, color: 'var(--dark)', lineHeight: 1 },
+  statLbl: { fontSize: 9.5, color: 'var(--stone)', marginTop: 4, lineHeight: 1.25 },
 
   days: { display: 'flex', gap: 7, justifyContent: 'space-between' },
   dayBar: { height: 54, borderRadius: 8, background: 'var(--soft, var(--line-soft))', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' },
