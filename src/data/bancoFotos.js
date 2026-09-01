@@ -1,611 +1,1506 @@
-// Banco de fotos de platillos (602). Cada entrada: { file, label, keys, receta?, fruta? }.
+// Banco de fotos de platillos (139). Índice MEJORADO + 11 platillos nuevos
+// (chilaquiles, sopes, tlacoyos, crepa, pasta boloñesa, pizza, hamburguesa, plato mediterráneo,
+// frijoles, cereal, bisquet) tomados del recetario. Cada entrada: { file, label, keys }.
 // Las imágenes viven en public/menu-images/.
-// 247 base + 355 nuevas (frutas dedicadas + platillos del recetario, ago 2026).
-// 'receta' = preparación base del recetario (465 emparejadas). 'fruta:true' = foto dedicada
-// de fruta que activa el uso de la fruta predominante como imagen del platillo (19 frutas).
 const BANCO_FOTOS = [
- {"file": "avena-con-fresa-y-nuez-04721cae.jpg", "label": "Avena con fresa y nuez", "keys": ["avena", "fresa", "nuez"], "receta": "40g de avena con canela; 1 scoop de proteína; encima fresa y nuez."},
- {"file": "bowl-de-yogurt-con-platano-y-chia-05f2e290.jpg", "label": "Bowl de yogurt con plátano y chía", "keys": ["yogurt", "platano", "chia", "banana"]},
- {"file": "huevo-con-nopales-084395fa.jpg", "label": "Huevo con nopales", "keys": ["huevo", "huevos", "nopal", "nopales", "clara", "claras"]},
- {"file": "huevos-revueltos-con-espinaca-y-jitomate-08b71ffb.jpg", "label": "Huevos revueltos con espinaca y jitomate", "keys": ["huevo", "huevos", "espinaca", "espinacas", "jitomate", "tomate", "clara", "claras"]},
- {"file": "avo-toast-de-salmon-ahumado-0db82c23.jpg", "label": "Avo toast de salmón ahumado", "keys": ["salmon", "aguacate", "avo", "pepino", "toast"], "receta": "1 pan de caja oroweat encima 20g de hummus untado + espinacas + jitomate y 60g de salmón ahumado + 4 cdas de queso feta encima + aderezo balsamico y 1"},
- {"file": "pan-toast-con-mantequilla-1595f995.jpg", "label": "Pan / toast con mantequilla", "keys": ["pan", "toast", "mantequilla", "frances"]},
- {"file": "bowl-completo-pollo-arroz-garbanzo-1603ac7a.jpg", "label": "Bowl completo (pollo, arroz, garbanzo)", "keys": ["bowl", "pollo", "arroz", "garbanzo", "garbanzos"]},
- {"file": "overnight-oats-con-kiwi-173a9a48.jpg", "label": "Overnight oats con kiwi", "keys": ["overnight", "avena", "yogurt", "kiwi"], "receta": "Avena remojada en yogurt griego; kiwi."},
- {"file": "bowl-de-fruta-frutos-rojos-17a41bbe.jpg", "label": "Bowl de fruta (frutos rojos)", "keys": ["fruta", "fresa", "arandano", "arandanos", "frambuesa", "blueberries", "berries", "frutos"], "receta": "Bowl de yogurt griego con frutos rojos y granola."},
- {"file": "avo-toast-de-salmon-y-arugula-1a117728.jpg", "label": "Avo toast de salmón y arúgula", "keys": ["salmon", "aguacate", "avo", "arugula", "toast"], "receta": "1 pan tostado con aguacate, salmón y arúgula; sal, limón y chile."},
- {"file": "molletes-1b9f70aa.jpg", "label": "Molletes", "keys": ["molletes", "mollete"], "receta": "2 rebanadas de pan de masa madre (60g) 75g de frijoles refritos ó en bola 60g de queso panela Pico de gallo 40g de aguacate ó 1 cda de crema + 5 galle"},
- {"file": "pepino-y-zanahoria-con-tajin-1ff9385c.jpg", "label": "Pepino y zanahoria con Tajín", "keys": ["pepino", "zanahoria", "tajin", "verdura", "verduras"]},
- {"file": "salmon-con-ensalada-207c54a6.jpg", "label": "Salmón con ensalada", "keys": ["salmon", "ensalada", "aguacate"], "receta": "180g de salmón con ensalada verde y aguacate."},
- {"file": "filete-de-pescado-con-papas-y-ensalada-22078269.jpg", "label": "Filete de pescado con papas y ensalada", "keys": ["pescado", "filete", "papa", "papas", "ensalada"], "receta": "180g de filete con papa al horno y ensalada."},
- {"file": "huevo-al-gusto-con-fruta-23ff0e72.jpg", "label": "Huevo al gusto con fruta", "keys": ["huevo", "huevos", "fresa", "aguacate", "cafe", "clara", "claras"]},
- {"file": "manzana-con-crema-de-cacahuate-24c21928.jpg", "label": "Manzana con crema de cacahuate", "keys": ["manzana", "cacahuate", "crema"], "receta": "manzana en gajos con crema de cacahuate."},
- {"file": "palomitas-27d117e6.jpg", "label": "Palomitas", "keys": ["palomitas", "palomita"]},
- {"file": "proteina-suplemento-batido-2bdff8b5.jpg", "label": "Proteína / suplemento (batido)", "keys": ["proteina", "suplemento", "whey", "batido"]},
- {"file": "toast-caprese-2d793ff2.jpg", "label": "Toast caprese", "keys": ["caprese", "pan", "toast", "jitomate", "queso", "albahaca"], "receta": "1 pan tostado con panela, jitomate y albahaca; sal, limón y chile."},
- {"file": "avo-toast-de-salmon-con-huevo-2e12f3d8.jpg", "label": "Avo toast de salmón con huevo", "keys": ["salmon", "aguacate", "avo", "toast", "huevo", "clara", "claras"]},
- {"file": "ensalada-de-nopales-301b4a1f.jpg", "label": "Ensalada de nopales", "keys": ["nopales", "nopal", "ensalada"], "receta": "Ensalada de nopal con lechuga, verduras y aderezo de limón y aceite de oliva."},
- {"file": "bowl-de-yogurt-con-mango-3055a6be.jpg", "label": "Bowl de yogurt con mango", "keys": ["yogurt", "mango", "granola"], "receta": "¾ taza de yogurt griego con ½ mango en cubos y 2 cdas de amaranto."},
- {"file": "bowl-de-acai-smoothie-bowl-3497145d.jpg", "label": "Bowl de açaí / smoothie bowl", "keys": ["acai", "bowl", "smoothie", "berries", "granola", "fresa"]},
- {"file": "omelette-360a45c9.jpg", "label": "Omelette", "keys": ["omelette", "omelet", "huevo", "ensalada", "omellete", "omele", "omelett", "clara", "claras"], "receta": "Añadir 3 huevos revueltos en un sartén + 30g de queso Oaxaca + 1 taza de verduras de tu elección (espinacas, tomate cherry, champiñones) Acompañar con"},
- {"file": "uvas-37624af9.jpg", "label": "Uvas", "keys": ["uva", "uvas", "fruta"]},
- {"file": "filete-de-pescado-con-papas-y-ensalada-3806b409.jpg", "label": "Filete de pescado con papas y ensalada", "keys": ["pescado", "filete", "papa", "papas", "ensalada"], "receta": "180g de filete con papa al horno y ensalada."},
- {"file": "tacos-de-pescado-3a5e4f2f.jpg", "label": "Tacos de pescado", "keys": ["tacos", "taco", "pescado"], "receta": "5 tortillas 210g de pescado asado y sazonado con orégano, pimienta y sal, poner en taquitos con un toque de mayonesa (maximo 1 cda en total) y hummus"},
- {"file": "tostadas-de-tinga-de-pollo-3c40f42a.jpg", "label": "Tostadas de tinga de pollo", "keys": ["tostadas", "tostada", "tinga", "pollo"], "receta": "2 piezas de tostadas horneadas sanissimo 100g de pollo desmenuzado en salsa verde Acompañar con lechuga y jitomate 40g de aguacate ó 1 cda de crema li"},
- {"file": "yogurt-griego-con-granola-y-arandano-3e1d3bbc.jpg", "label": "Yogurt griego con granola y arándano", "keys": ["yogurt", "griego", "granola", "arandano", "blueberry"], "receta": "¾ taza de yogurt griego con granola y arándano."},
- {"file": "waffle-con-platano-huevo-y-fresa-41819aee.jpg", "label": "Waffle con plátano, huevo y fresa", "keys": ["waffle", "waffles", "platano", "huevo", "fresa", "banana", "clara", "claras"]},
- {"file": "kiwi-con-chocolate-43c1b6a2.jpg", "label": "Kiwi con chocolate", "keys": ["kiwi", "chocolate", "fruta"]},
- {"file": "ensalada-de-garbanzo-4c2c258c.jpg", "label": "Ensalada de garbanzo", "keys": ["ensalada", "garbanzo", "garbanzos", "pepino", "jitomate"], "receta": "Ensalada de garbanzo con lechuga, verduras y aderezo de limón y aceite de oliva."},
- {"file": "omelette-520b8dfa.jpg", "label": "Omelette", "keys": ["omelette", "omelet", "huevo", "ensalada", "omellete", "omele", "omelett", "clara", "claras"], "receta": "Añadir 3 huevos revueltos en un sartén + 30g de queso Oaxaca + 1 taza de verduras de tu elección (espinacas, tomate cherry, champiñones) Acompañar con"},
- {"file": "omelette-de-champinones-y-espinaca-544342b6.jpg", "label": "Omelette de champiñones y espinaca", "keys": ["omelette", "omelet", "champinones", "espinaca", "huevo", "omellete", "omele", "omelett", "clara", "claras"], "receta": "Omelette de 2 huevos con champiñones y espinaca."},
- {"file": "filete-de-pescado-con-arroz-y-ejotes-5b4c9841.jpg", "label": "Filete de pescado con arroz y ejotes", "keys": ["pescado", "filete", "arroz", "ejotes"], "receta": "180g de filete de pescado con arroz y ejotes."},
- {"file": "bowl-de-pollo-con-quinoa-6156acab.jpg", "label": "Bowl de pollo con quinoa", "keys": ["bowl", "pollo", "quinoa", "aguacate", "ensalada"], "receta": "140g de quinoa cocida 100g de pollo asado 1 taza de verduras al gusto 1 cdta de aceite de oliva ó 40g de aguacate"},
- {"file": "jicama-y-pepino-con-chile-61f0506e.jpg", "label": "Jícama y pepino con chile", "keys": ["jicama", "pepino", "chile", "tajin"], "receta": "jícama y pepino con limón y tajín."},
- {"file": "avo-toast-con-cottage-y-salmon-656ee1b2.jpg", "label": "Avo toast con cottage y salmón", "keys": ["salmon", "aguacate", "avo", "toast", "cottage", "requeson"], "receta": "1 pan tostado con aguacate, cottage y salmón; sal, limón y chile."},
- {"file": "rice-cake-con-crema-de-cacahuate-664ee46f.jpg", "label": "Rice cake con crema de cacahuate", "keys": ["rice", "cake", "cacahuate", "crema"], "receta": "2 rice cakes con crema de cacahuate."},
- {"file": "kiwi-674284fc.jpg", "label": "Kiwi", "keys": ["kiwi", "fruta"]},
- {"file": "bowl-de-camaron-con-quinoa-6986415c.jpg", "label": "Bowl de camarón con quinoa", "keys": ["camaron", "camarones", "quinoa", "ensalada", "bowl"], "receta": "1 taza de quinoa con 120g de camarón, brócoli y hojas verdes; aderezo de limón."},
- {"file": "yogurt-con-manzana-y-nuez-6a9f95f8.jpg", "label": "Yogurt con manzana y nuez", "keys": ["yogurt", "manzana", "nuez", "canela"], "receta": "¾ taza de yogurt griego con manzana y nuez."},
- {"file": "ensalada-de-pollo-6aa80631.jpg", "label": "Ensalada de pollo", "keys": ["ensalada", "pollo", "aguacate"], "receta": "Base: Espinaca baby, jitomate cherry, pepino, pimiento rojo 60g de pollo asado + ½ taza de quinoa cocido 1 cdta de aderezo ó 20g de aguacate limon, sa"},
- {"file": "toast-con-crema-de-cacahuate-y-manzana-6ed2628b.jpg", "label": "Toast con crema de cacahuate y manzana", "keys": ["toast", "pan", "cacahuate", "manzana", "crema"]},
- {"file": "mango-con-pepino-y-limon-6f49693e.jpg", "label": "Mango con pepino y limón", "keys": ["mango", "pepino", "limon", "fruta"], "receta": "mango y pepino con limón y chile."},
- {"file": "mango-7013ca6b.jpg", "label": "Mango", "keys": ["mango", "fruta"]},
- {"file": "pan-frances-con-fresa-7244512c.jpg", "label": "Pan francés con fresa", "keys": ["pan", "frances", "fresa", "toast"], "receta": "Pan francés con claras; fresas y canela."},
- {"file": "yogurt-con-fresa-y-nuez-7390a2cd.jpg", "label": "Yogurt con fresa y nuez", "keys": ["yogurt", "fresa", "nuez"], "receta": "¾ taza de yogurt griego con fresa y nuez."},
- {"file": "hot-cakes-con-fresa-7668a681.jpg", "label": "Hot cakes con fresa", "keys": ["hotcakes", "hot", "cakes", "pancakes", "fresa", "hotcake", "panqueque", "panqueques"], "receta": "Hot cakes con fresas encima."},
- {"file": "bowl-de-yogurt-con-granola-y-frutos-rojos-7779682d.jpg", "label": "Bowl de yogurt con granola y frutos rojos", "keys": ["yogurt", "granola", "fresa", "arandano", "blueberry", "berries"]},
- {"file": "huevo-a-la-mexicana-con-rajas-77c81707.jpg", "label": "Huevo a la mexicana / con rajas", "keys": ["huevo", "huevos", "rajas", "mexicana", "poblano", "clara", "claras"]},
- {"file": "kiwi-con-chocolate-797d0b5c.jpg", "label": "Kiwi con chocolate", "keys": ["kiwi", "chocolate", "fruta"]},
- {"file": "ensalada-de-atun-7a05a06b.jpg", "label": "Ensalada de atún", "keys": ["ensalada", "atun", "pepino", "jitomate"], "receta": "150g de atun ó pollo desmenuzado Preparar con lechuga, jitomate, pepino Agregar 1 cda de aderezo bajo en grasa ó 40g de aguacate Acompañar con 2 paque"},
- {"file": "hot-cakes-con-fresa-7b7feeca.jpg", "label": "Hot cakes con fresa", "keys": ["hotcakes", "hot", "cakes", "pancakes", "fresa", "yogurt", "hotcake", "panqueque", "panqueques"], "receta": "Hot cakes con fresas encima."},
- {"file": "toast-de-pavo-con-aguacate-7cea73fc.jpg", "label": "Toast de pavo con aguacate", "keys": ["toast", "pan", "pavo", "aguacate"], "receta": "1 pan tostado con aguacate y pavo; sal, limón y chile."},
- {"file": "smoothie-de-fresa-8101a29a.jpg", "label": "Smoothie de fresa", "keys": ["smoothie", "fresa", "batido"], "receta": "Licuar proteína con fresa y leche/bebida vegetal."},
- {"file": "ensalada-de-atun-sellado-81a825c1.jpg", "label": "Ensalada de atún sellado", "keys": ["ensalada", "atun", "sellado", "aguacate"], "receta": "150-180g de atún sellado con ajonjolí, acompañado de ensalada."},
- {"file": "filete-de-pescado-con-papas-y-ensalada-81b9422d.jpg", "label": "Filete de pescado con papas y ensalada", "keys": ["pescado", "filete", "papa", "papas", "ensalada"], "receta": "180g de filete con papa al horno y ensalada."},
- {"file": "cottage-con-fresa-y-pistache-81d2d87b.jpg", "label": "Cottage con fresa y pistache", "keys": ["cottage", "fresa", "pistache", "yogurt", "requeson"], "receta": "cottage con fresas y pistaches."},
- {"file": "sandwich-de-aguacate-8514af82.jpg", "label": "Sándwich de aguacate", "keys": ["sandwich", "aguacate", "ensalada"], "receta": "2 rebanadas de pan integral con aguacate, panela, lechuga y jitomate."},
- {"file": "bowl-de-yogurt-con-kiwi-y-chia-8aac4dfa.jpg", "label": "Bowl de yogurt con kiwi y chía", "keys": ["yogurt", "kiwi", "chia"]},
- {"file": "gorditas-de-huevo-8d613926.jpg", "label": "Gorditas de huevo", "keys": ["gorditas", "gordita", "huevo", "arepa", "clara", "claras"]},
- {"file": "toast-de-crema-de-cacahuate-con-mermelada-y-platano-8ec685ac.jpg", "label": "Toast de crema de cacahuate con mermelada y plátano", "keys": ["toast", "pan", "cacahuate", "mermelada", "platano", "banana"]},
- {"file": "green-smoothie-jugo-verde-92408e20.jpg", "label": "Green smoothie / jugo verde", "keys": ["green", "smoothie", "jugo", "verde"], "receta": "Licuar espinaca, apio, piña y jengibre."},
- {"file": "avo-toast-de-salmon-con-queso-crema-93df3bba.jpg", "label": "Avo toast de salmón con queso crema", "keys": ["salmon", "aguacate", "avo", "toast", "queso"]},
- {"file": "enfrijoladas-93ed7b15.jpg", "label": "Enfrijoladas", "keys": ["enfrijoladas", "enchiladas", "frijol", "entomatadas", "entomatada"], "receta": "Cafe + 120ml de leche lala gris 2 tortillas de maiz Por dentro agregar 40g de queso panela (distribuido en las 2 tortillas) ½ taza de frijoles 40g de"},
- {"file": "tostadas-de-verduras-con-panela-99f874c1.jpg", "label": "Tostadas de verduras con panela", "keys": ["tostadas", "tostada", "panela", "verduras", "ensalada"]},
- {"file": "overnight-oats-con-fresa-9a603d06.jpg", "label": "Overnight oats con fresa", "keys": ["overnight", "avena", "fresa", "granola"], "receta": "Avena remojada en yogurt griego; fresas y granola."},
- {"file": "omelette-de-espinaca-9ac57f00.jpg", "label": "Omelette de espinaca", "keys": ["omelette", "omelet", "espinaca", "huevo", "jitomate", "omellete", "omele", "omelett", "clara", "claras"], "receta": "2 huevos en omelette con espinaca; 2 tortillas y salsa."},
- {"file": "chia-pudding-con-platano-9b9d28a0.jpg", "label": "Chía pudding con plátano", "keys": ["chia", "pudding", "platano", "granola", "banana"], "receta": "Chía remojada en leche; plátano y granola."},
- {"file": "quesadillas-de-pollo-9bd87548.jpg", "label": "Quesadillas de pollo", "keys": ["quesadillas", "quesadilla", "pollo", "sincronizada", "sincronizadas"], "receta": "2 tortillas de maíz asadas con pollo deshebrado; con salsa."},
- {"file": "huevos-a-la-mexicana-9c1677c4.jpg", "label": "Huevos a la mexicana", "keys": ["huevo", "huevos", "mexicana", "clara", "claras"], "receta": "2 huevos a la mexicana + 2 rebanadas de pechuga de pavo, 2 tortillas de maíz ó 2 paquetes de salmas 1 taza de papaya con 100g de yogurt griego y encim"},
- {"file": "avena-con-manzana-y-canela-9c9fa35a.jpg", "label": "Avena con manzana y canela", "keys": ["avena", "manzana", "canela"], "receta": "40g de avena con canela; 1 scoop de proteína; encima manzana y canela y nuez."},
- {"file": "huevo-con-nopales-y-frijoles-9ef72a40.jpg", "label": "Huevo con nopales y frijoles", "keys": ["huevo", "huevos", "nopal", "nopales", "frijol", "clara", "claras"]},
- {"file": "sandwich-de-pavo-con-aguacate-a4a21b69.jpg", "label": "Sándwich de pavo con aguacate", "keys": ["sandwich", "pavo", "aguacate"], "receta": "2 rebanadas de pan integral con pavo, aguacate, lechuga y jitomate."},
- {"file": "tostadas-de-bistec-con-nopales-a79eebc5.jpg", "label": "Tostadas de bistec con nopales", "keys": ["tostadas", "tostada", "bistec", "nopales", "carne"], "receta": "3 tostadas horneadas con bistec asado y nopales."},
- {"file": "pollo-con-verduras-y-arroz-a906bffe.jpg", "label": "Pollo con verduras y arroz", "keys": ["pollo", "verduras", "arroz", "salteado"], "receta": "120-180g de pollo salteado con verduras y arroz."},
- {"file": "huevos-rancheros-a9667de8.jpg", "label": "Huevos rancheros", "keys": ["huevos", "huevo", "rancheros", "clara", "claras"], "receta": "4 tortillas + 5 huevos al gusto calienta 3 rebanadas de pechuga de pavo (san Rafael o bernina) Agrega con 40g de aguacate Acompaña con un vaso de choc"},
- {"file": "cottage-con-durazno-y-granola-abf997b1.jpg", "label": "Cottage con durazno y granola", "keys": ["cottage", "durazno", "granola", "requeson"], "receta": "cottage con durazno y granola."},
- {"file": "smoothie-de-platano-ad24e82c.jpg", "label": "Smoothie de plátano", "keys": ["smoothie", "platano", "batido", "banana"], "receta": "Licuar proteína con plátano y leche/bebida vegetal."},
- {"file": "smoothie-de-papaya-af52a9aa.jpg", "label": "Smoothie de papaya", "keys": ["smoothie", "papaya", "batido"], "receta": "Licuar proteína con papaya y leche/bebida vegetal."},
- {"file": "pera-af849f1b.jpg", "label": "Pera", "keys": ["pera", "fruta"]},
- {"file": "wrap-de-pavo-b0a9a5c7.jpg", "label": "Wrap de pavo", "keys": ["wrap", "pavo", "aguacate"], "receta": "1 rebanada de pan pita (libanus) 80g de pechuga de pavo (kirkland) 2 cdas de jocoque bajo en grasa 20g de aguacate Acompañar con ensalada verde (espin"},
- {"file": "omelette-de-atun-b11429d5.jpg", "label": "Omelette de atún", "keys": ["omelette", "omelet", "atun", "huevo", "omellete", "omele", "omelett", "clara", "claras"], "receta": "Omelette de 2 huevos con atún."},
- {"file": "mango-b118acad.jpg", "label": "Mango", "keys": ["mango", "fruta"]},
- {"file": "tostadas-de-atun-con-guacamole-b397194d.jpg", "label": "Tostadas de atún con guacamole", "keys": ["tostadas", "tostada", "atun", "guacamole"]},
- {"file": "rice-cake-con-crema-de-cacahuate-b5070045.jpg", "label": "Rice cake con crema de cacahuate", "keys": ["rice", "cake", "cacahuate", "crema"], "receta": "2 rice cakes con crema de cacahuate."},
- {"file": "omelette-de-espinaca-y-jitomate-b715de38.jpg", "label": "Omelette de espinaca y jitomate", "keys": ["omelette", "omelet", "espinaca", "huevo", "jitomate", "frittata", "omellete", "omele", "omelett", "clara", "claras"], "receta": "Omelette de 2 huevos con espinaca y jitomate."},
- {"file": "hot-cakes-con-arandano-b80ca901.jpg", "label": "Hot cakes con arándano", "keys": ["hotcakes", "hot", "cakes", "pancakes", "arandano", "blueberry", "hotcake", "panqueque", "panqueques"], "receta": "Hot cakes con arándanos."},
- {"file": "huevo-con-jamon-y-avo-toast-b9a88647.jpg", "label": "Huevo con jamón y avo toast", "keys": ["huevo", "huevos", "jamon", "avo", "toast", "aguacate", "clara", "claras"]},
- {"file": "toast-de-atun-b9a91a9b.jpg", "label": "Toast de atún", "keys": ["toast", "atun", "ceviche", "tostada"], "receta": "1 pan de caja marca oroweat untar 40g de aguacate encima 90g de atún en agua 2 tazas entre: hojas de espinaca, jitomate y lechuga O Op p cc ii ó ón n … Nfitness 360®"},
- {"file": "sandwich-de-crema-de-cacahuate-y-platano-bd60cddf.jpg", "label": "Sándwich de crema de cacahuate y plátano", "keys": ["sandwich", "cacahuate", "platano", "crema", "banana"], "receta": "2 rebanadas de pan integral con crema de cacahuate y plátano."},
- {"file": "hot-cakes-bf854f36.jpg", "label": "Hot cakes", "keys": ["hotcakes", "hot", "cakes", "pancakes", "hotcake", "panqueque", "panqueques"], "receta": "azucar + 60 gr de harina de avena + canela + vainilla + polvo para hornear + espinacas (licuar todo) Acompañar con 1 cucharada de crema de almendras +"},
- {"file": "smoothie-de-pina-c1a08c97.jpg", "label": "Smoothie de piña", "keys": ["smoothie", "pina", "coco", "batido"], "receta": "Licuar proteína con piña y leche/bebida vegetal."},
- {"file": "proteina-suplemento-batido-c266d718.jpg", "label": "Proteína / suplemento (batido)", "keys": ["proteina", "suplemento", "whey", "batido"]},
- {"file": "avena-con-platano-y-canela-c3abdd78.jpg", "label": "Avena con plátano y canela", "keys": ["avena", "platano", "canela", "banana"], "receta": "40g de avena con canela; 1 scoop de proteína; encima plátano y canela."},
- {"file": "yogurt-con-mango-y-nuez-c4f24fb1.jpg", "label": "Yogurt con mango y nuez", "keys": ["yogurt", "mango", "nuez", "cashew"], "receta": "¾ taza de yogurt griego con mango y nuez."},
- {"file": "sandwich-de-pavo-con-aguacate-c661b447.jpg", "label": "Sándwich de pavo con aguacate", "keys": ["sandwich", "pavo", "aguacate"], "receta": "2 rebanadas de pan integral con pavo, aguacate, lechuga y jitomate."},
- {"file": "batido-de-proteina-chocolate-c81d2be4.jpg", "label": "Batido de proteína (chocolate)", "keys": ["proteina", "batido", "chocolate", "smoothie"], "receta": "Proteína chocolate con leche/bebida vegetal y hielo."},
- {"file": "bowl-de-yogurt-con-granola-y-frutos-rojos-cd77f20f.jpg", "label": "Bowl de yogurt con granola y frutos rojos", "keys": ["yogurt", "granola", "fresa", "arandano", "berries"]},
- {"file": "wrap-de-verduras-con-hummus-cfe76798.jpg", "label": "Wrap de verduras con hummus", "keys": ["wrap", "verduras", "hummus", "aguacate"], "receta": "1 tortilla integral con hummus, verduras y aguacate."},
- {"file": "bowl-de-quinoa-con-garbanzo-d09489a5.jpg", "label": "Bowl de quinoa con garbanzo", "keys": ["bowl", "quinoa", "garbanzo", "aguacate", "verduras"], "receta": "1 taza de quinoa con 120g de pollo, garbanzo y hojas verdes; aderezo de limón."},
- {"file": "avo-toast-d15de246.jpg", "label": "Avo toast", "keys": ["avo", "toast", "aguacate", "pan"], "receta": "2 rebanadas de pan bimbo cero cero ó 4 rice cakes (OKKO) 40g de aguacate (sal, pimienta y limon) 2 huevos cocidos rebanados + 4 rebandas de pechuga de"},
- {"file": "arroz-blanco-d1ad870e.jpg", "label": "Arroz blanco", "keys": ["arroz", "blanco"]},
- {"file": "hot-cakes-de-espinaca-verdes-d2e17161.jpg", "label": "Hot cakes de espinaca (verdes)", "keys": ["hotcakes", "hot", "cakes", "pancakes", "espinaca", "verde", "hotcake", "panqueque", "panqueques"], "receta": "Hot cakes verdes de espinaca; fruta encima."},
- {"file": "papas-cambray-d35ee765.jpg", "label": "Papas cambray", "keys": ["papa", "papas", "cambray"]},
- {"file": "manzana-verde-d48e8015.jpg", "label": "Manzana verde", "keys": ["manzana", "verde", "fruta"]},
- {"file": "yogurt-con-fresa-y-nuez-d494b64f.jpg", "label": "Yogurt con fresa y nuez", "keys": ["yogurt", "fresa", "nuez"], "receta": "¾ taza de yogurt griego con fresa y nuez."},
- {"file": "hot-cakes-de-avena-con-platano-d58f23e3.jpg", "label": "Hot cakes de avena con plátano", "keys": ["hotcakes", "hot", "cakes", "pancakes", "avena", "platano", "hotcake", "panqueque", "panqueques", "banana"], "receta": "Hot cakes de avena y huevo; plátano y miel sin azúcar."},
- {"file": "palomitas-d80d5a96.jpg", "label": "Palomitas", "keys": ["palomitas", "palomita"]},
- {"file": "rollitos-de-jamon-dbbc05e9.jpg", "label": "Rollitos de jamón", "keys": ["rollitos", "jamon", "rollo", "pavo"]},
- {"file": "manzana-con-crema-de-cacahuate-e4a7a0ff.jpg", "label": "Manzana con crema de cacahuate", "keys": ["manzana", "cacahuate", "crema"], "receta": "manzana en gajos con crema de cacahuate."},
- {"file": "rice-cake-con-cottage-e6671aec.jpg", "label": "Rice cake con cottage", "keys": ["rice", "cake", "cottage", "requeson"], "receta": "2 rice cakes con cottage y jitomate."},
- {"file": "bowl-de-pollo-con-arroz-y-brocoli-e898f45e.jpg", "label": "Bowl de pollo con arroz y brócoli", "keys": ["bowl", "pollo", "arroz", "brocoli"], "receta": "1 taza de arroz con 120g de pollo, brócoli y hojas verdes; aderezo de limón."},
- {"file": "toast-con-crema-de-cacahuate-ec6eb1e1.jpg", "label": "Toast con crema de cacahuate", "keys": ["toast", "pan", "cacahuate", "crema"], "receta": "1 pan integral tostado con crema de cacahuate y plátano."},
- {"file": "toast-con-mermelada-f027ec04.jpg", "label": "Toast con mermelada", "keys": ["toast", "pan", "mermelada"]},
- {"file": "hot-cakes-de-platano-f37ede98.jpg", "label": "Hot cakes de plátano", "keys": ["hotcakes", "hot", "cakes", "pancakes", "platano", "hotcake", "panqueque", "panqueques", "banana"], "receta": "40g de avena o de harina de avena+ 120ml de claras + mezclar todo eso y después añadir 1/2 platano machacado + 3 cdas de queso cottage, revolver y pon"},
- {"file": "hot-cakes-con-huevo-y-fresa-f637f683.jpg", "label": "Hot cakes con huevo y fresa", "keys": ["hotcakes", "hot", "cakes", "pancakes", "huevo", "fresa", "hotcake", "panqueque", "panqueques", "clara", "claras"]},
- {"file": "sandwich-de-crema-de-cacahuate-f699f1b0.jpg", "label": "Sándwich de crema de cacahuate", "keys": ["sandwich", "cacahuate", "crema"], "receta": "2 rebanadas de pan integral con crema de cacahuate y plátano."},
- {"file": "toast-de-huevo-con-pico-de-gallo-f69ef2e4.jpg", "label": "Toast de huevo con pico de gallo", "keys": ["toast", "pan", "huevo", "aguacate", "pico", "clara", "claras"], "receta": "1 pan tostado con huevo, aguacate y pico de gallo; sal, limón y chile."},
- {"file": "panela-asada-con-nopales-f8411658.jpg", "label": "Panela asada con nopales", "keys": ["panela", "nopales", "queso", "aguacate", "asada"], "receta": "panela asada con nopales y aguacate."},
- {"file": "tostadas-de-panela-con-frijol-f8c9d66e.jpg", "label": "Tostadas de panela con frijol", "keys": ["tostadas", "tostada", "panela", "frijol", "queso"], "receta": "3 tostadas horneadas con frijoles y panela."},
- {"file": "sandwich-de-crema-de-cacahuate-f9f4eadc.jpg", "label": "Sándwich de crema de cacahuate", "keys": ["sandwich", "cacahuate", "crema"], "receta": "2 rebanadas de pan integral con crema de cacahuate y plátano."},
- {"file": "avena-con-fresa-faa6ce8b.jpg", "label": "Avena con fresa", "keys": ["avena", "fresa"]},
- {"file": "tostadas-de-atun-con-aguacate-fb0698d4.jpg", "label": "Tostadas de atún con aguacate", "keys": ["tostadas", "tostada", "atun", "aguacate"], "receta": "3 tostadas horneadas con atún a la mexicana y aguacate."},
- {"file": "smoothie-de-frutos-rojos-fd5b3a26.jpg", "label": "Smoothie de frutos rojos", "keys": ["smoothie", "frutos", "berries", "arandano", "fresa", "batido"], "receta": "Licuar proteína con frutos rojos y leche/bebida vegetal."},
- {"file": "toast-de-hummus-y-aguacate-fe83fefb.jpg", "label": "Toast de hummus y aguacate", "keys": ["toast", "pan", "hummus", "aguacate", "jitomate"], "receta": "1 pan tostado con hummus, aguacate y jitomate; sal, limón y chile."},
- {"file": "smoothie-de-pina-ff859ae5.jpg", "label": "Smoothie de piña", "keys": ["smoothie", "pina", "coco", "batido"], "receta": "Licuar proteína con piña y leche/bebida vegetal."},
- {"file": "chilaquiles-verdes-457f20d6.jpg", "label": "Chilaquiles verdes", "keys": ["chilaquiles", "chilquiles", "totopos", "verdes"]},
- {"file": "sopes-7615428c.jpg", "label": "Sopes", "keys": ["sopes", "sope"], "receta": "2 sopes de maíz marca ochoa o los de la tortilleria del super en cada uno poner 1 cdita de frijoles refritos isadora light 50g de pollo o cecina encim"},
- {"file": "tlacoyos-a1a334ff.jpg", "label": "Tlacoyos", "keys": ["tlacoyos", "tlacoyo"], "receta": "3 talcoyos de requesón o frijol o combinado Encima poner en cada uno 30g de bistec asado o pollo asado + salsa al gusto Acompañar con verduras asadas"},
- {"file": "crepa-salada-de-huevo-57d0d5c9.jpg", "label": "Crepa salada de huevo", "keys": ["crepa", "crepas", "crepe", "huevo", "espinaca"], "receta": "Crepa rellena de huevo, espinaca y panela."},
- {"file": "pasta-a-la-bolonesa-6488fc84.jpg", "label": "Pasta a la boloñesa", "keys": ["pasta", "spaghetti", "espagueti", "bolonesa", "carne"], "receta": "200g de pasta cocida a elegir ½ taza de salsa de tomate 180g de carne molida 1 vaso de leche de 250ml marca lala 100 gris"},
- {"file": "pizza-casera-fit-2e5cc603.jpg", "label": "Pizza casera / fit", "keys": ["pizza", "pita"], "receta": "1 pan pita taquero ó 1 tortilla grande de harina integral Untar 2-3 cdas de salsa de tomate Agregar 30g de queso mozarella rallado + 60g de pechuga de"},
- {"file": "hamburguesa-a4f5f420.jpg", "label": "Hamburguesa", "keys": ["hamburguesa", "burger"], "receta": "2 rebanadas de pan Oroweat o bollos integrales para hamburguesa (marca; oroweat, bimbo) 1 rebanada de queso blanco Lechuga, jitomate, cebolla 1 cdita"},
- {"file": "plato-mediterraneo-b180f8b3.jpg", "label": "Plato mediterráneo", "keys": ["mediterraneo", "mediterranea"], "receta": "1 cdita de aceite de oliva encima de las verduras"},
- {"file": "frijoles-refritos-7ba97a98.jpg", "label": "Frijoles refritos", "keys": ["frijoles", "frijol", "refritos"]},
- {"file": "cereal-con-leche-556c4682.jpg", "label": "Cereal con leche", "keys": ["cereal", "hojuelas", "proteina"]},
- {"file": "bisquet-con-huevo-20ea085e.jpg", "label": "Bisquet con huevo", "keys": ["bisquet", "bagel", "huevo"], "receta": "bisquet integral con huevo y panela."},
- {"file": "rollitos-de-pavo.jpg", "label": "Rollitos de pavo", "keys": ["rollitos", "rollito", "rollo", "pavo", "jamon"], "receta": "En 4 rebanadas de pechuga de pavo, coloca en tiritas (10g de queso panela,10g de aguacate y rebanada de pechuga de pavo, enrollarlos y puedes acompaña"},
- {"file": "molletes.jpg", "label": "Molletes", "keys": ["molletes", "mollete"], "receta": "2 rebanadas de pan de masa madre (60g) 75g de frijoles refritos ó en bola 60g de queso panela Pico de gallo 40g de aguacate ó 1 cda de crema + 5 galle"},
- {"file": "claras-con-verduras.jpg", "label": "Claras con verduras", "keys": ["claras", "clara", "verduras", "verdura", "huevo", "huevos"], "receta": "4 claras guisadas con verduras (a elegir); 20g de aguacate y limón."},
- {"file": "tostadas-de-pavo-con-aguacate.jpg", "label": "Tostadas de pavo con aguacate", "keys": ["tostadas", "tostada", "pavo", "aguacate"], "receta": "3 tostadas horneadas con pavo, lechuga y aguacate."},
- {"file": "pescado-a-la-plancha.jpg", "label": "Pescado a la plancha", "keys": ["pescado", "filete", "plancha"]},
- {"file": "brochetas-de-panela.jpg", "label": "Brochetas de panela", "keys": ["panela", "queso", "brochetas", "brocheta"]},
- {"file": "enchiladas.jpg", "label": "Enchiladas", "keys": ["enchiladas", "enchilada"], "receta": "2 tortillas de maíz ó 4 tortillas marca misión ligeritas, rellenar de pollo, ocupar en total 90g de pollo cocido desmenuzado, bañar con salsa verde o"},
- {"file": "salmon-con-arroz.jpg", "label": "Salmon con arroz", "keys": ["salmon", "arroz"], "receta": "100g de arroz cocido 100g de salmón cocido 1 calabaza rebanada asada 20g de aguacate Mezclar todo en un bowl"},
- {"file": "sopes-o-chalupas.jpg", "label": "Sopes o chalupas", "keys": ["sopes", "sope", "chalupas", "chalupa", "chalupitas"]},
- {"file": "tostadas-de-pavo-con-salmas.jpg", "label": "Tostadas de pavo con salmas", "keys": ["tostadas", "tostada", "pavo", "salmas", "jamon"]},
- {"file": "alambre-de-pollo.jpg", "label": "Alambre de pollo", "keys": ["alambre", "pollo"], "receta": "100g de pollo asado con calabacitas, pimientos . Acompañar con 2 tortillas mission ligeras ó 2 tostadas sanissimo 20g de aguacate + gotitas de limon"},
- {"file": "quesadillas.jpg", "label": "Quesadillas", "keys": ["quesadillas", "quesadilla", "sincronizada", "sincronizadas"], "receta": "2 tortillas de nopal marca susalia 60g de queso panela entre las 2 2 rebanadas de pechuga de pavo entre las 2 Acompañar con pimientos cebolla, espinac"},
- {"file": "quesadilla-con-aguacate.jpg", "label": "Quesadilla con aguacate", "keys": ["quesadilla", "quesadillas", "aguacate", "sincronizada"]},
- {"file": "alambre-de-pollo-con-verduras.jpg", "label": "Alambre de pollo con verduras", "keys": ["alambre", "pollo", "verduras", "fajitas"], "receta": "alambre de pollo con pimiento y cebolla; tortillas."},
- {"file": "tacos-de-pollo.jpg", "label": "Tacos de pollo", "keys": ["tacos", "taco", "pollo"], "receta": "120g de pollo desmenuzado 4 tortillas de maiz 1 cda de aceite de oliva para cocinar + 1 taza de verduras a elegir . tortillas de maíz ó 4 paquetes de"},
- {"file": "tostada-de-atun.jpg", "label": "Tostada de atun", "keys": ["tostada", "tostadas", "atun"], "receta": "2 paquetes de salmas ó 2 rebanadas de pan 90g de atun en lata bajo en sodio 20g de aguacate ó 1 cdita de mayonesa"},
- {"file": "bowl-de-yogurt-con-fruta.jpg", "label": "Bowl de yogurt con fruta", "keys": ["yogurt", "bowl", "fruta", "granola"], "receta": "200g de yogurt griego con 3 cdas de queso cottage revolver 30g de cereal special fitness 20g de avena en hojuelas 120g de mix de berries 20g entre chi"},
- {"file": "avena-con-fruta.jpg", "label": "Avena con fruta", "keys": ["avena", "fruta"]},
- {"file": "ensalada-de-atun.jpg", "label": "Ensalada de atun", "keys": ["ensalada", "atun", "bowl"], "receta": "150g de atun ó pollo desmenuzado Preparar con lechuga, jitomate, pepino Agregar 1 cda de aderezo bajo en grasa ó 40g de aguacate Acompañar con 2 paque"},
- {"file": "wrap-de-pollo.jpg", "label": "Wrap de pollo", "keys": ["wrap", "pollo"], "receta": "1 pan pita (libanus integral) + 180g de pollo asado Cherrys, espinaca, pepino, cebolla morada 30g de aguacate 1 taza de melónó sandía ó papaya O Op p … · Recetario · 21"},
- {"file": "tacos-de-bistec.jpg", "label": "Tacos de bistec", "keys": ["tacos", "taco", "bistec", "carne"], "receta": "4 tortillas de maíz 180g de bistec magro Acompañar con verduras asadas 20g de aguacate"},
- {"file": "ensalada-de-quinoa-con-pavo.jpg", "label": "Ensalada de quinoa con pavo", "keys": ["ensalada", "quinoa", "pavo"], "receta": "Ensalada de pavo con lechuga, verduras y aderezo de limón y aceite de oliva."},
- {"file": "aguacate.jpg", "label": "Aguacate", "keys": ["aguacate"], "receta": "En un bowl mezclar 40g de pollo ya sea asado o desmenuzado + 30g de requesón + 20g de aguacate la mezcla ponerla en 3 nopales baby asados Acompañar co"},
- {"file": "bowl-de-cottage.jpg", "label": "Bowl de cottage", "keys": ["cottage", "requeson", "bowl"], "receta": "150g de queso cottage bajo en grasa Agregar 20g de avena ó granola (granvita 0%) + 1 fruta a elegir de la tabla de equivalencias + 10 almendras ó 1 cd"},
- {"file": "hot-cakes-con-fruta.jpg", "label": "Hot cakes con fruta", "keys": ["hotcakes", "hot", "cakes", "hotcake", "pancakes", "fruta"]},
- {"file": "rice-cakes.jpg", "label": "Rice cakes", "keys": ["rice", "cake", "cakes"], "receta": "2 rice cake con germen de trigo, 1 cda de requesón o algún otro queso de tu agrado y encima 30g de salmón ahumado Aparte 1 jitomate rebanado con sal y"},
- {"file": "huevos-revueltos.jpg", "label": "Huevos revueltos", "keys": ["huevos", "huevo", "revueltos", "revuelto", "claras", "clara"], "receta": "3 huevos + 80g de pechuga de pavo Preparar a la mexicana ó con nopales 40g de aguacate + 1 tortilla de maiz ó 2 tortillas de nopal para acompañar 4TA"},
- {"file": "sandwich-de-atun.jpg", "label": "Sandwich de atun", "keys": ["sandwich", "atun"], "receta": "2 rebanadas de pan bimbo cero cero 90g de atun en lata bajo en sodio 1 cdta de mayonesa light + 1 fruta O Op p cc ii ó ón n 31 MUFFINS DE PROTEINA (2-"},
- {"file": "huevos-estrellados.jpg", "label": "Huevos estrellados", "keys": ["huevos", "huevo", "estrellados", "estrellado", "claras"], "receta": "3 panes de caja marca oroweat untar en cada uno 20g de aguacate, hojas de espinaca y encima de cada pan 1 huevo estrellado y 60g de panela rallado ent"},
- {"file": "pasta-integral.jpg", "label": "Pasta integral", "keys": ["pasta", "spaghetti", "espagueti"]},
- {"file": "sandwich-de-pavo.jpg", "label": "Sandwich de pavo", "keys": ["sandwich", "pavo"], "receta": "2 rebanadas de pan bimbo cero cero 2 rebanadas de pechuga de pavo 30g de queso panela bajo en grasa lechuga, jitomate, pepino 1 cda de mayonesa ó 20g"},
- {"file": "avo-toast-con-huevo.jpg", "label": "Avo toast con huevo", "keys": ["avo", "toast", "aguacate", "huevo", "pan"], "receta": "1 pan tostado con aguacate y huevo; sal, limón y chile."},
- {"file": "ensalada-de-pollo.jpg", "label": "Ensalada de pollo", "keys": ["ensalada", "pollo"], "receta": "Base: Espinaca baby, jitomate cherry, pepino, pimiento rojo 60g de pollo asado + ½ taza de quinoa cocido 1 cdta de aderezo ó 20g de aguacate limon, sa"},
- {"file": "ceviche-de-pescado.jpg", "label": "Ceviche de pescado", "keys": ["ceviche", "pescado", "tostada"], "receta": "ceviche de pescado con pico de gallo; tostadas horneadas."},
- {"file": "ensalada-de-pollo-con-verduras.jpg", "label": "Ensalada de pollo con verduras", "keys": ["ensalada", "pollo", "verduras"]},
- {"file": "omelette.jpg", "label": "Omelette", "keys": ["omelette", "omelet", "omellete", "huevo", "claras"], "receta": "Añadir 3 huevos revueltos en un sartén + 30g de queso Oaxaca + 1 taza de verduras de tu elección (espinacas, tomate cherry, champiñones) Acompañar con"},
- {"file": "nopales-con-frijol.jpg", "label": "Nopales con frijol", "keys": ["nopal", "nopales", "frijol", "frijoles", "huarache", "huaraches"]},
- {"file": "huevos-con-ejote.jpg", "label": "Huevos con ejote", "keys": ["huevo", "huevos", "ejote", "ejotes", "clara", "claras"]},
- {"file": "huevos-en-salsa-verde.jpg", "label": "Huevos en salsa verde", "keys": ["huevo", "huevos", "salsa", "verde", "ahogados", "clara", "claras"], "receta": "2 huevos con salsa verde; acompañar con tortillas."},
- {"file": "melon-con-almendra.jpg", "label": "Melón con almendra", "keys": ["melon", "almendra", "almendras", "fruta"]},
- {"file": "quesadillas-de-rajas.jpg", "label": "Quesadillas de rajas", "keys": ["quesadilla", "quesadillas", "rajas", "poblano", "sincronizada"], "receta": "2 tortillas asadas con rajas; salsa."},
- {"file": "smoothie-de-mango.jpg", "label": "Smoothie de mango", "keys": ["smoothie", "batido", "mango", "licuado"], "receta": "Licuar proteína con mango y leche/bebida vegetal."},
- {"file": "poke-bowl-de-tofu.jpg", "label": "Poke bowl de tofu", "keys": ["poke", "bowl", "tofu", "arroz", "aguacate"], "receta": "Poke bowl de tofu con arroz, pepino, edamame, zanahoria y aguacate; salsa de soya ligera."},
- {"file": "granola-con-arandano.jpg", "label": "Granola con arándano", "keys": ["granola", "avena", "arandano", "arandanos", "barrita"], "receta": "Arándano con granola."},
- {"file": "milanesa-de-pollo.jpg", "label": "Milanesa de pollo", "keys": ["pollo", "milanesa", "pechuga", "empanizado"]},
- {"file": "cecina-con-panela.jpg", "label": "Cecina con panela", "keys": ["cecina", "bistec", "carne", "panela", "queso"]},
- {"file": "papa-horneada-rellena.jpg", "label": "Papa horneada rellena", "keys": ["papa", "papas"]},
- {"file": "huevos-con-brocoli.jpg", "label": "Huevos con brocoli", "keys": ["huevo", "huevos", "brocoli", "claras"]},
- {"file": "enchiladas-divorciadas.jpg", "label": "Enchiladas divorciadas", "keys": ["enchiladas", "divorciadas", "enchilada"]},
- {"file": "rice-cake-con-pepino.jpg", "label": "Rice cake con pepino", "keys": ["rice", "cake", "pepino", "galletas"]},
- {"file": "salmon-teriyaki.jpg", "label": "Salmón teriyaki", "keys": ["salmon", "teriyaki", "arroz", "edamame"]},
- {"file": "poke-bowl-de-salmon.jpg", "label": "Poke bowl de salmón", "keys": ["poke", "bowl", "salmon", "mango", "aguacate"], "receta": "Poke bowl de salmón con arroz, pepino, edamame, zanahoria y aguacate; salsa de soya ligera."},
- {"file": "pasta-con-pollo.jpg", "label": "Pasta con pollo", "keys": ["pasta", "spaghetti", "espagueti", "pollo", "alfredo"]},
- {"file": "sopa-de-verduras.jpg", "label": "Sopa de verduras", "keys": ["sopa", "caldo", "verduras", "minestrone"]},
- {"file": "tinga-deshebrada.jpg", "label": "Tinga deshebrada", "keys": ["cochinita", "tinga", "deshebrada", "pollo", "barbacoa"]},
- {"file": "verduras-rostizadas-con-pollo.jpg", "label": "Verduras rostizadas con pollo", "keys": ["pollo", "coles", "verduras", "rostizadas"]},
- {"file": "pure-de-camote.jpg", "label": "Puré de camote", "keys": ["camote", "pure", "calabaza"]},
- {"file": "bolitas-de-avena.jpg", "label": "Bolitas de avena", "keys": ["bolitas", "avena", "cacahuate", "barrita", "proteina"]},
- {"file": "tortilla-espanola.jpg", "label": "Tortilla española", "keys": ["tortilla", "espanola", "huevo", "papa", "frittata"], "receta": "tortilla española de huevo, papa y cebolla al horno."},
- {"file": "res-a-la-plancha.jpg", "label": "Res a la plancha", "keys": ["res", "bistec", "arrachera", "carne", "plancha"]},
- {"file": "huevos-en-salsa-roja.jpg", "label": "Huevos en salsa roja", "keys": ["huevo", "huevos", "salsa", "roja", "rancheros"]},
- {"file": "chuleta-a-la-parrilla.jpg", "label": "Chuleta a la parrilla", "keys": ["chuleta", "costilla", "cerdo", "res", "parrilla"]},
- {"file": "edamames.jpg", "label": "Edamames", "keys": ["edamame", "edamames"]},
- {"file": "smoothie-de-fresa.jpg", "label": "Smoothie de fresa", "keys": ["smoothie", "fresa", "batido"], "receta": "Licuar proteína con fresa y leche/bebida vegetal."},
- {"file": "frijoles-charros.jpg", "label": "Frijoles charros", "keys": ["frijol", "frijoles", "charros", "caldo"]},
- {"file": "bowl-de-camaron.jpg", "label": "Bowl de camarón", "keys": ["camaron", "camarones", "bowl", "brocoli"]},
- {"file": "bowl-de-res-con-brocoli.jpg", "label": "Bowl de res con brocoli", "keys": ["bowl", "res", "brocoli", "carne"], "receta": "1 taza de arroz con 120g de res, brócoli y hojas verdes; aderezo de limón."},
- {"file": "guisado-de-res.jpg", "label": "Guisado de res", "keys": ["res", "guisado", "curry", "carne"]},
- {"file": "omelette-con-frijol.jpg", "label": "Omelette con frijol", "keys": ["omelette", "huevo", "frijol", "elote"]},
- {"file": "brochetas-de-pollo.jpg", "label": "Brochetas de pollo", "keys": ["brochetas", "pollo", "teriyaki", "alambre"]},
- {"file": "crema-de-champinones.jpg", "label": "Crema de champiñones", "keys": ["crema", "champinones", "sopa"]},
- {"file": "salteado-de-pollo.jpg", "label": "Salteado de pollo", "keys": ["salteado", "pollo", "verduras", "chop"]},
- {"file": "tacos-de-lechuga-con-atun.jpg", "label": "Tacos de lechuga con atun", "keys": ["tacos", "lechuga", "atun"], "receta": "hojas de lechuga con atún y aguacate."},
- {"file": "tacos-de-rajas.jpg", "label": "Tacos de rajas", "keys": ["tacos", "rajas", "poblano"]},
- {"file": "nopal-asado.jpg", "label": "Nopal asado", "keys": ["nopal", "nopales", "asado"]},
- {"file": "quesadillas-de-champinones.jpg", "label": "Quesadillas de champiñones", "keys": ["quesadilla", "quesadillas", "champinones", "hongos"], "receta": "2 tortillas de maíz asadas con panela y champiñones; con salsa."},
- {"file": "tlacoyos-con-nopal.jpg", "label": "Tlacoyos con nopal", "keys": ["tlacoyo", "tlacoyos", "frijol", "nopal"]},
- {"file": "avo-toast-con-huevo-estrellado-y-pavo.jpg", "label": "Avo toast con huevo estrellado y pavo", "keys": ["avo", "toast", "huevo", "estrellado", "pavo"]},
- {"file": "avocado-toast-de-claras-con-pavo.jpg", "label": "Avocado toast de claras con pavo", "keys": ["avocado", "toast", "claras", "pavo"]},
- {"file": "barrita.jpg", "label": "Barrita", "keys": ["barrita"]},
- {"file": "barrita-kirkland.jpg", "label": "Barrita kirkland +", "keys": ["barrita", "kirkland"]},
- {"file": "barrita-nature-valley-proteina.jpg", "label": "Barrita Nature Valley proteina", "keys": ["barrita", "nature", "valley", "proteina"]},
- {"file": "bowl-de-arroz-integral-con-pollo-asado-frijoles-y-verduras.jpg", "label": "Bowl de arroz integral con pollo asado, frijoles y verduras", "keys": ["bowl", "arroz", "integral", "pollo", "asado", "frijoles", "verduras"]},
- {"file": "bowl-de-atun-con-arroz-integral-verduras-y-leche-descremada.jpg", "label": "Bowl de atún con arroz integral, verduras y leche descremada", "keys": ["bowl", "atun", "arroz", "integral", "verduras", "leche", "descremada"]},
- {"file": "bowl-de-avena-con-cottage-y-fruta.jpg", "label": "Bowl de avena con cottage y fruta", "keys": ["bowl", "avena", "cottage", "fruta"]},
- {"file": "crepa-de-avena-con-pollo-queso-panela-espinacas-y-leche.jpg", "label": "Crepa de avena con pollo, queso panela, espinacas y leche", "keys": ["crepa", "avena", "pollo", "queso", "panela", "espinacas", "leche"]},
- {"file": "fruta.jpg", "label": "Fruta", "keys": ["fruta"]},
- {"file": "granola-con-yogurt-y-uvas.jpg", "label": "Granola con yogurt y uvas", "keys": ["granola", "yogurt", "uvas"]},
- {"file": "huevo-cocido-con-queso-cottage.jpg", "label": "Huevo cocido con queso cottage", "keys": ["huevo", "cocido", "queso", "cottage"]},
- {"file": "jicama-y-yogurt-bebible.jpg", "label": "Jicama y yogurt bebible", "keys": ["jicama", "yogurt", "bebible"]},
- {"file": "licuado.jpg", "label": "Licuado", "keys": ["licuado"]},
- {"file": "licuado-con-platano-o-papaya-avena-cottage-y-cacahuate.jpg", "label": "Licuado con plátano o papaya, avena, cottage y cacahuate", "keys": ["licuado", "platano", "papaya", "avena", "cottage", "cacahuate"]},
- {"file": "licuado-de-leche-con-mango-o-mamey-granola-y-almendras.jpg", "label": "Licuado de leche con mango o mamey, granola y almendras", "keys": ["licuado", "leche", "mango", "mamey", "granola", "almendras"]},
- {"file": "lunch.jpg", "label": "Lunch", "keys": ["lunch"]},
- {"file": "mandarinas.jpg", "label": "Mandarinas", "keys": ["mandarinas"]},
- {"file": "mango-con-chocolate-amargo.jpg", "label": "Mango con chocolate amargo", "keys": ["mango", "chocolate", "amargo"]},
- {"file": "melon-con-ajonjoli.jpg", "label": "Melón con ajonjolí", "keys": ["melon", "ajonjoli"]},
- {"file": "naranja.jpg", "label": "Naranja", "keys": ["naranja"]},
- {"file": "pan-de-caja-con-yogurt-griego-frutos-rojos-y-nuez.jpg", "label": "Pan de caja con yogurt griego, frutos rojos y nuez", "keys": ["pan", "caja", "yogurt", "griego", "frutos", "rojos", "nuez"]},
- {"file": "papilla-de-fruta.jpg", "label": "Papilla de fruta", "keys": ["papilla", "fruta"]},
- {"file": "platano-con-nutella.jpg", "label": "Plátano con nutella", "keys": ["platano", "nutella"]},
- {"file": "quesadillas-de-pollo-con-verduras.jpg", "label": "Quesadillas de pollo con verduras", "keys": ["quesadillas", "pollo", "verduras"]},
- {"file": "rice-cakes-con-requeson-y-pavo.jpg", "label": "Rice cakes con requesón y pavo", "keys": ["rice", "cakes", "requeson", "pavo"]},
- {"file": "tacos-de-bistec-con-verduras-asadas.jpg", "label": "Tacos de bistec con verduras asadas", "keys": ["tacos", "bistec", "verduras", "asadas"]},
- {"file": "tostadas-de-queso-panela-con-frijoles-y-verdura.jpg", "label": "Tostadas de queso panela con frijoles y verdura", "keys": ["tostadas", "queso", "panela", "frijoles", "verdura"]},
- {"file": "tunas-con-pepitas-de-girasol.jpg", "label": "Tunas con pepitas de girasol", "keys": ["tunas", "pepitas", "girasol"]},
- {"file": "waffles.jpg", "label": "Waffles", "keys": ["waffles"]},
- {"file": "yogurt-con-fruta.jpg", "label": "Yogurt con fruta", "keys": ["yogurt", "fruta"]},
- {"file": "albondigas-suecas-de-pavo.jpg", "label": "Albóndigas suecas de pavo", "keys": ["albondigas", "suecas", "pavo"], "receta": "albóndigas de pavo en salsa ligera con puré de papa y ejotes."},
- {"file": "arroz-frito-con-camaron.jpg", "label": "Arroz frito con camarón", "keys": ["arroz", "frito", "camaron"], "receta": "Arroz frito con camarón, ligero."},
- {"file": "atole-proteico-de-avena.jpg", "label": "Atole proteico de avena", "keys": ["atole", "proteico", "avena"], "receta": "atole de avena con proteína, leche y canela."},
- {"file": "atun-a-la-mexicana-con-pure-de-papa.jpg", "label": "Atún a la mexicana con puré de papa", "keys": ["atun", "mexicana", "pure", "papa"], "receta": "150-180g de atún a la mexicana, acompañado de puré de papa."},
- {"file": "atun-a-la-mexicana-con-quinoa-y-espinaca.jpg", "label": "Atún a la mexicana con quinoa y espinaca", "keys": ["atun", "mexicana", "quinoa", "espinaca"], "receta": "150-180g de atún a la mexicana, con quinoa y espinaca."},
- {"file": "atun-a-la-mexicana-con-quinoa.jpg", "label": "Atún a la mexicana con quinoa", "keys": ["atun", "mexicana", "quinoa"], "receta": "150-180g de atún a la mexicana, acompañado de quinoa."},
- {"file": "atun-a-la-plancha-con-quinoa.jpg", "label": "Atún a la plancha con quinoa", "keys": ["atun", "plancha", "quinoa"], "receta": "150-180g de atún a la plancha, acompañado de quinoa."},
- {"file": "atun-al-chipotle-con-calabacitas.jpg", "label": "Atún al chipotle con calabacitas", "keys": ["atun", "chipotle", "calabacitas"], "receta": "150-180g de atún al chipotle, acompañado de calabacitas."},
- {"file": "atun-al-chipotle-con-camote-al-horno.jpg", "label": "Atún al chipotle con camote al horno", "keys": ["atun", "chipotle", "camote", "horno"], "receta": "150-180g de atún al chipotle, acompañado de camote al horno."},
- {"file": "atun-al-chipotle-con-esparragos.jpg", "label": "Atún al chipotle con espárragos", "keys": ["atun", "chipotle", "esparragos"], "receta": "150-180g de atún al chipotle, acompañado de espárragos."},
- {"file": "atun-al-chipotle-con-pure-de-papa.jpg", "label": "Atún al chipotle con puré de papa", "keys": ["atun", "chipotle", "pure", "papa"], "receta": "150-180g de atún al chipotle, acompañado de puré de papa."},
- {"file": "atun-al-chipotle-con-quinoa-y-espinaca.jpg", "label": "Atún al chipotle con quinoa y espinaca", "keys": ["atun", "chipotle", "quinoa", "espinaca"], "receta": "150-180g de atún al chipotle, con quinoa y espinaca."},
- {"file": "atun-con-mayonesa-y-chipotle.jpg", "label": "Atún Con Mayonesa Y Chipotle", "keys": ["atun", "mayonesa", "chipotle"], "receta": "1 tostada de maíz 90g de atún con 1 cda de mayonesa light revuleta con 1 chile chipotle Agregar cebolla, jitomate y espinacas"},
- {"file": "atun-en-salsa-de-soya-con-arroz.jpg", "label": "Atún en salsa de soya con arroz", "keys": ["atun", "salsa", "soya", "arroz"], "receta": "150-180g de atún en salsa de soya, acompañado de arroz."},
- {"file": "atun-en-salsa-de-soya-con-calabacitas.jpg", "label": "Atún en salsa de soya con calabacitas", "keys": ["atun", "salsa", "soya", "calabacitas"], "receta": "150-180g de atún en salsa de soya, acompañado de calabacitas."},
- {"file": "atun-en-salsa-de-soya-con-elote-y-calabaza.jpg", "label": "Atún en salsa de soya con elote y calabaza", "keys": ["atun", "salsa", "soya", "elote", "calabaza"], "receta": "150-180g de atún en salsa de soya, con elote y calabaza."},
- {"file": "atun-en-salsa-de-soya-con-esparragos.jpg", "label": "Atún en salsa de soya con espárragos", "keys": ["atun", "salsa", "soya", "esparragos"], "receta": "150-180g de atún en salsa de soya, acompañado de espárragos."},
- {"file": "atun-guisado-a-la-mexicana.jpg", "label": "Atún guisado a la mexicana", "keys": ["atun", "guisado", "mexicana"], "receta": "atún guisado a la mexicana; arroz."},
- {"file": "avena-caliente-con-durazno.jpg", "label": "Avena caliente con durazno", "keys": ["avena", "caliente", "durazno"], "receta": "40g de avena caliente con proteína y durazno."},
- {"file": "avena-caliente-con-mango.jpg", "label": "Avena caliente con mango", "keys": ["avena", "caliente", "mango"], "receta": "40g de avena caliente con proteína y mango."},
- {"file": "avena-caliente-con-papaya.jpg", "label": "Avena caliente con papaya", "keys": ["avena", "caliente", "papaya"], "receta": "40g de avena caliente con proteína y papaya."},
- {"file": "avena-caliente-con-pina.jpg", "label": "Avena caliente con piña", "keys": ["avena", "caliente", "pina"], "receta": "40g de avena caliente con proteína y piña."},
- {"file": "avena-con-papaya-y-chia.jpg", "label": "Avena con papaya y chía", "keys": ["avena", "papaya", "chia"], "receta": "40g de avena con canela; 1 scoop de proteína; encima papaya y chía."},
- {"file": "bagel-integral-con-salmon.jpg", "label": "Bagel integral con salmón", "keys": ["bagel", "integral", "salmon"], "receta": "medio bagel integral con salmón y queso crema."},
- {"file": "barbacoa-de-res-en-consome.jpg", "label": "Barbacoa de res en consomé", "keys": ["barbacoa", "res", "consome"], "receta": "barbacoa de res con consomé; tortillas, cebolla y cilantro."},
- {"file": "bastones-de-apio-con-hummus.jpg", "label": "Bastones de apio con hummus", "keys": ["bastones", "apio", "hummus"], "receta": "Bastones de apio con hummus."},
- {"file": "bastones-de-brocoli-con-hummus.jpg", "label": "Bastones de brócoli con hummus", "keys": ["bastones", "brocoli", "hummus"], "receta": "Bastones de brócoli con hummus."},
- {"file": "bastones-de-coliflor-con-hummus.jpg", "label": "Bastones de coliflor con hummus", "keys": ["bastones", "coliflor", "hummus"], "receta": "Bastones de coliflor con hummus."},
- {"file": "bastones-de-jicama-con-hummus.jpg", "label": "Bastones de jícama con hummus", "keys": ["bastones", "jicama", "hummus"], "receta": "Bastones de jícama con hummus."},
- {"file": "bastones-de-pepino-con-hummus.jpg", "label": "Bastones de pepino con hummus", "keys": ["bastones", "pepino", "hummus"], "receta": "Bastones de pepino con hummus."},
- {"file": "bastones-de-verdura-con-guacamole.jpg", "label": "Bastones De Verdura Con Guacamole", "keys": ["bastones", "verdura", "guacamole"], "receta": "1 taza de verduras en bastones con 40g de guacamole natural."},
- {"file": "bastones-de-zanahoria-con-hummus.jpg", "label": "Bastones de zanahoria con hummus", "keys": ["bastones", "zanahoria", "hummus"], "receta": "Bastones de zanahoria con hummus."},
- {"file": "berenjena-rellena-de-res.jpg", "label": "Berenjena rellena de res", "keys": ["berenjena", "rellena", "res"], "receta": "Berenjena rellena de res, al horno."},
- {"file": "bisquet-half-half.jpg", "label": "Bisquet Half & Half", "keys": ["bisquet", "half", "half"], "receta": "1 pieza de bisquet (only light) cortado a la mitas, untar en 1 mitad 20g de aguacate + 2 huevos al gusto, en la otra mitad agregar 3 cdas de queso cot"},
- {"file": "bowl-proteico-dulce.jpg", "label": "Bowl Proteico Dulce", "keys": ["bowl", "proteico", "dulce"], "receta": "100g de yogurt griego + 5 cds de cottage 30g de granola marca wild +100g de frutos rojos ó 200g de fresas"},
- {"file": "breakfast-bowl-de-huevo-y-pavo.jpg", "label": "Breakfast bowl de huevo y pavo", "keys": ["breakfast", "bowl", "huevo", "pavo"], "receta": "Bowl de huevo con pavo, espinaca y aguacate."},
- {"file": "buddha-bowl-de-pavo.jpg", "label": "Buddha bowl de pavo", "keys": ["buddha", "bowl", "pavo"], "receta": "Buddha bowl de pavo con quinoa, verduras asadas y aguacate; aderezo de tahini."},
- {"file": "burrito-de-huevo-con-machaca.jpg", "label": "Burrito de huevo con machaca", "keys": ["burrito", "huevo", "machaca"], "receta": "Tortilla integral de huevo con machaca; salsa."},
- {"file": "calabaza-rellena-de-pollo.jpg", "label": "Calabaza rellena de pollo", "keys": ["calabaza", "rellena", "pollo"], "receta": "Calabaza rellena de pollo, al horno."},
- {"file": "carpaccio-de-calabaza-y-panela.jpg", "label": "Carpaccio De Calabaza Y Panela", "keys": ["carpaccio", "calabaza", "panela"], "receta": "90g de queso panela 1 calabaza rebanada y marinar todo en 2 cdas de aceite de oliva + limón, pimienta y sal Acompañar con 2 paquetes de salmas"},
- {"file": "chalupitas-de-nopal-cambray-con-pavo-y-pollo.jpg", "label": "Chalupitas De Nopal Cambray Con Pavo Y Pollo", "keys": ["chalupitas", "nopal", "cambray", "pavo", "pollo"], "receta": "3 nopales cambray en cada uno poner 1 rebanada de pechuga de pavo + 20g de pollo asado y 30g de aguacate entre los dos + salsa al gusto"},
- {"file": "chalupitas-de-nopal-con-pollo-desmenuzado.jpg", "label": "Chalupitas De Nopal Con Pollo Desmenuzado", "keys": ["chalupitas", "nopal", "pollo", "desmenuzado"], "receta": "2 sopes de la tortilleria de la comer o fresko, en cada uno poner 1 cda de frijoles + 45g de pollo desmenuzado y acompañar con nopales asados encima o"},
- {"file": "chalupitas-de-nopal-con-pollo.jpg", "label": "Chalupitas De Nopal con pollo", "keys": ["chalupitas", "nopal", "pollo"], "receta": "3 nopales cambray, en cada uno poner 30g de panela asado o planchado y 30g de pollo desmenuzado Acompañar con 4 paquetes de salmas ó tortillas de maíz"},
- {"file": "chalupitas-de-nopal-con-requeson.jpg", "label": "Chalupitas De Nopal Con Requesón", "keys": ["chalupitas", "nopal", "requeson"], "receta": "2 nopales baby asados, encima de cada uno poner 1 rebanada de pechuga de pavo y 30g de requesón o panela o oaxaca y entre ambos 20g de aguacate acompa"},
- {"file": "chalupitas-de-pollo.jpg", "label": "Chalupitas De Pollo", "keys": ["chalupitas", "pollo"]},
- {"file": "chia-con-leche-y-fresa.jpg", "label": "Chía con leche y fresa", "keys": ["chia", "leche", "fresa"], "receta": "chía remojada en leche con fresas."},
- {"file": "chia-con-leche-y-mango.jpg", "label": "Chía Con Leche Y Mango", "keys": ["chia", "leche", "mango"], "receta": "1 cda de chía remojada en 1 taza de leche/bebida vegetal, con ½ mango en cubos."},
- {"file": "chia-pudin-overnight.jpg", "label": "Chia Pudin Overnight", "keys": ["chia", "pudin", "overnight"], "receta": "Dejar en un recipiente una noche antes: 250ml de leche light deslactosada 20g de avena Canela, vainilla 1 cda de chia y en la mañana agregar 1 porción"},
- {"file": "chilaquiles-rojos-con-huevo.jpg", "label": "Chilaquiles rojos con huevo", "keys": ["chilaquiles", "rojos", "huevo"], "receta": "totopos horneados en salsa roja con huevo."},
- {"file": "chilaquiles-rojos-con-panela.jpg", "label": "Chilaquiles rojos con panela", "keys": ["chilaquiles", "rojos", "panela"], "receta": "Chilaquiles rojos con panela, totopos horneados, cebolla y cilantro."},
- {"file": "chilaquiles-rojos-con-pollo.jpg", "label": "Chilaquiles rojos con pollo", "keys": ["chilaquiles", "rojos", "pollo"], "receta": "Chilaquiles rojos con pollo, totopos horneados, cebolla y cilantro."},
- {"file": "chilaquiles-rojos-horneados-con-huevo.jpg", "label": "Chilaquiles Rojos Horneados Con Huevo", "keys": ["chilaquiles", "rojos", "horneados", "huevo"], "receta": "60g de totopos horneados bañados en salsa roja, con 2 huevos estrellados, cebolla y cilantro; 30g de panela."},
- {"file": "chile-poblano-relleno-de-panela.jpg", "label": "Chile poblano relleno de panela", "keys": ["chile", "poblano", "relleno", "panela"], "receta": "Chile poblano relleno de panela, al horno."},
- {"file": "chile-relleno-de-atun.jpg", "label": "Chile relleno de atún", "keys": ["chile", "relleno", "atun"], "receta": "Chile relleno de atún, al horno."},
- {"file": "chiles-rellenos-de-panela-al-horno.jpg", "label": "Chiles rellenos de panela al horno", "keys": ["chiles", "rellenos", "panela", "horno"], "receta": "chile poblano relleno de panela al horno en caldillo."},
- {"file": "ciruela-natural.jpg", "label": "Ciruela natural", "keys": ["ciruela", "natural"], "receta": "1 porción de ciruela fresca."},
- {"file": "cochinita-pibil-de-pavo.jpg", "label": "Cochinita pibil de pavo", "keys": ["cochinita", "pibil", "pavo"], "receta": "cochinita de pavo con achiote; tortillas y cebolla morada."},
- {"file": "coctel-de-fruta-con-chia.jpg", "label": "Coctel De Fruta Con Chía", "keys": ["coctel", "fruta", "chia"], "receta": "1 taza de fruta picada (papaya, melón, fresa) con 1 cda de chía y limón."},
- {"file": "crema-de-betabel-con-panela.jpg", "label": "Crema de betabel con panela", "keys": ["crema", "betabel", "panela"], "receta": "Crema ligera de betabel (sin crema) con panela y semillas."},
- {"file": "crema-de-brocoli-con-panela.jpg", "label": "Crema de brócoli con panela", "keys": ["crema", "brocoli", "panela"], "receta": "Crema ligera de brócoli (sin crema) con panela y semillas."},
- {"file": "crema-de-calabaza-con-panela.jpg", "label": "Crema De Calabaza Con Panela", "keys": ["crema", "calabaza", "panela"], "receta": "Crema de calabaza asada (con caldo, sin crema) con 30g de panela y semillas."},
- {"file": "crema-de-chicharo-con-panela.jpg", "label": "Crema de chícharo con panela", "keys": ["crema", "chicharo", "panela"], "receta": "Crema ligera de chícharo (sin crema) con panela y semillas."},
- {"file": "crema-de-coliflor-con-panela.jpg", "label": "Crema de coliflor con panela", "keys": ["crema", "coliflor", "panela"], "receta": "Crema ligera de coliflor (sin crema) con panela y semillas."},
- {"file": "crema-de-elote-con-panela.jpg", "label": "Crema de elote con panela", "keys": ["crema", "elote", "panela"], "receta": "Crema ligera de elote (sin crema) con panela y semillas."},
- {"file": "crema-de-espinaca-con-panela.jpg", "label": "Crema de espinaca con panela", "keys": ["crema", "espinaca", "panela"], "receta": "Crema ligera de espinaca (sin crema) con panela y semillas."},
- {"file": "crema-de-flor-de-calabaza.jpg", "label": "Crema de flor de calabaza", "keys": ["crema", "flor", "calabaza"], "receta": "Crema de flor de calabaza ligera con panela."},
- {"file": "crema-de-poblano-con-panela.jpg", "label": "Crema de poblano con panela", "keys": ["crema", "poblano", "panela"], "receta": "Crema ligera de poblano (sin crema) con panela y semillas."},
- {"file": "crema-de-zanahoria-con-panela.jpg", "label": "Crema de zanahoria con panela", "keys": ["crema", "zanahoria", "panela"], "receta": "Crema ligera de zanahoria (sin crema) con panela y semillas."},
- {"file": "crema-de-zanahoria-y-jengibre.jpg", "label": "Crema de zanahoria y jengibre", "keys": ["crema", "zanahoria", "jengibre"], "receta": "crema de zanahoria y jengibre con panela."},
- {"file": "cubos-de-panela-con-chile-y-limon.jpg", "label": "Cubos De Panela Con Chile Y Limón", "keys": ["cubos", "panela", "chile", "limon"], "receta": "60-90g de queso panela en cubos, con limón, chile en polvo y sal."},
- {"file": "cubos-de-panela-con-chile.jpg", "label": "Cubos De Panela Con Chile", "keys": ["cubos", "panela", "chile"], "receta": "panela en cubos con chile y limón."},
- {"file": "discada-de-res-y-pollo.jpg", "label": "Discada de res y pollo", "keys": ["discada", "res", "pollo"], "receta": "discada norteña de res y pollo con verduras; tortillas."},
- {"file": "elote-desgranado-con-limon.jpg", "label": "Elote Desgranado Con Limón", "keys": ["elote", "desgranado", "limon"], "receta": "½ taza de granos de elote cocido con limón, chile y 1 cdta de queso rallado (opcional)."},
- {"file": "ensalada-caprese-con-res.jpg", "label": "Ensalada caprese con res", "keys": ["ensalada", "caprese", "res"], "receta": "Ensalada caprese con res, aderezo de limón y aceite de oliva."},
- {"file": "ensalada-cesar-con-res.jpg", "label": "Ensalada césar con res", "keys": ["ensalada", "cesar", "res"], "receta": "Ensalada césar con res, aderezo de limón y aceite de oliva."},
- {"file": "ensalada-con-pasta-y-proteina.jpg", "label": "Ensalada Con Pasta Y Proteina", "keys": ["ensalada", "pasta", "proteina"], "receta": "100g de pasta integral fusilli cocida natural 70g de pollo o atún o salmón Espinacas, jitomate cherry, palmitos, corazones de alcachofa Aderezo: soya"},
- {"file": "ensalada-de-espinaca-con-res.jpg", "label": "Ensalada de espinaca con res", "keys": ["ensalada", "espinaca", "res"], "receta": "Ensalada de espinaca con res, aderezo de limón y aceite de oliva."},
- {"file": "ensalada-de-kale-con-res.jpg", "label": "Ensalada de kale con res", "keys": ["ensalada", "kale", "res"], "receta": "Ensalada de kale con res, aderezo de limón y aceite de oliva."},
- {"file": "ensalada-mediterranea-con-res.jpg", "label": "Ensalada mediterránea con res", "keys": ["ensalada", "mediterranea", "res"], "receta": "Ensalada mediterránea con res, aderezo de limón y aceite de oliva."},
- {"file": "ensalada-mixta-con-res.jpg", "label": "Ensalada mixta con res", "keys": ["ensalada", "mixta", "res"], "receta": "Ensalada mixta con res, aderezo de limón y aceite de oliva."},
- {"file": "ensalada-tricolor-estilo-griego.jpg", "label": "Ensalada Tricolor, Estilo Griego", "keys": ["ensalada", "tricolor", "estilo", "griego"], "receta": "Quinoa; 20g cruda ó 70g ya cocida 20g de aguacate en rodajas, 90g de queso feta en cubos o desmoronado hojas de espinaca, jitomate cherry, arúgula y p… Nfitness 360®"},
- {"file": "fruta-arandano.jpg", "label": "Arándano", "keys": ["arandano", "arandanos", "blueberry"], "fruta": true},
- {"file": "fruta-ciruela.jpg", "label": "Ciruela", "keys": ["ciruela"], "fruta": true},
- {"file": "fruta-coco.jpg", "label": "Coco", "keys": ["coco"], "fruta": true},
- {"file": "fruta-durazno.jpg", "label": "Durazno", "keys": ["durazno"], "fruta": true},
- {"file": "fruta-fresa.jpg", "label": "Fresa", "keys": ["fresa", "fresas"], "fruta": true},
- {"file": "fruta-frutos-rojos.jpg", "label": "Frutos rojos", "keys": ["frutos rojos", "berries"], "fruta": true},
- {"file": "fruta-guayaba.jpg", "label": "Guayaba", "keys": ["guayaba"], "fruta": true},
- {"file": "fruta-kiwi.jpg", "label": "Kiwi", "keys": ["kiwi"], "fruta": true},
- {"file": "fruta-mandarina.jpg", "label": "Mandarina", "keys": ["mandarina"], "fruta": true},
- {"file": "fruta-manzana.jpg", "label": "Manzana", "keys": ["manzana"], "fruta": true},
- {"file": "fruta-melon.jpg", "label": "Melón", "keys": ["melon"], "fruta": true},
- {"file": "fruta-papaya.jpg", "label": "Papaya", "keys": ["papaya"], "fruta": true},
- {"file": "fruta-pera.jpg", "label": "Pera", "keys": ["pera"], "fruta": true},
- {"file": "fruta-pina.jpg", "label": "Piña", "keys": ["pina"], "fruta": true},
- {"file": "fruta-platano.jpg", "label": "Plátano", "keys": ["platano", "banana"], "fruta": true},
- {"file": "fruta-sandia.jpg", "label": "Sandía", "keys": ["sandia"], "fruta": true},
- {"file": "fruta-toronja.jpg", "label": "Toronja", "keys": ["toronja"], "fruta": true},
- {"file": "fruta-tuna.jpg", "label": "Tuna", "keys": ["tuna"], "fruta": true},
- {"file": "fruta-uva.jpg", "label": "Uva", "keys": ["uva", "uvas"], "fruta": true},
- {"file": "galletas-de-arroz-con-hummus.jpg", "label": "Galletas de arroz con hummus", "keys": ["galletas", "arroz", "hummus"], "receta": "galletas de arroz con hummus y pepino."},
- {"file": "guayaba-natural.jpg", "label": "Guayaba natural", "keys": ["guayaba", "natural"], "receta": "1 porción de guayaba fresca."},
- {"file": "higado-encebollado.jpg", "label": "Hígado encebollado", "keys": ["higado", "encebollado"], "receta": "hígado encebollado; arroz y ensalada."},
- {"file": "huevo-con-costra-de-queso-feta.jpg", "label": "Huevo Con Costra De Queso Feta", "keys": ["huevo", "costra", "queso", "feta"], "receta": "30g de queso feta + 2 huevos estrellado , servir en 2 tortillas de maiz 1 huevo en cada una. Decorar con cilantro y jitomates cherrys Acompañar con 1/"},
- {"file": "huevo-con-pechuga-de-pavo.jpg", "label": "Huevo Con Pechuga De Pavo", "keys": ["huevo", "pechuga", "pavo"], "receta": "2 huevos revueltos con 2 rebanadas de pechuga de pavo 2 tortillas de maíz ó 2 paquetes de salmas 1 taza de papaya Jugo verde: pepino, apio, nopal, lim"},
- {"file": "huevo-duro-con-pepino.jpg", "label": "Huevo duro con pepino", "keys": ["huevo", "duro", "pepino"], "receta": "huevo duro con pepino, limón y chile."},
- {"file": "lentejas-guisadas.jpg", "label": "Lentejas guisadas", "keys": ["lentejas", "guisadas"], "receta": "lentejas guisadas con verduras."},
- {"file": "lomo-de-cerdo-a-la-mexicana-con-arroz-y-ensalada.jpg", "label": "Lomo de cerdo a la mexicana con arroz y ensalada", "keys": ["lomo", "cerdo", "mexicana", "arroz", "ensalada"], "receta": "150-180g de lomo de cerdo a la mexicana, con arroz y ensalada."},
- {"file": "lomo-de-cerdo-a-la-mexicana-con-ensalada.jpg", "label": "Lomo de cerdo a la mexicana con ensalada", "keys": ["lomo", "cerdo", "mexicana", "ensalada"], "receta": "150-180g de lomo de cerdo a la mexicana, acompañado de ensalada."},
- {"file": "lomo-de-cerdo-a-la-mexicana-con-quinoa.jpg", "label": "Lomo de cerdo a la mexicana con quinoa", "keys": ["lomo", "cerdo", "mexicana", "quinoa"], "receta": "150-180g de lomo de cerdo a la mexicana, acompañado de quinoa."},
- {"file": "lomo-de-cerdo-a-la-naranja-con-camote-al-horno.jpg", "label": "Lomo de cerdo a la naranja con camote al horno", "keys": ["lomo", "cerdo", "naranja", "camote", "horno"], "receta": "150-180g de lomo de cerdo a la naranja, acompañado de camote al horno."},
- {"file": "lomo-de-cerdo-a-la-naranja-con-elote-y-calabaza.jpg", "label": "Lomo de cerdo a la naranja con elote y calabaza", "keys": ["lomo", "cerdo", "naranja", "elote", "calabaza"], "receta": "150-180g de lomo de cerdo a la naranja, con elote y calabaza."},
- {"file": "lomo-de-cerdo-a-la-naranja-con-pure-de-papa.jpg", "label": "Lomo de cerdo a la naranja con puré de papa", "keys": ["lomo", "cerdo", "naranja", "pure", "papa"], "receta": "150-180g de lomo de cerdo a la naranja, acompañado de puré de papa."},
- {"file": "lomo-de-cerdo-a-la-naranja-con-quinoa.jpg", "label": "Lomo de cerdo a la naranja con quinoa", "keys": ["lomo", "cerdo", "naranja", "quinoa"], "receta": "150-180g de lomo de cerdo a la naranja, acompañado de quinoa."},
- {"file": "lomo-de-cerdo-a-la-plancha-con-arroz-y-ensalada.jpg", "label": "Lomo de cerdo a la plancha con arroz y ensalada", "keys": ["lomo", "cerdo", "plancha", "arroz", "ensalada"], "receta": "150-180g de lomo de cerdo a la plancha, con arroz y ensalada."},
- {"file": "lomo-de-cerdo-a-la-plancha-con-arroz.jpg", "label": "Lomo de cerdo a la plancha con arroz", "keys": ["lomo", "cerdo", "plancha", "arroz"], "receta": "150-180g de lomo de cerdo a la plancha, acompañado de arroz."},
- {"file": "lomo-de-cerdo-a-las-finas-hierbas-con-calabacitas.jpg", "label": "Lomo de cerdo a las finas hierbas con calabacitas", "keys": ["lomo", "cerdo", "finas", "hierbas", "calabacitas"], "receta": "150-180g de lomo de cerdo a las finas hierbas, acompañado de calabacitas."},
- {"file": "lomo-de-cerdo-a-las-finas-hierbas-con-camote-al-horno.jpg", "label": "Lomo de cerdo a las finas hierbas con camote al horno", "keys": ["lomo", "cerdo", "finas", "hierbas", "camote", "horno"], "receta": "150-180g de lomo de cerdo a las finas hierbas, acompañado de camote al horno."},
- {"file": "lomo-de-cerdo-a-las-finas-hierbas-con-elote-y-calabaza.jpg", "label": "Lomo de cerdo a las finas hierbas con elote y calabaza", "keys": ["lomo", "cerdo", "finas", "hierbas", "elote", "calabaza"], "receta": "150-180g de lomo de cerdo a las finas hierbas, con elote y calabaza."},
- {"file": "lomo-de-cerdo-a-las-finas-hierbas-con-pure-de-papa.jpg", "label": "Lomo de cerdo a las finas hierbas con puré de papa", "keys": ["lomo", "cerdo", "finas", "hierbas", "pure", "papa"], "receta": "150-180g de lomo de cerdo a las finas hierbas, acompañado de puré de papa."},
- {"file": "lomo-de-cerdo-adobado-con-arroz-y-ensalada.jpg", "label": "Lomo de cerdo adobado con arroz y ensalada", "keys": ["lomo", "cerdo", "adobado", "arroz", "ensalada"], "receta": "150-180g de lomo de cerdo adobado, con arroz y ensalada."},
- {"file": "lomo-de-cerdo-adobado-con-camote-al-horno.jpg", "label": "Lomo de cerdo adobado con camote al horno", "keys": ["lomo", "cerdo", "adobado", "camote", "horno"], "receta": "150-180g de lomo de cerdo adobado, acompañado de camote al horno."},
- {"file": "lomo-de-cerdo-adobado-con-quinoa.jpg", "label": "Lomo de cerdo adobado con quinoa", "keys": ["lomo", "cerdo", "adobado", "quinoa"], "receta": "150-180g de lomo de cerdo adobado, acompañado de quinoa."},
- {"file": "lomo-de-cerdo-al-ajillo-con-arroz.jpg", "label": "Lomo de cerdo al ajillo con arroz", "keys": ["lomo", "cerdo", "ajillo", "arroz"], "receta": "150-180g de lomo de cerdo al ajillo, acompañado de arroz."},
- {"file": "lomo-de-cerdo-al-ajillo-con-ensalada.jpg", "label": "Lomo de cerdo al ajillo con ensalada", "keys": ["lomo", "cerdo", "ajillo", "ensalada"], "receta": "150-180g de lomo de cerdo al ajillo, acompañado de ensalada."},
- {"file": "lomo-de-cerdo-al-ajillo-con-quinoa-y-espinaca.jpg", "label": "Lomo de cerdo al ajillo con quinoa y espinaca", "keys": ["lomo", "cerdo", "ajillo", "quinoa", "espinaca"], "receta": "150-180g de lomo de cerdo al ajillo, con quinoa y espinaca."},
- {"file": "lomo-de-cerdo-al-chipotle-con-camote-al-horno.jpg", "label": "Lomo de cerdo al chipotle con camote al horno", "keys": ["lomo", "cerdo", "chipotle", "camote", "horno"], "receta": "150-180g de lomo de cerdo al chipotle, acompañado de camote al horno."},
- {"file": "lomo-de-cerdo-al-chipotle-con-pure-de-papa.jpg", "label": "Lomo de cerdo al chipotle con puré de papa", "keys": ["lomo", "cerdo", "chipotle", "pure", "papa"], "receta": "150-180g de lomo de cerdo al chipotle, acompañado de puré de papa."},
- {"file": "lomo-de-cerdo-al-chipotle-con-quinoa-y-espinaca.jpg", "label": "Lomo de cerdo al chipotle con quinoa y espinaca", "keys": ["lomo", "cerdo", "chipotle", "quinoa", "espinaca"], "receta": "150-180g de lomo de cerdo al chipotle, con quinoa y espinaca."},
- {"file": "lomo-de-cerdo-al-chipotle-con-quinoa.jpg", "label": "Lomo de cerdo al chipotle con quinoa", "keys": ["lomo", "cerdo", "chipotle", "quinoa"], "receta": "150-180g de lomo de cerdo al chipotle, acompañado de quinoa."},
- {"file": "lomo-de-cerdo-al-curry-con-arroz-con-calabacitas.jpg", "label": "Lomo de cerdo al curry con arroz con calabacitas", "keys": ["lomo", "cerdo", "curry", "arroz", "calabacitas"]},
- {"file": "lomo-de-cerdo-al-curry-con-arroz-con-esparragos.jpg", "label": "Lomo de cerdo al curry con arroz con espárragos", "keys": ["lomo", "cerdo", "curry", "arroz", "esparragos"]},
- {"file": "lomo-de-cerdo-al-curry-con-arroz-y-ensalada.jpg", "label": "Lomo de cerdo al curry con arroz y ensalada", "keys": ["lomo", "cerdo", "curry", "arroz", "ensalada"], "receta": "150-180g de lomo de cerdo al curry, con arroz y ensalada."},
- {"file": "lomo-de-cerdo-al-curry-con-arroz.jpg", "label": "Lomo de cerdo al curry con arroz", "keys": ["lomo", "cerdo", "curry", "arroz"], "receta": "150-180g de lomo de cerdo al curry, acompañado de arroz."},
- {"file": "lomo-de-cerdo-al-horno-con-especias-con-camote-al-horno.jpg", "label": "Lomo de cerdo al horno con especias con camote al horno", "keys": ["lomo", "cerdo", "horno", "especias", "camote", "horno"], "receta": "150-180g de lomo de cerdo al horno con especias, acompañado de camote al horno."},
- {"file": "lomo-de-cerdo-al-horno-con-especias-con-pure-de-papa.jpg", "label": "Lomo de cerdo al horno con especias con puré de papa", "keys": ["lomo", "cerdo", "horno", "especias", "pure", "papa"], "receta": "150-180g de lomo de cerdo al horno con especias, acompañado de puré de papa."},
- {"file": "lomo-de-cerdo-al-horno-con-especias-con-quinoa-y-espinaca.jpg", "label": "Lomo de cerdo al horno con especias con quinoa y espinaca", "keys": ["lomo", "cerdo", "horno", "especias", "quinoa", "espinaca"], "receta": "150-180g de lomo de cerdo al horno con especias, con quinoa y espinaca."},
- {"file": "lomo-de-cerdo-al-horno-con-especias-con-quinoa.jpg", "label": "Lomo de cerdo al horno con especias con quinoa", "keys": ["lomo", "cerdo", "horno", "especias", "quinoa"], "receta": "150-180g de lomo de cerdo al horno con especias, acompañado de quinoa."},
- {"file": "lomo-de-cerdo-al-pastor-con-arroz.jpg", "label": "Lomo de cerdo al pastor con arroz", "keys": ["lomo", "cerdo", "pastor", "arroz"], "receta": "150-180g de lomo de cerdo al pastor, acompañado de arroz."},
- {"file": "lomo-de-cerdo-al-pastor-con-calabacitas.jpg", "label": "Lomo de cerdo al pastor con calabacitas", "keys": ["lomo", "cerdo", "pastor", "calabacitas"], "receta": "150-180g de lomo de cerdo al pastor, acompañado de calabacitas."},
- {"file": "lomo-de-cerdo-al-pastor-con-esparragos.jpg", "label": "Lomo de cerdo al pastor con esparragos", "keys": ["lomo", "cerdo", "pastor", "esparragos"], "receta": "150-180g de lomo de cerdo al pastor, acompañado de espárragos."},
- {"file": "lomo-de-cerdo-al-pastor-con-quinoa-y-espinaca.jpg", "label": "Lomo de cerdo al pastor con quinoa y espinaca", "keys": ["lomo", "cerdo", "pastor", "quinoa", "espinaca"], "receta": "150-180g de lomo de cerdo al pastor, con quinoa y espinaca."},
- {"file": "lomo-de-cerdo-empanizado-al-horno-con-elote-y-calabaza.jpg", "label": "Lomo de cerdo empanizado al horno con elote y calabaza", "keys": ["lomo", "cerdo", "empanizado", "horno", "elote", "calabaza"], "receta": "150-180g de lomo de cerdo empanizado al horno, con elote y calabaza."},
- {"file": "lomo-de-cerdo-empanizado-al-horno-con-ensalada.jpg", "label": "Lomo de cerdo empanizado al horno con ensalada", "keys": ["lomo", "cerdo", "empanizado", "horno", "ensalada"], "receta": "150-180g de lomo de cerdo empanizado al horno, acompañado de ensalada."},
- {"file": "lomo-de-cerdo-empanizado-al-horno-con-quinoa.jpg", "label": "Lomo de cerdo empanizado al horno con quinoa", "keys": ["lomo", "cerdo", "empanizado", "horno", "quinoa"], "receta": "150-180g de lomo de cerdo empanizado al horno, acompañado de quinoa."},
- {"file": "lomo-de-cerdo-en-pipian-verde-con-arroz-y-ensalada.jpg", "label": "Lomo de cerdo en pipián verde con arroz y ensalada", "keys": ["lomo", "cerdo", "pipian", "verde", "arroz", "ensalada"], "receta": "150-180g de lomo de cerdo en pipián verde, con arroz y ensalada."},
- {"file": "lomo-de-cerdo-en-pipian-verde-con-arroz.jpg", "label": "Lomo de cerdo en pipián verde con arroz", "keys": ["lomo", "cerdo", "pipian", "verde", "arroz"], "receta": "150-180g de lomo de cerdo en pipián verde, acompañado de arroz."},
- {"file": "lomo-de-cerdo-en-pipian-verde-con-ensalada.jpg", "label": "Lomo de cerdo en pipián verde con ensalada", "keys": ["lomo", "cerdo", "pipian", "verde", "ensalada"], "receta": "150-180g de lomo de cerdo en pipián verde, acompañado de ensalada."},
- {"file": "lomo-de-cerdo-en-salsa-bbq-ligera-con-ensalada.jpg", "label": "Lomo de cerdo en salsa BBQ ligera con ensalada", "keys": ["lomo", "cerdo", "salsa", "bbq", "ligera", "ensalada"], "receta": "150-180g de lomo de cerdo en salsa BBQ ligera, acompañado de ensalada."},
- {"file": "lomo-de-cerdo-en-salsa-bbq-ligera-con-quinoa-y-espinaca.jpg", "label": "Lomo de cerdo en salsa BBQ ligera con quinoa y espinaca", "keys": ["lomo", "cerdo", "salsa", "bbq", "ligera", "quinoa", "espinaca"], "receta": "150-180g de lomo de cerdo en salsa BBQ ligera, con quinoa y espinaca."},
- {"file": "lomo-de-cerdo-en-salsa-bbq-ligera-con-quinoa.jpg", "label": "Lomo de cerdo en salsa BBQ ligera con quinoa", "keys": ["lomo", "cerdo", "salsa", "bbq", "ligera", "quinoa"], "receta": "150-180g de lomo de cerdo en salsa BBQ ligera, acompañado de quinoa."},
- {"file": "lomo-de-cerdo-en-salsa-de-champinones-con-elote-y-calabaza.jpg", "label": "Lomo de cerdo en salsa de champiñones con elote y calabaza", "keys": ["lomo", "cerdo", "salsa", "champinones", "elote", "calabaza"], "receta": "150-180g de lomo de cerdo en salsa de champiñones, con elote y calabaza."},
- {"file": "lomo-de-cerdo-en-salsa-de-champinones-con-ensalada.jpg", "label": "Lomo de cerdo en salsa de champiñones con ensalada", "keys": ["lomo", "cerdo", "salsa", "champinones", "ensalada"], "receta": "150-180g de lomo de cerdo en salsa de champiñones, acompañado de ensalada."},
- {"file": "lomo-de-cerdo-encebollado-con-calabacitas.jpg", "label": "Lomo de cerdo encebollado con calabacitas", "keys": ["lomo", "cerdo", "encebollado", "calabacitas"], "receta": "150-180g de lomo de cerdo encebollado, acompañado de calabacitas."},
- {"file": "lomo-de-cerdo-encebollado-con-camote-al-horno.jpg", "label": "Lomo de cerdo encebollado con camote al horno", "keys": ["lomo", "cerdo", "encebollado", "camote", "horno"], "receta": "150-180g de lomo de cerdo encebollado, acompañado de camote al horno."},
- {"file": "lomo-de-cerdo-encebollado-con-esparragos.jpg", "label": "Lomo de cerdo encebollado con espárragos", "keys": ["lomo", "cerdo", "encebollado", "esparragos"], "receta": "150-180g de lomo de cerdo encebollado, acompañado de espárragos."},
- {"file": "lomo-de-cerdo-encebollado-con-pure-de-papa.jpg", "label": "Lomo de cerdo encebollado con puré de papa", "keys": ["lomo", "cerdo", "encebollado", "pure", "papa"], "receta": "150-180g de lomo de cerdo encebollado, acompañado de puré de papa."},
- {"file": "lomo-de-cerdo-encebollado-con-quinoa-y-espinaca.jpg", "label": "Lomo de cerdo encebollado con quinoa y espinaca", "keys": ["lomo", "cerdo", "encebollado", "quinoa", "espinaca"], "receta": "150-180g de lomo de cerdo encebollado, con quinoa y espinaca."},
- {"file": "mandarina-natural.jpg", "label": "Mandarina natural", "keys": ["mandarina", "natural"], "receta": "1 porción de mandarina fresca."},
- {"file": "mega-gringa-de-pan-pita.jpg", "label": "Mega Gringa De Pan Pita", "keys": ["mega", "gringa", "pan", "pita"], "receta": "1 pan pita tradicional empaque azul 100g de pechuga de pavo"},
- {"file": "melon-con-chile-y-limon.jpg", "label": "Melón con chile y limón", "keys": ["melon", "chile", "limon"], "receta": "Melón con chile y limón."},
- {"file": "milanesa-de-res-al-horno.jpg", "label": "Milanesa de res al horno", "keys": ["milanesa", "res", "horno"], "receta": "milanesa de res horneada con ensalada."},
- {"file": "mix-de-frutos-secos.jpg", "label": "Mix De Frutos Secos", "keys": ["mix", "frutos", "secos"], "receta": "Un puño (~15g) de almendras, nueces y pepitas naturales sin sal."},
- {"file": "pan-pita-con-panela-y-champinon.jpg", "label": "Pan Pita Con Panela Y Champiñón", "keys": ["pan", "pita", "panela", "champinon"], "receta": "1 pan pita integral con salsa de jitomate, 40g de panela y champiñón/pimiento; hornear."},
- {"file": "pan-pita-de-salmon.jpg", "label": "Pan Pita De Salmón", "keys": ["pan", "pita", "salmon"], "receta": "1 pan pita marca libanés 90g de salmón ahumado encima, antes untar 1 cda de queso crema light poner hojas de espinacas encima, pimienta y gotitas de a"},
- {"file": "pan-tostado-con-burrata-y-cherry.jpg", "label": "Pan Tostado Con Burrata Y Cherry", "keys": ["pan", "tostado", "burrata", "cherry"], "receta": "2 rebanadas de pan bimbo cero cero 40g de aguacate machacado untado 90g de burrata entre ambos panes Espinaca, jitomate cherry, germen"},
- {"file": "panela-asado-con-salsa.jpg", "label": "Panela Asado Con Salsa", "keys": ["panela", "asado", "salsa"], "receta": "2 paquete de salmas 60g de panela asado y pico de gallo 1 yogurt bebible oikos"},
- {"file": "panque-proteico-de-platano.jpg", "label": "Panqué proteico de plátano", "keys": ["panque", "proteico", "platano"], "receta": "panqué horneado de avena, proteína y plátano."},
- {"file": "pasta-con-salsa-de-tomate-y-atun.jpg", "label": "Pasta Con Salsa De Tomate Y Atún", "keys": ["pasta", "salsa", "tomate", "atun"], "receta": "100g de pasta con salsa de tomate natural o comprado pero de buena calidad 90g de atún de lata en agua mezlcar con la pasta champiñones y calabazas as"},
- {"file": "pavo-a-la-naranja-con-camote-al-horno.jpg", "label": "Pavo a la naranja con camote al horno", "keys": ["pavo", "naranja", "camote", "horno"], "receta": "150-180g de pavo a la naranja, acompañado de camote al horno."},
- {"file": "pavo-a-la-naranja-con-elote-y-calabaza.jpg", "label": "Pavo a la naranja con elote y calabaza", "keys": ["pavo", "naranja", "elote", "calabaza"], "receta": "150-180g de pavo a la naranja, con elote y calabaza."},
- {"file": "pavo-a-la-naranja-con-pure-de-papa.jpg", "label": "Pavo a la naranja con puré de papa", "keys": ["pavo", "naranja", "pure", "papa"], "receta": "150-180g de pavo a la naranja, acompañado de puré de papa."},
- {"file": "pavo-a-la-plancha-con-arroz.jpg", "label": "Pavo a la plancha con arroz", "keys": ["pavo", "plancha", "arroz"], "receta": "150-180g de pavo a la plancha, acompañado de arroz."},
- {"file": "pavo-a-las-finas-hierbas-con-calabacitas.jpg", "label": "Pavo a las finas hierbas con calabacitas", "keys": ["pavo", "finas", "hierbas", "calabacitas"], "receta": "150-180g de pavo a las finas hierbas, acompañado de calabacitas."},
- {"file": "pavo-a-las-finas-hierbas-con-camote-al-horno.jpg", "label": "Pavo a las finas hierbas con camote al horno", "keys": ["pavo", "finas", "hierbas", "camote", "horno"], "receta": "150-180g de pavo a las finas hierbas, acompañado de camote al horno."},
- {"file": "pavo-a-las-finas-hierbas-con-elote-y-calabaza.jpg", "label": "Pavo a las finas hierbas con elote y calabaza", "keys": ["pavo", "finas", "hierbas", "elote", "calabaza"], "receta": "150-180g de pavo a las finas hierbas, con elote y calabaza."},
- {"file": "pavo-a-las-finas-hierbas-con-esparragos.jpg", "label": "Pavo a las finas hierbas con espárragos", "keys": ["pavo", "finas", "hierbas", "esparragos"], "receta": "150-180g de pavo a las finas hierbas, acompañado de espárragos."},
- {"file": "pavo-a-las-finas-hierbas-con-pure-de-papa.jpg", "label": "Pavo a las finas hierbas con puré de papa", "keys": ["pavo", "finas", "hierbas", "pure", "papa"], "receta": "150-180g de pavo a las finas hierbas, acompañado de puré de papa."},
- {"file": "pavo-adobado-con-camote-al-horno.jpg", "label": "Pavo adobado con camote al horno", "keys": ["pavo", "adobado", "camote", "horno"], "receta": "150-180g de pavo adobado, acompañado de camote al horno."},
- {"file": "pavo-adobado-con-pure-de-papa.jpg", "label": "Pavo adobado con puré de papa", "keys": ["pavo", "adobado", "pure", "papa"], "receta": "150-180g de pavo adobado, acompañado de puré de papa."},
- {"file": "pavo-al-ajillo-con-arroz.jpg", "label": "Pavo al ajillo con arroz", "keys": ["pavo", "ajillo", "arroz"], "receta": "150-180g de pavo al ajillo, acompañado de arroz."},
- {"file": "pavo-al-chipotle-con-camote-al-horno.jpg", "label": "Pavo al chipotle con camote al horno", "keys": ["pavo", "chipotle", "camote", "horno"], "receta": "150-180g de pavo al chipotle, acompañado de camote al horno."},
- {"file": "pavo-al-chipotle-con-pure-de-papa.jpg", "label": "Pavo al chipotle con puré de papa", "keys": ["pavo", "chipotle", "pure", "papa"], "receta": "150-180g de pavo al chipotle, acompañado de puré de papa."},
- {"file": "pavo-al-curry-con-arroz.jpg", "label": "Pavo al curry con arroz", "keys": ["pavo", "curry", "arroz"], "receta": "150-180g de pavo al curry, acompañado de arroz."},
- {"file": "pavo-al-curry-con-calabacitas.jpg", "label": "Pavo al curry con calabacitas", "keys": ["pavo", "curry", "calabacitas"], "receta": "150-180g de pavo al curry, acompañado de calabacitas."},
- {"file": "pavo-al-curry-con-esparragos.jpg", "label": "Pavo al curry con espárragos", "keys": ["pavo", "curry", "esparragos"], "receta": "150-180g de pavo al curry, acompañado de espárragos."},
- {"file": "pavo-al-horno-con-especias-con-camote-al-horno.jpg", "label": "Pavo al horno con especias con camote al horno", "keys": ["pavo", "horno", "especias", "camote", "horno"], "receta": "150-180g de pavo al horno con especias, acompañado de camote al horno."},
- {"file": "pavo-al-horno-con-especias-con-pure-de-papa.jpg", "label": "Pavo al horno con especias con puré de papa", "keys": ["pavo", "horno", "especias", "pure", "papa"], "receta": "150-180g de pavo al horno con especias, acompañado de puré de papa."},
- {"file": "pavo-al-pastor-con-arroz.jpg", "label": "Pavo al pastor con arroz", "keys": ["pavo", "pastor", "arroz"], "receta": "150-180g de pavo al pastor, acompañado de arroz."},
- {"file": "pavo-al-pastor-con-calabacitas.jpg", "label": "Pavo al pastor con calabacitas", "keys": ["pavo", "pastor", "calabacitas"], "receta": "150-180g de pavo al pastor, acompañado de calabacitas."},
- {"file": "pavo-al-pastor-con-esparragos.jpg", "label": "Pavo al pastor con espárragos", "keys": ["pavo", "pastor", "esparragos"], "receta": "150-180g de pavo al pastor, acompañado de espárragos."},
- {"file": "pavo-con-calabacitas-a-la-mexicana.jpg", "label": "Pavo con calabacitas a la mexicana", "keys": ["pavo", "calabacitas", "mexicana"], "receta": "150-180g de pavo a la plancha con calabacitas a la mexicana."},
- {"file": "pavo-con-camote-al-horno.jpg", "label": "Pavo con camote al horno", "keys": ["pavo", "camote", "horno"], "receta": "150-180g de pavo a la plancha con camote al horno."},
- {"file": "pavo-con-pure-de-papa.jpg", "label": "Pavo con puré de papa", "keys": ["pavo", "pure", "papa"], "receta": "150-180g de pavo a la plancha con puré de papa."},
- {"file": "pavo-empanizado-al-horno-con-elote-y-calabaza.jpg", "label": "Pavo empanizado al horno con elote y calabaza", "keys": ["pavo", "empanizado", "horno", "elote", "calabaza"], "receta": "150-180g de pavo empanizado al horno, con elote y calabaza."},
- {"file": "pavo-en-pipian-verde-con-arroz.jpg", "label": "Pavo en pipián verde con arroz", "keys": ["pavo", "pipian", "verde", "arroz"], "receta": "150-180g de pavo en pipián verde, acompañado de arroz."},
- {"file": "pavo-en-salsa-de-champinones-con-arroz.jpg", "label": "Pavo en salsa de champiñones con arroz", "keys": ["pavo", "salsa", "champinones", "arroz"], "receta": "150-180g de pavo en salsa de champiñones, acompañado de arroz."},
- {"file": "pavo-en-salsa-de-champinones-con-elote-y-calabaza.jpg", "label": "Pavo en salsa de champiñones con elote y calabaza", "keys": ["pavo", "salsa", "champinones", "elote", "calabaza"], "receta": "150-180g de pavo en salsa de champiñones, con elote y calabaza."},
- {"file": "pavo-encebollado-con-calabacitas.jpg", "label": "Pavo encebollado con calabacitas", "keys": ["pavo", "encebollado", "calabacitas"], "receta": "150-180g de pavo encebollado, acompañado de calabacitas."},
- {"file": "pavo-encebollado-con-camote-al-horno.jpg", "label": "Pavo encebollado con camote al horno", "keys": ["pavo", "encebollado", "camote", "horno"], "receta": "150-180g de pavo encebollado, acompañado de camote al horno."},
- {"file": "pavo-encebollado-con-esparragos.jpg", "label": "Pavo encebollado con espárragos", "keys": ["pavo", "encebollado", "esparragos"], "receta": "150-180g de pavo encebollado, acompañado de espárragos."},
- {"file": "pavo-encebollado-con-pure-de-papa.jpg", "label": "Pavo encebollado con puré de papa", "keys": ["pavo", "encebollado", "pure", "papa"], "receta": "150-180g de pavo encebollado, acompañado de puré de papa."},
- {"file": "pechuga-de-pavo-asada.jpg", "label": "Pechuga De Pavo Asada", "keys": ["pechuga", "pavo", "asada"], "receta": "90g de pechuga de pavo kirkland rebanada asada. Colocar en 2 rice cake 1 cda de hummus y encima, espinacas y germen y la pechuga gotitas de aceite de"},
- {"file": "pechuga-rellena-de-espinaca-y-panela.jpg", "label": "Pechuga rellena de espinaca y panela", "keys": ["pechuga", "rellena", "espinaca", "panela"], "receta": "120-180g de pechuga rellena de espinaca y panela; ensalada."},
- {"file": "pepino-con-queso-cottage.jpg", "label": "Pepino con queso cottage", "keys": ["pepino", "queso", "cottage"], "receta": "rodajas de pepino con cottage y chile."},
- {"file": "pescado-a-la-veracruzana-con-calabacitas.jpg", "label": "Pescado a la veracruzana con calabacitas", "keys": ["pescado", "veracruzana", "calabacitas"], "receta": "150-180g de pescado a la veracruzana, acompañado de calabacitas."},
- {"file": "pescado-a-la-veracruzana-con-elote-y-calabaza.jpg", "label": "Pescado a la veracruzana con elote y calabaza", "keys": ["pescado", "veracruzana", "elote", "calabaza"], "receta": "150-180g de pescado a la veracruzana, con elote y calabaza."},
- {"file": "pescado-a-la-veracruzana-con-esparragos.jpg", "label": "Pescado a la veracruzana con espárragos", "keys": ["pescado", "veracruzana", "esparragos"], "receta": "150-180g de pescado a la veracruzana, acompañado de espárragos."},
- {"file": "pescado-a-las-finas-hierbas-con-camote-al-horno.jpg", "label": "Pescado a las finas hierbas con camote al horno", "keys": ["pescado", "finas", "hierbas", "camote", "horno"], "receta": "150-180g de pescado a las finas hierbas, acompañado de camote al horno."},
- {"file": "pescado-a-las-finas-hierbas-con-quinoa.jpg", "label": "Pescado a las finas hierbas con quinoa", "keys": ["pescado", "finas", "hierbas", "quinoa"], "receta": "150-180g de pescado a las finas hierbas, acompañado de quinoa."},
- {"file": "pescado-al-chipotle-con-calabacitas.jpg", "label": "Pescado al chipotle con calabacitas", "keys": ["pescado", "chipotle", "calabacitas"], "receta": "150-180g de pescado al chipotle, acompañado de calabacitas."},
- {"file": "pescado-al-chipotle-con-camote-al-horno.jpg", "label": "Pescado al chipotle con camote al horno", "keys": ["pescado", "chipotle", "camote", "horno"], "receta": "150-180g de pescado al chipotle, acompañado de camote al horno."},
- {"file": "pescado-al-chipotle-con-esparragos.jpg", "label": "Pescado al chipotle con espárragos", "keys": ["pescado", "chipotle", "esparragos"], "receta": "150-180g de pescado al chipotle, acompañado de espárragos."},
- {"file": "pescado-al-chipotle-con-quinoa-y-espinaca.jpg", "label": "Pescado al chipotle con quinoa y espinaca", "keys": ["pescado", "chipotle", "quinoa", "espinaca"], "receta": "150-180g de pescado al chipotle, con quinoa y espinaca."},
- {"file": "pescado-al-curry-con-elote-y-calabaza.jpg", "label": "Pescado al curry con elote y calabaza", "keys": ["pescado", "curry", "elote", "calabaza"], "receta": "150-180g de pescado al curry, con elote y calabaza."},
- {"file": "pescado-al-curry-con-quinoa.jpg", "label": "Pescado al curry con quinoa", "keys": ["pescado", "curry", "quinoa"], "receta": "150-180g de pescado al curry, acompañado de quinoa."},
- {"file": "pescado-con-camote-al-horno.jpg", "label": "Pescado con camote al horno", "keys": ["pescado", "camote", "horno"], "receta": "150-180g de pescado a la plancha con camote al horno."},
- {"file": "pescado-con-quinoa-y-espinaca.jpg", "label": "Pescado con quinoa y espinaca", "keys": ["pescado", "quinoa", "espinaca"], "receta": "150-180g de pescado a la plancha con quinoa con espinaca."},
- {"file": "pescado-empanizado-al-horno-con-calabacitas.jpg", "label": "Pescado empanizado al horno con calabacitas", "keys": ["pescado", "empanizado", "horno", "calabacitas"], "receta": "150-180g de pescado empanizado al horno, acompañado de calabacitas."},
- {"file": "pescado-empanizado-al-horno-con-camote-al-horno.jpg", "label": "Pescado empanizado al horno con camote al horno", "keys": ["pescado", "empanizado", "horno", "camote", "horno"], "receta": "150-180g de pescado empanizado al horno, acompañado de camote al horno."},
- {"file": "pescado-empanizado-al-horno-con-esparragos.jpg", "label": "Pescado empanizado al horno con espárragos", "keys": ["pescado", "empanizado", "horno", "esparragos"], "receta": "150-180g de pescado empanizado al horno, acompañado de espárragos."},
- {"file": "pescado-empapelado-con-quinoa.jpg", "label": "Pescado empapelado con quinoa", "keys": ["pescado", "empapelado", "quinoa"], "receta": "150-180g de pescado empapelado, acompañado de quinoa."},
- {"file": "pescado-en-costra-de-ajonjoli-con-quinoa-y-espinaca.jpg", "label": "Pescado en costra de ajonjolí con quinoa y espinaca", "keys": ["pescado", "costra", "ajonjoli", "quinoa", "espinaca"], "receta": "150-180g de pescado en costra de ajonjolí, con quinoa y espinaca."},
- {"file": "pescado-en-salsa-de-mango-con-elote-y-calabaza.jpg", "label": "Pescado en salsa de mango con elote y calabaza", "keys": ["pescado", "salsa", "mango", "elote", "calabaza"], "receta": "150-180g de pescado en salsa de mango, con elote y calabaza."},
- {"file": "pescado-zarandeado-con-calabacitas.jpg", "label": "Pescado zarandeado con calabacitas", "keys": ["pescado", "zarandeado", "calabacitas"], "receta": "150-180g de pescado zarandeado, acompañado de calabacitas."},
- {"file": "pescado-zarandeado-con-esparragos.jpg", "label": "Pescado zarandeado con espárragos", "keys": ["pescado", "zarandeado", "esparragos"], "receta": "150-180g de pescado zarandeado, acompañado de espárragos."},
- {"file": "pescado-zarandeado-con-quinoa-y-espinaca.jpg", "label": "Pescado zarandeado con quinoa y espinaca", "keys": ["pescado", "zarandeado", "quinoa", "espinaca"], "receta": "150-180g de pescado zarandeado, con quinoa y espinaca."},
- {"file": "pimiento-relleno-de-pavo.jpg", "label": "Pimiento relleno de pavo", "keys": ["pimiento", "relleno", "pavo"], "receta": "Pimiento relleno de pavo, al horno."},
- {"file": "pina-con-chile-y-limon.jpg", "label": "Piña con chile y limón", "keys": ["pina", "chile", "limon"], "receta": "Piña con chile y limón."},
- {"file": "pita-con-pavo-y-huevo.jpg", "label": "Pita Con Pavo Y Huevo", "keys": ["pita", "pavo", "huevo"], "receta": "1 pan pita marca libanus integral taquero, untar 20g de aguacate, encima poner 2 rebanadas de pechuga de pavo (30g) y 2 huevos estrellados o revueltos"},
- {"file": "platano-congelado-con-cacao.jpg", "label": "Plátano congelado con cacao", "keys": ["platano", "congelado", "cacao"], "receta": "plátano congelado espolvoreado con cacao."},
- {"file": "pollo-a-la-naranja-con-camote-al-horno.jpg", "label": "Pollo a la naranja con camote al horno", "keys": ["pollo", "naranja", "camote", "horno"], "receta": "150-180g de pollo a la naranja, acompañado de camote al horno."},
- {"file": "pollo-a-la-naranja-con-elote-y-calabaza.jpg", "label": "Pollo a la naranja con elote y calabaza", "keys": ["pollo", "naranja", "elote", "calabaza"], "receta": "150-180g de pollo a la naranja, con elote y calabaza."},
- {"file": "pollo-a-la-naranja-con-pure-de-papa.jpg", "label": "Pollo a la naranja con puré de papa", "keys": ["pollo", "naranja", "pure", "papa"], "receta": "150-180g de pollo a la naranja, acompañado de puré de papa."},
- {"file": "pollo-a-las-finas-hierbas-con-calabacitas.jpg", "label": "Pollo a las finas hierbas con calabacitas", "keys": ["pollo", "finas", "hierbas", "calabacitas"], "receta": "150-180g de pollo a las finas hierbas, acompañado de calabacitas."},
- {"file": "pollo-a-las-finas-hierbas-con-camote-al-horno.jpg", "label": "Pollo a las finas hierbas con camote al horno", "keys": ["pollo", "finas", "hierbas", "camote", "horno"], "receta": "150-180g de pollo a las finas hierbas, acompañado de camote al horno."},
- {"file": "pollo-a-las-finas-hierbas-con-esparragos.jpg", "label": "Pollo a las finas hierbas con espárragos", "keys": ["pollo", "finas", "hierbas", "esparragos"], "receta": "150-180g de pollo a las finas hierbas, acompañado de espárragos."},
- {"file": "pollo-a-las-finas-hierbas-con-pure-de-papa.jpg", "label": "Pollo a las finas hierbas con puré de papa", "keys": ["pollo", "finas", "hierbas", "pure", "papa"], "receta": "150-180g de pollo a las finas hierbas, acompañado de puré de papa."},
- {"file": "pollo-adobado-con-camote-al-horno.jpg", "label": "Pollo adobado con camote al horno", "keys": ["pollo", "adobado", "camote", "horno"], "receta": "150-180g de pollo adobado, acompañado de camote al horno."},
- {"file": "pollo-adobado-con-pure-de-papa.jpg", "label": "Pollo adobado con puré de papa", "keys": ["pollo", "adobado", "pure", "papa"], "receta": "150-180g de pollo adobado, acompañado de puré de papa."},
- {"file": "pollo-al-chipotle-con-camote-al-horno.jpg", "label": "Pollo al chipotle con camote al horno", "keys": ["pollo", "chipotle", "camote", "horno"], "receta": "150-180g de pollo al chipotle, acompañado de camote al horno."},
- {"file": "pollo-al-chipotle-con-pure-de-papa.jpg", "label": "Pollo al chipotle con puré de papa", "keys": ["pollo", "chipotle", "pure", "papa"], "receta": "150-180g de pollo al chipotle, acompañado de puré de papa."},
- {"file": "pollo-al-curry-con-calabacitas.jpg", "label": "Pollo al curry con calabacitas", "keys": ["pollo", "curry", "calabacitas"], "receta": "150-180g de pollo al curry, acompañado de calabacitas."},
- {"file": "pollo-al-curry-con-esparragos.jpg", "label": "Pollo al curry con espárragos", "keys": ["pollo", "curry", "esparragos"], "receta": "150-180g de pollo al curry, acompañado de espárragos."},
- {"file": "pollo-al-horno-con-especias-con-camote-al-horno.jpg", "label": "Pollo al horno con especias con camote al horno", "keys": ["pollo", "horno", "especias", "camote", "horno"], "receta": "150-180g de pollo al horno con especias, acompañado de camote al horno."},
- {"file": "pollo-al-horno-con-especias-con-pure-de-papa.jpg", "label": "Pollo al horno con especias con puré de papa", "keys": ["pollo", "horno", "especias", "pure", "papa"], "receta": "150-180g de pollo al horno con especias, acompañado de puré de papa."},
- {"file": "pollo-al-pastor-con-calabacitas.jpg", "label": "Pollo al pastor con calabacitas", "keys": ["pollo", "pastor", "calabacitas"], "receta": "150-180g de pollo al pastor, acompañado de calabacitas."},
- {"file": "pollo-al-pastor-con-esparragos.jpg", "label": "Pollo al pastor con espárragos", "keys": ["pollo", "pastor", "esparragos"], "receta": "150-180g de pollo al pastor, acompañado de espárragos."},
- {"file": "pollo-con-calabacitas-a-la-mexicana.jpg", "label": "Pollo con calabacitas a la mexicana", "keys": ["pollo", "calabacitas", "mexicana"], "receta": "150-180g de pollo a la plancha con calabacitas a la mexicana."},
- {"file": "pollo-con-camote-al-horno.jpg", "label": "Pollo con camote al horno", "keys": ["pollo", "camote", "horno"], "receta": "150-180g de pollo a la plancha con camote al horno."},
- {"file": "pollo-con-pure-de-papa.jpg", "label": "Pollo con puré de papa", "keys": ["pollo", "pure", "papa"], "receta": "150-180g de pollo a la plancha con puré de papa."},
- {"file": "pollo-en-salsa-de-champinones-con-elote-y-calabaza.jpg", "label": "Pollo en salsa de champiñones con elote y calabaza", "keys": ["pollo", "salsa", "champinones", "elote", "calabaza"], "receta": "150-180g de pollo en salsa de champiñones, con elote y calabaza."},
- {"file": "pollo-encebollado-con-calabacitas.jpg", "label": "Pollo encebollado con calabacitas", "keys": ["pollo", "encebollado", "calabacitas"], "receta": "150-180g de pollo encebollado, acompañado de calabacitas."},
- {"file": "pollo-encebollado-con-camote-al-horno.jpg", "label": "Pollo encebollado con camote al horno", "keys": ["pollo", "encebollado", "camote", "horno"], "receta": "150-180g de pollo encebollado, acompañado de camote al horno."},
- {"file": "pollo-encebollado-con-esparragos.jpg", "label": "Pollo encebollado con espárragos", "keys": ["pollo", "encebollado", "esparragos"], "receta": "150-180g de pollo encebollado, acompañado de espárragos."},
- {"file": "pollo-encebollado-con-pure-de-papa.jpg", "label": "Pollo encebollado con puré de papa", "keys": ["pollo", "encebollado", "pure", "papa"], "receta": "150-180g de pollo encebollado, acompañado de puré de papa."},
- {"file": "pollo-y-papa-al-vapor.jpg", "label": "Pollo y papa al vapor", "keys": ["pollo", "papa", "vapor"], "receta": "Prepara 120 g de pechuga de pollo a la plancha, acompaña con 210 de papa cocida y verduras al vapor como calabaza y ejotes. Usa 1 cdta de aceite de ol… Nfitness 360®"},
- {"file": "requeson-con-nuez-y-miel.jpg", "label": "Requesón con nuez y miel", "keys": ["requeson", "nuez", "miel"], "receta": "requesón con nuez y un toque de miel."},
- {"file": "res-a-la-mexicana-con-arroz-y-ensalada.jpg", "label": "Res a la mexicana con arroz y ensalada", "keys": ["res", "mexicana", "arroz", "ensalada"], "receta": "150-180g de res a la mexicana, con arroz y ensalada."},
- {"file": "res-a-la-mexicana-con-ensalada.jpg", "label": "Res a la mexicana con ensalada", "keys": ["res", "mexicana", "ensalada"], "receta": "150-180g de res a la mexicana, acompañado de ensalada."},
- {"file": "res-a-la-mexicana-con-quinoa.jpg", "label": "Res a la mexicana con quinoa", "keys": ["res", "mexicana", "quinoa"], "receta": "150-180g de res a la mexicana, acompañado de quinoa."},
- {"file": "res-a-la-naranja-con-camote-al-horno.jpg", "label": "Res a la naranja con camote al horno", "keys": ["res", "naranja", "camote", "horno"], "receta": "150-180g de res a la naranja, acompañado de camote al horno."},
- {"file": "res-a-la-naranja-con-elote-y-calabaza.jpg", "label": "Res a la naranja con elote y calabaza", "keys": ["res", "naranja", "elote", "calabaza"], "receta": "150-180g de res a la naranja, con elote y calabaza."},
- {"file": "res-a-la-naranja-con-pure-de-papa.jpg", "label": "Res a la naranja con puré de papa", "keys": ["res", "naranja", "pure", "papa"], "receta": "150-180g de res a la naranja, acompañado de puré de papa."},
- {"file": "res-a-la-naranja-con-quinoa.jpg", "label": "Res a la naranja con quinoa", "keys": ["res", "naranja", "quinoa"], "receta": "150-180g de res a la naranja, acompañado de quinoa."},
- {"file": "res-a-las-finas-hierbas-con-calabacitas.jpg", "label": "Res a las finas hierbas con calabacitas", "keys": ["res", "finas", "hierbas", "calabacitas"], "receta": "150-180g de res a las finas hierbas, acompañado de calabacitas."},
- {"file": "res-a-las-finas-hierbas-con-camote-al-horno.jpg", "label": "Res a las finas hierbas con camote al horno", "keys": ["res", "finas", "hierbas", "camote", "horno"], "receta": "150-180g de res a las finas hierbas, acompañado de camote al horno."},
- {"file": "res-a-las-finas-hierbas-con-elote-y-calabaza.jpg", "label": "Res a las finas hierbas con elote y calabaza", "keys": ["res", "finas", "hierbas", "elote", "calabaza"], "receta": "150-180g de res a las finas hierbas, con elote y calabaza."},
- {"file": "res-a-las-finas-hierbas-con-pure-de-papa.jpg", "label": "Res a las finas hierbas con puré de papa", "keys": ["res", "finas", "hierbas", "pure", "papa"], "receta": "150-180g de res a las finas hierbas, acompañado de puré de papa."},
- {"file": "res-adobado-con-arroz-y-ensalada.jpg", "label": "Res adobado con arroz y ensalada", "keys": ["res", "adobado", "arroz", "ensalada"], "receta": "150-180g de res adobado, con arroz y ensalada."},
- {"file": "res-al-ajillo-con-ensalada.jpg", "label": "Res al ajillo con ensalada", "keys": ["res", "ajillo", "ensalada"], "receta": "150-180g de res al ajillo, acompañado de ensalada."},
- {"file": "res-al-ajillo-con-quinoa-y-espinaca.jpg", "label": "Res al ajillo con quinoa y espinaca", "keys": ["res", "ajillo", "quinoa", "espinaca"], "receta": "150-180g de res al ajillo, con quinoa y espinaca."},
- {"file": "res-al-chipotle-con-camote-al-horno.jpg", "label": "Res al chipotle con camote al horno", "keys": ["res", "chipotle", "camote", "horno"], "receta": "150-180g de res al chipotle, acompañado de camote al horno."},
- {"file": "res-al-chipotle-con-pure-de-papa.jpg", "label": "Res al chipotle con puré de papa", "keys": ["res", "chipotle", "pure", "papa"], "receta": "150-180g de res al chipotle, acompañado de puré de papa."},
- {"file": "res-al-chipotle-con-quinoa-y-espinaca.jpg", "label": "Res al chipotle con quinoa y espinaca", "keys": ["res", "chipotle", "quinoa", "espinaca"], "receta": "150-180g de res al chipotle, con quinoa y espinaca."},
- {"file": "res-al-chipotle-con-quinoa.jpg", "label": "Res al chipotle con quinoa", "keys": ["res", "chipotle", "quinoa"], "receta": "150-180g de res al chipotle, acompañado de quinoa."},
- {"file": "res-al-horno-con-especias-con-camote-al-horno.jpg", "label": "Res al horno con especias con camote al horno", "keys": ["res", "horno", "especias", "camote", "horno"], "receta": "150-180g de res al horno con especias, acompañado de camote al horno."},
- {"file": "res-al-horno-con-especias-con-pure-de-papa.jpg", "label": "Res al horno con especias con puré de papa", "keys": ["res", "horno", "especias", "pure", "papa"], "receta": "150-180g de res al horno con especias, acompañado de puré de papa."},
- {"file": "res-al-horno-con-especias-con-quinoa-y-espinaca.jpg", "label": "Res al horno con especias con quinoa y espinaca", "keys": ["res", "horno", "especias", "quinoa", "espinaca"], "receta": "150-180g de res al horno con especias, con quinoa y espinaca."},
- {"file": "res-al-horno-con-especias-con-quinoa.jpg", "label": "Res al horno con especias con quinoa", "keys": ["res", "horno", "especias", "quinoa"], "receta": "150-180g de res al horno con especias, acompañado de quinoa."},
- {"file": "res-al-pastor-con-calabacitas.jpg", "label": "Res al pastor con calabacitas", "keys": ["res", "pastor", "calabacitas"], "receta": "150-180g de res al pastor, acompañado de calabacitas."},
- {"file": "res-al-pastor-con-esparragos.jpg", "label": "Res al pastor con espárragos", "keys": ["res", "pastor", "esparragos"], "receta": "150-180g de res al pastor, acompañado de espárragos."},
- {"file": "res-al-pastor-con-quinoa-y-espinaca.jpg", "label": "Res al pastor con quinoa y espinaca", "keys": ["res", "pastor", "quinoa", "espinaca"], "receta": "150-180g de res al pastor, con quinoa y espinaca."},
- {"file": "res-en-chile-pasilla.jpg", "label": "Res en chile pasilla", "keys": ["res", "chile", "pasilla"], "receta": "120-180g de res en salsa de chile pasilla con nopales y arroz."},
- {"file": "res-en-pipian-verde-con-arroz.jpg", "label": "Res en pipián verde con arroz", "keys": ["res", "pipian", "verde", "arroz"], "receta": "150-180g de res en pipián verde, acompañado de arroz."},
- {"file": "res-en-salsa-bbq-ligera-con-ensalada.jpg", "label": "Res en salsa BBQ ligera con ensalada", "keys": ["res", "salsa", "bbq", "ligera", "ensalada"], "receta": "150-180g de res en salsa BBQ ligera, acompañado de ensalada."},
- {"file": "res-en-salsa-de-champinones-con-arroz.jpg", "label": "Res en salsa de champiñones con arroz", "keys": ["res", "salsa", "champinones", "arroz"], "receta": "150-180g de res en salsa de champiñones, acompañado de arroz."},
- {"file": "res-encebollado-con-calabacitas.jpg", "label": "Res encebollado con calabacitas", "keys": ["res", "encebollado", "calabacitas"], "receta": "150-180g de res encebollado, acompañado de calabacitas."},
- {"file": "rollos-de-lechuga-con-pollo.jpg", "label": "Rollos de lechuga con pollo", "keys": ["rollos", "lechuga", "pollo"], "receta": "Hojas de lechuga rellenas de pollo y aguacate."},
- {"file": "rollos-de-lechuga-con-tofu.jpg", "label": "Rollos de lechuga con tofu", "keys": ["rollos", "lechuga", "tofu"], "receta": "Hojas de lechuga rellenas de tofu y aguacate."},
- {"file": "salmon-a-la-veracruzana-con-calabacitas.jpg", "label": "Salmón a la veracruzana con calabacitas", "keys": ["salmon", "veracruzana", "calabacitas"], "receta": "150-180g de salmón a la veracruzana, acompañado de calabacitas."},
- {"file": "salmon-a-la-veracruzana-con-elote-y-calabaza.jpg", "label": "Salmón a la veracruzana con elote y calabaza", "keys": ["salmon", "veracruzana", "elote", "calabaza"], "receta": "150-180g de salmón a la veracruzana, con elote y calabaza."},
- {"file": "salmon-a-la-veracruzana-con-esparragos.jpg", "label": "Salmón a la veracruzana con espárragos", "keys": ["salmon", "veracruzana", "esparragos"], "receta": "150-180g de salmón a la veracruzana, acompañado de espárragos."},
- {"file": "salmon-a-las-finas-hierbas-con-camote-al-horno.jpg", "label": "Salmón a las finas hierbas con camote al horno", "keys": ["salmon", "finas", "hierbas", "camote", "horno"], "receta": "150-180g de salmón a las finas hierbas, acompañado de camote al horno."},
- {"file": "salmon-a-las-finas-hierbas-con-pure-de-papa.jpg", "label": "Salmón a las finas hierbas con puré de papa", "keys": ["salmon", "finas", "hierbas", "pure", "papa"], "receta": "150-180g de salmón a las finas hierbas, acompañado de puré de papa."},
- {"file": "salmon-a-las-finas-hierbas-con-quinoa.jpg", "label": "Salmón a las finas hierbas con quinoa", "keys": ["salmon", "finas", "hierbas", "quinoa"], "receta": "150-180g de salmón a las finas hierbas, acompañado de quinoa."},
- {"file": "salmon-al-chipotle-con-calabacitas.jpg", "label": "Salmón al chipotle con calabacitas", "keys": ["salmon", "chipotle", "calabacitas"], "receta": "150-180g de salmón al chipotle, acompañado de calabacitas."},
- {"file": "salmon-al-chipotle-con-camote-al-horno.jpg", "label": "Salmón al chipotle con camote al horno", "keys": ["salmon", "chipotle", "camote", "horno"], "receta": "150-180g de salmón al chipotle, acompañado de camote al horno."},
- {"file": "salmon-al-chipotle-con-esparragos.jpg", "label": "Salmón al chipotle con espárragos", "keys": ["salmon", "chipotle", "esparragos"], "receta": "150-180g de salmón al chipotle, acompañado de espárragos."},
- {"file": "salmon-al-chipotle-con-quinoa-y-espinaca.jpg", "label": "Salmón al chipotle con quinoa y espinaca", "keys": ["salmon", "chipotle", "quinoa", "espinaca"], "receta": "150-180g de salmón al chipotle, con quinoa y espinaca."},
- {"file": "salmon-al-curry-con-elote-y-calabaza.jpg", "label": "Salmón al curry con elote y calabaza", "keys": ["salmon", "curry", "elote", "calabaza"], "receta": "150-180g de salmón al curry, con elote y calabaza."},
- {"file": "salmon-al-curry-con-quinoa.jpg", "label": "Salmón al curry con quinoa", "keys": ["salmon", "curry", "quinoa"], "receta": "150-180g de salmón al curry, acompañado de quinoa."},
- {"file": "salmon-al-mojo-de-ajo-con-camote-al-horno.jpg", "label": "Salmón al mojo de ajo con camote al horno", "keys": ["salmon", "mojo", "ajo", "camote", "horno"], "receta": "150-180g de salmón al mojo de ajo, acompañado de camote al horno."},
- {"file": "salmon-al-mojo-de-ajo-con-pure-de-papa.jpg", "label": "Salmón al mojo de ajo con puré de papa", "keys": ["salmon", "mojo", "ajo", "pure", "papa"], "receta": "150-180g de salmón al mojo de ajo, acompañado de puré de papa."},
- {"file": "salmon-al-mojo-de-ajo-con-quinoa-y-espinaca.jpg", "label": "Salmón al mojo de ajo con quinoa y espinaca", "keys": ["salmon", "mojo", "ajo", "quinoa", "espinaca"], "receta": "150-180g de salmón al mojo de ajo, con quinoa y espinaca."},
- {"file": "salmon-al-mojo-de-ajo-con-quinoa.jpg", "label": "Salmón al mojo de ajo con quinoa", "keys": ["salmon", "mojo", "ajo", "quinoa"], "receta": "150-180g de salmón al mojo de ajo, acompañado de quinoa."},
- {"file": "salmon-con-calabacitas-a-la-mexicana.jpg", "label": "Salmón con calabacitas a la mexicana", "keys": ["salmon", "calabacitas", "mexicana"], "receta": "150-180g de salmón a la plancha con calabacitas a la mexicana."},
- {"file": "salmon-con-pure-de-papa.jpg", "label": "Salmón con puré de papa", "keys": ["salmon", "pure", "papa"], "receta": "150-180g de salmón a la plancha con puré de papa."},
- {"file": "salmon-con-quinoa-y-espinaca.jpg", "label": "Salmón con quinoa y espinaca", "keys": ["salmon", "quinoa", "espinaca"], "receta": "150-180g de salmón a la plancha con quinoa con espinaca."},
- {"file": "salmon-empanizado-al-horno-con-calabacitas.jpg", "label": "Salmón empanizado al horno con calabacitas", "keys": ["salmon", "empanizado", "horno", "calabacitas"], "receta": "150-180g de salmón empanizado al horno, acompañado de calabacitas."},
- {"file": "salmon-en-costra-de-ajonjoli-con-quinoa-y-espinaca.jpg", "label": "Salmón en costra de ajonjolí con quinoa y espinaca", "keys": ["salmon", "costra", "ajonjoli", "quinoa", "espinaca"], "receta": "150-180g de salmón en costra de ajonjolí, con quinoa y espinaca."},
- {"file": "salmon-zarandeado-con-calabacitas.jpg", "label": "Salmón zarandeado con calabacitas", "keys": ["salmon", "zarandeado", "calabacitas"], "receta": "150-180g de salmón zarandeado, acompañado de calabacitas."},
- {"file": "salmon-zarandeado-con-esparragos.jpg", "label": "Salmón zarandeado con espárragos", "keys": ["salmon", "zarandeado", "esparragos"], "receta": "150-180g de salmón zarandeado, acompañado de espárragos."},
- {"file": "salmon-zarandeado-con-quinoa-y-espinaca.jpg", "label": "Salmón zarandeado con quinoa y espinaca", "keys": ["salmon", "zarandeado", "quinoa", "espinaca"], "receta": "150-180g de salmón zarandeado, con quinoa y espinaca."},
- {"file": "sandia-con-chile-y-limon.jpg", "label": "Sandía con chile y limón", "keys": ["sandia", "chile", "limon"], "receta": "Sandía con chile y limón."},
- {"file": "sandwich-con-pan-thins.jpg", "label": "Sandwich Con Pan Thins", "keys": ["sandwich", "pan", "thins"], "receta": "40g de panela + 40g de salmón ahumado espinacas, kale, jitomate cherry 2 tapas de pan thins"},
- {"file": "sandwich-tuna-melt-1.jpg", "label": "Sandwich Tuna Melt 1", "keys": ["sandwich", "tuna", "melt", "1"]},
- {"file": "sandwich-tuna-melt.jpg", "label": "Sandwich Tuna Melt", "keys": ["sandwich", "tuna", "melt"], "receta": "2 rebanadas de pan masa madre ó Ezequiel ó bimbo cero cero 60g de atun en lata con 1 cda de mayonesa y chipotle 40g de queso mozarella bajo en grasa C"},
- {"file": "smoothie-express-completo.jpg", "label": "Smoothie Express Completo", "keys": ["smoothie", "express", "completo"], "receta": "1.5 scoops de proteína de moka 1 shot de café expresso 1 cda de crema de cacahuate natural 1 plátano y 1 cda de avena en hojuelas hielos 300ml de agua"},
- {"file": "smoothie-reese-s.jpg", "label": "Smoothie Reese´S", "keys": ["smoothie", "reese", "s"], "receta": "1 scoop de proteina 1 cda de avena 1 cda de crema de cacahuate 1 datil + ¼ de platano 1 shot de cafe Canela, vainilla O Op p cc ii ó ón n 31"},
- {"file": "sopa-azteca-tortilla.jpg", "label": "Sopa azteca (tortilla)", "keys": ["sopa", "azteca", "tortilla"], "receta": "sopa de tortilla con panela y totopos horneados."},
- {"file": "sopa-de-fideo-con-pollo.jpg", "label": "Sopa de fideo con pollo", "keys": ["sopa", "fideo", "pollo"], "receta": "sopa de fideo integral con pollo."},
- {"file": "sopa-de-pollo-y-panela.jpg", "label": "Sopa de pollo y panela", "keys": ["sopa", "pollo", "panela"]},
- {"file": "sopa-de-tortilla-con-pollo.jpg", "label": "Sopa de tortilla con pollo", "keys": ["sopa", "tortilla", "pollo"], "receta": "sopa de tortilla con pollo, totopos horneados y panela."},
- {"file": "sope-con-frijol-y-bistec.jpg", "label": "Sope Con Frijol Y Bistec", "keys": ["sope", "frijol", "bistec"], "receta": "1 sope de la tortilleria del super, encima 1 cda de frijoles enteros encima 50g de bistec asado y nopales asados"},
- {"file": "sope-con-pollo-o-huevo.jpg", "label": "Sope Con Pollo O Huevo", "keys": ["sope", "pollo", "huevo"], "receta": "1 sope marca ochoa untar 20g de aguacate, encima 2 huevos estrellados ó 60g de pollo y 30g de panela o feta encima 1 taza de champiñones asados igual"},
- {"file": "sope-de-pollo-o-huevo.jpg", "label": "Sope De Pollo O Huevo", "keys": ["sope", "pollo", "huevo"], "receta": "1 sope de maíz marca ochoa o los de la tortilleria de la mega o fresko. 60g de pollo desmenuzado ó 2 huevos y 30g de queso panela rallado + 1 cdita de"},
- {"file": "tlacoyo-de-requeson-pavo.jpg", "label": "Tlacoyo De Requeson + Pavo", "keys": ["tlacoyo", "requeson", "pavo"], "receta": "1 tlacoyo de maiz 70g de requeson preparado a la mexicana 2 rebanadas de pechuga de pavo 20g de aguacate"},
- {"file": "toastadas-de-arroz-inflado.jpg", "label": "Toastadas De Arroz Inflado", "keys": ["toastadas", "arroz", "inflado"], "receta": "2 tostadas de arroz inflado 4 rebanadas de pechuga de pavo + 30g de requesón o cottage, pimienta, orégano y poca sal Ensalada de jitomate con espinaca"},
- {"file": "tofu-a-la-plancha-con-ensalada.jpg", "label": "Tofu a la plancha con ensalada", "keys": ["tofu", "plancha", "ensalada"], "receta": "150-180g de tofu a la plancha, acompañado de ensalada."},
- {"file": "tofu-agridulce-con-calabacitas.jpg", "label": "Tofu agridulce con calabacitas", "keys": ["tofu", "agridulce", "calabacitas"], "receta": "150-180g de tofu agridulce, acompañado de calabacitas."},
- {"file": "tofu-agridulce-con-camote-al-horno.jpg", "label": "Tofu agridulce con camote al horno", "keys": ["tofu", "agridulce", "camote", "horno"], "receta": "150-180g de tofu agridulce, acompañado de camote al horno."},
- {"file": "tofu-agridulce-con-esparragos.jpg", "label": "Tofu agridulce con espárragos", "keys": ["tofu", "agridulce", "esparragos"], "receta": "150-180g de tofu agridulce, acompañado de espárragos."},
- {"file": "tofu-agridulce-con-pure-de-papa.jpg", "label": "Tofu agridulce con puré de papa", "keys": ["tofu", "agridulce", "pure", "papa"], "receta": "150-180g de tofu agridulce, acompañado de puré de papa."},
- {"file": "tofu-agridulce-con-quinoa-y-espinaca.jpg", "label": "Tofu agridulce con quinoa y espinaca", "keys": ["tofu", "agridulce", "quinoa", "espinaca"], "receta": "150-180g de tofu agridulce, con quinoa y espinaca."},
- {"file": "tofu-al-ajillo-con-elote-y-calabaza.jpg", "label": "Tofu al ajillo con elote y calabaza", "keys": ["tofu", "ajillo", "elote", "calabaza"], "receta": "150-180g de tofu al ajillo, con elote y calabaza."},
- {"file": "tofu-al-ajillo-con-ensalada.jpg", "label": "Tofu al ajillo con ensalada", "keys": ["tofu", "ajillo", "ensalada"], "receta": "150-180g de tofu al ajillo, acompañado de ensalada."},
- {"file": "tofu-al-curry-con-camote-al-horno.jpg", "label": "Tofu al curry con camote al horno", "keys": ["tofu", "curry", "camote", "horno"], "receta": "150-180g de tofu al curry, acompañado de camote al horno."},
- {"file": "tofu-al-curry-con-pure-de-papa.jpg", "label": "Tofu al curry con puré de papa", "keys": ["tofu", "curry", "pure", "papa"], "receta": "150-180g de tofu al curry, acompañado de puré de papa."},
- {"file": "tofu-al-curry-con-quinoa-y-espinaca.jpg", "label": "Tofu al curry con quinoa y espinaca", "keys": ["tofu", "curry", "quinoa", "espinaca"], "receta": "150-180g de tofu al curry, con quinoa y espinaca."},
- {"file": "tofu-al-curry-con-quinoa.jpg", "label": "Tofu al curry con quinoa", "keys": ["tofu", "curry", "quinoa"], "receta": "150-180g de tofu al curry, acompañado de quinoa."},
- {"file": "tofu-en-salsa-de-champinones-con-ensalada.jpg", "label": "Tofu en salsa de champiñones con ensalada", "keys": ["tofu", "salsa", "champinones", "ensalada"], "receta": "150-180g de tofu en salsa de champiñones, acompañado de ensalada."},
- {"file": "tofu-en-salsa-de-champinones-con-quinoa.jpg", "label": "Tofu en salsa de champiñones con quinoa", "keys": ["tofu", "salsa", "champinones", "quinoa"], "receta": "150-180g de tofu en salsa de champiñones, acompañado de quinoa."},
- {"file": "tofu-teriyaki-con-calabacitas.jpg", "label": "Tofu teriyaki con calabacitas", "keys": ["tofu", "teriyaki", "calabacitas"], "receta": "150-180g de tofu teriyaki, acompañado de calabacitas."},
- {"file": "tofu-teriyaki-con-elote-y-calabaza.jpg", "label": "Tofu teriyaki con elote y calabaza", "keys": ["tofu", "teriyaki", "elote", "calabaza"], "receta": "150-180g de tofu teriyaki, con elote y calabaza."},
- {"file": "tofu-teriyaki-con-esparragos.jpg", "label": "Tofu teriyaki con espárragos", "keys": ["tofu", "teriyaki", "esparragos"], "receta": "150-180g de tofu teriyaki, acompañado de espárragos."},
- {"file": "toronja-natural.jpg", "label": "Toronja natural", "keys": ["toronja", "natural"], "receta": "1 porción de toronja fresca."},
- {"file": "tostada-francesa-de-avena.jpg", "label": "Tostada francesa de avena", "keys": ["tostada", "francesa", "avena"], "receta": "tostada francesa de avena con fresas y canela."},
- {"file": "tostaditas-de-pollo-o-atun.jpg", "label": "Tostaditas De Pollo Ó Atun", "keys": ["tostaditas", "pollo", "atun"], "receta": "4 tostadas horneadas ó 4 paquetes de salmas ó 20 galletas habaneras 150g de atun en lata ó pollo asado Lechuga, limon, sal y pimienta 1 cdta de aceite"},
- {"file": "tuna-natural.jpg", "label": "Tuna natural", "keys": ["tuna", "natural"], "receta": "1 porción de tuna fresca."},
- {"file": "uvas-congeladas-con-yogurt.jpg", "label": "Uvas Congeladas Con Yogurt", "keys": ["uvas", "congeladas", "yogurt"], "receta": "15 uvas congeladas con ½ taza de yogurt griego natural."},
- {"file": "volcanes-de-carne-o-pllo.jpg", "label": "Volcanes De Carne O Pllo", "keys": ["volcanes", "carne", "pllo"], "receta": "4 tostadas de coliflor marca susalia en todas fundir queso oaxaca, en total ocupar 40g y 70g de pollo o carne entre todas las tostadas, añadir gucamol"},
- {"file": "volcanes-de-pollo-y-queso.jpg", "label": "Volcanes De Pollo Y Queso", "keys": ["volcanes", "pollo", "queso"], "receta": "2 tortillas de maíz dejar en el comal a dorar y encima poner queso panela, en cada una 15g entre las dos 60g de pollo asada o desmenuzado como prefier"},
- {"file": "zanahoria-y-apio-con-hummus.jpg", "label": "Zanahoria Y Apio Con Hummus", "keys": ["zanahoria", "apio", "hummus"], "receta": "1 taza de zanahoria y apio en bastones con 2-3 cdas de hummus."},
- {"file": "zanahorias-baby-con-guacamole.jpg", "label": "Zanahorias baby con guacamole", "keys": ["zanahorias", "baby", "guacamole"], "receta": "zanahorias baby con guacamole."}
+ {
+  "file": "avena-con-fresa-y-nuez-04721cae.jpg",
+  "label": "Avena con fresa y nuez",
+  "keys": [
+   "avena",
+   "fresa",
+   "nuez"
+  ]
+ },
+ {
+  "file": "bowl-de-yogurt-con-platano-y-chia-05f2e290.jpg",
+  "label": "Bowl de yogurt con plátano y chía",
+  "keys": [
+   "yogurt",
+   "platano",
+   "chia",
+   "banana"
+  ]
+ },
+ {
+  "file": "huevo-con-nopales-084395fa.jpg",
+  "label": "Huevo con nopales",
+  "keys": [
+   "huevo",
+   "huevos",
+   "nopal",
+   "nopales",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "huevos-revueltos-con-espinaca-y-jitomate-08b71ffb.jpg",
+  "label": "Huevos revueltos con espinaca y jitomate",
+  "keys": [
+   "huevo",
+   "huevos",
+   "espinaca",
+   "espinacas",
+   "jitomate",
+   "tomate",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "avo-toast-de-salmon-ahumado-0db82c23.jpg",
+  "label": "Avo toast de salmón ahumado",
+  "keys": [
+   "salmon",
+   "aguacate",
+   "avo",
+   "pepino",
+   "toast"
+  ]
+ },
+ {
+  "file": "pan-toast-con-mantequilla-1595f995.jpg",
+  "label": "Pan / toast con mantequilla",
+  "keys": [
+   "pan",
+   "toast",
+   "mantequilla",
+   "frances"
+  ]
+ },
+ {
+  "file": "bowl-completo-pollo-arroz-garbanzo-1603ac7a.jpg",
+  "label": "Bowl completo (pollo, arroz, garbanzo)",
+  "keys": [
+   "bowl",
+   "pollo",
+   "arroz",
+   "garbanzo",
+   "garbanzos"
+  ]
+ },
+ {
+  "file": "overnight-oats-con-kiwi-173a9a48.jpg",
+  "label": "Overnight oats con kiwi",
+  "keys": [
+   "overnight",
+   "avena",
+   "yogurt",
+   "kiwi"
+  ]
+ },
+ {
+  "file": "bowl-de-fruta-frutos-rojos-17a41bbe.jpg",
+  "label": "Bowl de fruta (frutos rojos)",
+  "keys": [
+   "fruta",
+   "fresa",
+   "arandano",
+   "arandanos",
+   "frambuesa",
+   "blueberries",
+   "berries",
+   "frutos"
+  ]
+ },
+ {
+  "file": "avo-toast-de-salmon-y-arugula-1a117728.jpg",
+  "label": "Avo toast de salmón y arúgula",
+  "keys": [
+   "salmon",
+   "aguacate",
+   "avo",
+   "arugula",
+   "toast"
+  ]
+ },
+ {
+  "file": "molletes-1b9f70aa.jpg",
+  "label": "Molletes",
+  "keys": [
+   "molletes",
+   "mollete"
+  ]
+ },
+ {
+  "file": "pepino-y-zanahoria-con-tajin-1ff9385c.jpg",
+  "label": "Pepino y zanahoria con Tajín",
+  "keys": [
+   "pepino",
+   "zanahoria",
+   "tajin",
+   "verdura",
+   "verduras"
+  ]
+ },
+ {
+  "file": "salmon-con-ensalada-207c54a6.jpg",
+  "label": "Salmón con ensalada",
+  "keys": [
+   "salmon",
+   "ensalada",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "filete-de-pescado-con-papas-y-ensalada-22078269.jpg",
+  "label": "Filete de pescado con papas y ensalada",
+  "keys": [
+   "pescado",
+   "filete",
+   "papa",
+   "papas",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "huevo-al-gusto-con-fruta-23ff0e72.jpg",
+  "label": "Huevo al gusto con fruta",
+  "keys": [
+   "huevo",
+   "huevos",
+   "fresa",
+   "aguacate",
+   "cafe",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "manzana-con-crema-de-cacahuate-24c21928.jpg",
+  "label": "Manzana con crema de cacahuate",
+  "keys": [
+   "manzana",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "palomitas-27d117e6.jpg",
+  "label": "Palomitas",
+  "keys": [
+   "palomitas",
+   "palomita"
+  ]
+ },
+ {
+  "file": "proteina-suplemento-batido-2bdff8b5.jpg",
+  "label": "Proteína / suplemento (batido)",
+  "keys": [
+   "proteina",
+   "suplemento",
+   "whey",
+   "batido"
+  ]
+ },
+ {
+  "file": "toast-caprese-2d793ff2.jpg",
+  "label": "Toast caprese",
+  "keys": [
+   "caprese",
+   "pan",
+   "toast",
+   "jitomate",
+   "queso",
+   "albahaca"
+  ]
+ },
+ {
+  "file": "avo-toast-de-salmon-con-huevo-2e12f3d8.jpg",
+  "label": "Avo toast de salmón con huevo",
+  "keys": [
+   "salmon",
+   "aguacate",
+   "avo",
+   "toast",
+   "huevo",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "ensalada-de-nopales-301b4a1f.jpg",
+  "label": "Ensalada de nopales",
+  "keys": [
+   "nopales",
+   "nopal",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "bowl-de-yogurt-con-mango-3055a6be.jpg",
+  "label": "Bowl de yogurt con mango",
+  "keys": [
+   "yogurt",
+   "mango",
+   "granola"
+  ]
+ },
+ {
+  "file": "bowl-de-acai-smoothie-bowl-3497145d.jpg",
+  "label": "Bowl de açaí / smoothie bowl",
+  "keys": [
+   "acai",
+   "bowl",
+   "smoothie",
+   "berries",
+   "granola",
+   "fresa"
+  ]
+ },
+ {
+  "file": "omelette-360a45c9.jpg",
+  "label": "Omelette",
+  "keys": [
+   "omelette",
+   "omelet",
+   "huevo",
+   "ensalada",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "uvas-37624af9.jpg",
+  "label": "Uvas",
+  "keys": [
+   "uva",
+   "uvas",
+   "fruta"
+  ]
+ },
+ {
+  "file": "filete-de-pescado-con-papas-y-ensalada-3806b409.jpg",
+  "label": "Filete de pescado con papas y ensalada",
+  "keys": [
+   "pescado",
+   "filete",
+   "papa",
+   "papas",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "tacos-de-pescado-3a5e4f2f.jpg",
+  "label": "Tacos de pescado",
+  "keys": [
+   "tacos",
+   "taco",
+   "pescado"
+  ]
+ },
+ {
+  "file": "tostadas-de-tinga-de-pollo-3c40f42a.jpg",
+  "label": "Tostadas de tinga de pollo",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "tinga",
+   "pollo"
+  ]
+ },
+ {
+  "file": "yogurt-griego-con-granola-y-arandano-3e1d3bbc.jpg",
+  "label": "Yogurt griego con granola y arándano",
+  "keys": [
+   "yogurt",
+   "griego",
+   "granola",
+   "arandano",
+   "blueberry"
+  ]
+ },
+ {
+  "file": "waffle-con-platano-huevo-y-fresa-41819aee.jpg",
+  "label": "Waffle con plátano, huevo y fresa",
+  "keys": [
+   "waffle",
+   "waffles",
+   "platano",
+   "huevo",
+   "fresa",
+   "banana",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "kiwi-con-chocolate-43c1b6a2.jpg",
+  "label": "Kiwi con chocolate",
+  "keys": [
+   "kiwi",
+   "chocolate",
+   "fruta"
+  ]
+ },
+ {
+  "file": "ensalada-de-garbanzo-4c2c258c.jpg",
+  "label": "Ensalada de garbanzo",
+  "keys": [
+   "ensalada",
+   "garbanzo",
+   "garbanzos",
+   "pepino",
+   "jitomate"
+  ]
+ },
+ {
+  "file": "omelette-520b8dfa.jpg",
+  "label": "Omelette",
+  "keys": [
+   "omelette",
+   "omelet",
+   "huevo",
+   "ensalada",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "omelette-de-champinones-y-espinaca-544342b6.jpg",
+  "label": "Omelette de champiñones y espinaca",
+  "keys": [
+   "omelette",
+   "omelet",
+   "champinones",
+   "espinaca",
+   "huevo",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "filete-de-pescado-con-arroz-y-ejotes-5b4c9841.jpg",
+  "label": "Filete de pescado con arroz y ejotes",
+  "keys": [
+   "pescado",
+   "filete",
+   "arroz",
+   "ejotes"
+  ]
+ },
+ {
+  "file": "bowl-de-pollo-con-quinoa-6156acab.jpg",
+  "label": "Bowl de pollo con quinoa",
+  "keys": [
+   "bowl",
+   "pollo",
+   "quinoa",
+   "aguacate",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "jicama-y-pepino-con-chile-61f0506e.jpg",
+  "label": "Jícama y pepino con chile",
+  "keys": [
+   "jicama",
+   "pepino",
+   "chile",
+   "tajin"
+  ]
+ },
+ {
+  "file": "avo-toast-con-cottage-y-salmon-656ee1b2.jpg",
+  "label": "Avo toast con cottage y salmón",
+  "keys": [
+   "salmon",
+   "aguacate",
+   "avo",
+   "toast",
+   "cottage",
+   "requeson"
+  ]
+ },
+ {
+  "file": "rice-cake-con-crema-de-cacahuate-664ee46f.jpg",
+  "label": "Rice cake con crema de cacahuate",
+  "keys": [
+   "rice",
+   "cake",
+   "cacahuate",
+   "crema",
+   "tostada",
+   "tostadas",
+   "arroz",
+   "tortita",
+   "tortitas"
+  ]
+ },
+ {
+  "file": "kiwi-674284fc.jpg",
+  "label": "Kiwi",
+  "keys": [
+   "kiwi",
+   "fruta"
+  ]
+ },
+ {
+  "file": "bowl-de-camaron-con-quinoa-6986415c.jpg",
+  "label": "Bowl de camarón con quinoa",
+  "keys": [
+   "camaron",
+   "camarones",
+   "quinoa",
+   "ensalada",
+   "bowl"
+  ]
+ },
+ {
+  "file": "yogurt-con-manzana-y-nuez-6a9f95f8.jpg",
+  "label": "Yogurt con manzana y nuez",
+  "keys": [
+   "yogurt",
+   "manzana",
+   "nuez",
+   "canela"
+  ]
+ },
+ {
+  "file": "ensalada-de-pollo-6aa80631.jpg",
+  "label": "Ensalada de pollo",
+  "keys": [
+   "ensalada",
+   "pollo",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "toast-con-crema-de-cacahuate-y-manzana-6ed2628b.jpg",
+  "label": "Toast con crema de cacahuate y manzana",
+  "keys": [
+   "toast",
+   "pan",
+   "cacahuate",
+   "manzana",
+   "crema"
+  ]
+ },
+ {
+  "file": "mango-con-pepino-y-limon-6f49693e.jpg",
+  "label": "Mango con pepino y limón",
+  "keys": [
+   "mango",
+   "pepino",
+   "limon",
+   "fruta"
+  ]
+ },
+ {
+  "file": "mango-7013ca6b.jpg",
+  "label": "Mango",
+  "keys": [
+   "mango",
+   "fruta"
+  ]
+ },
+ {
+  "file": "pan-frances-con-fresa-7244512c.jpg",
+  "label": "Pan francés con fresa",
+  "keys": [
+   "pan",
+   "frances",
+   "fresa",
+   "toast"
+  ]
+ },
+ {
+  "file": "yogurt-con-fresa-y-nuez-7390a2cd.jpg",
+  "label": "Yogurt con fresa y nuez",
+  "keys": [
+   "yogurt",
+   "fresa",
+   "nuez"
+  ]
+ },
+ {
+  "file": "hot-cakes-con-fresa-7668a681.jpg",
+  "label": "Hot cakes con fresa",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "fresa",
+   "hotcake",
+   "panqueque",
+   "panqueques"
+  ]
+ },
+ {
+  "file": "bowl-de-yogurt-con-granola-y-frutos-rojos-7779682d.jpg",
+  "label": "Bowl de yogurt con granola y frutos rojos",
+  "keys": [
+   "yogurt",
+   "granola",
+   "fresa",
+   "arandano",
+   "blueberry",
+   "berries"
+  ]
+ },
+ {
+  "file": "huevo-a-la-mexicana-con-rajas-77c81707.jpg",
+  "label": "Huevo a la mexicana / con rajas",
+  "keys": [
+   "huevo",
+   "huevos",
+   "rajas",
+   "mexicana",
+   "poblano",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "kiwi-con-chocolate-797d0b5c.jpg",
+  "label": "Kiwi con chocolate",
+  "keys": [
+   "kiwi",
+   "chocolate",
+   "fruta"
+  ]
+ },
+ {
+  "file": "ensalada-de-atun-7a05a06b.jpg",
+  "label": "Ensalada de atún",
+  "keys": [
+   "ensalada",
+   "atun",
+   "pepino",
+   "jitomate"
+  ]
+ },
+ {
+  "file": "hot-cakes-con-fresa-7b7feeca.jpg",
+  "label": "Hot cakes con fresa",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "fresa",
+   "yogurt",
+   "hotcake",
+   "panqueque",
+   "panqueques"
+  ]
+ },
+ {
+  "file": "toast-de-pavo-con-aguacate-7cea73fc.jpg",
+  "label": "Toast de pavo con aguacate",
+  "keys": [
+   "toast",
+   "pan",
+   "pavo",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "smoothie-de-fresa-8101a29a.jpg",
+  "label": "Smoothie de fresa",
+  "keys": [
+   "smoothie",
+   "fresa",
+   "batido"
+  ]
+ },
+ {
+  "file": "ensalada-de-atun-sellado-81a825c1.jpg",
+  "label": "Ensalada de atún sellado",
+  "keys": [
+   "ensalada",
+   "atun",
+   "sellado",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "filete-de-pescado-con-papas-y-ensalada-81b9422d.jpg",
+  "label": "Filete de pescado con papas y ensalada",
+  "keys": [
+   "pescado",
+   "filete",
+   "papa",
+   "papas",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "cottage-con-fresa-y-pistache-81d2d87b.jpg",
+  "label": "Cottage con fresa y pistache",
+  "keys": [
+   "cottage",
+   "fresa",
+   "pistache",
+   "yogurt",
+   "requeson"
+  ]
+ },
+ {
+  "file": "sandwich-de-aguacate-8514af82.jpg",
+  "label": "Sándwich de aguacate",
+  "keys": [
+   "sandwich",
+   "aguacate",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "bowl-de-yogurt-con-kiwi-y-chia-8aac4dfa.jpg",
+  "label": "Bowl de yogurt con kiwi y chía",
+  "keys": [
+   "yogurt",
+   "kiwi",
+   "chia"
+  ]
+ },
+ {
+  "file": "gorditas-de-huevo-8d613926.jpg",
+  "label": "Gorditas de huevo",
+  "keys": [
+   "gorditas",
+   "gordita",
+   "huevo",
+   "arepa",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "toast-de-crema-de-cacahuate-con-mermelada-y-platano-8ec685ac.jpg",
+  "label": "Toast de crema de cacahuate con mermelada y plátano",
+  "keys": [
+   "toast",
+   "pan",
+   "cacahuate",
+   "mermelada",
+   "platano",
+   "banana"
+  ]
+ },
+ {
+  "file": "green-smoothie-jugo-verde-92408e20.jpg",
+  "label": "Green smoothie / jugo verde",
+  "keys": [
+   "green",
+   "smoothie",
+   "jugo",
+   "verde"
+  ]
+ },
+ {
+  "file": "avo-toast-de-salmon-con-queso-crema-93df3bba.jpg",
+  "label": "Avo toast de salmón con queso crema",
+  "keys": [
+   "salmon",
+   "aguacate",
+   "avo",
+   "toast",
+   "queso"
+  ]
+ },
+ {
+  "file": "enfrijoladas-93ed7b15.jpg",
+  "label": "Enfrijoladas",
+  "keys": [
+   "enfrijoladas",
+   "enchiladas",
+   "frijol",
+   "entomatadas",
+   "entomatada"
+  ]
+ },
+ {
+  "file": "tostadas-de-verduras-con-panela-99f874c1.jpg",
+  "label": "Tostadas de verduras con panela",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "panela",
+   "verduras",
+   "ensalada"
+  ]
+ },
+ {
+  "file": "overnight-oats-con-fresa-9a603d06.jpg",
+  "label": "Overnight oats con fresa",
+  "keys": [
+   "overnight",
+   "avena",
+   "fresa",
+   "granola"
+  ]
+ },
+ {
+  "file": "omelette-de-espinaca-9ac57f00.jpg",
+  "label": "Omelette de espinaca",
+  "keys": [
+   "omelette",
+   "omelet",
+   "espinaca",
+   "huevo",
+   "jitomate",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "chia-pudding-con-platano-9b9d28a0.jpg",
+  "label": "Chía pudding con plátano",
+  "keys": [
+   "chia",
+   "pudding",
+   "platano",
+   "granola",
+   "banana"
+  ]
+ },
+ {
+  "file": "quesadillas-de-pollo-9bd87548.jpg",
+  "label": "Quesadillas de pollo",
+  "keys": [
+   "quesadillas",
+   "quesadilla",
+   "pollo",
+   "sincronizada",
+   "sincronizadas"
+  ]
+ },
+ {
+  "file": "huevos-a-la-mexicana-9c1677c4.jpg",
+  "label": "Huevos a la mexicana",
+  "keys": [
+   "huevo",
+   "huevos",
+   "mexicana",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "avena-con-manzana-y-canela-9c9fa35a.jpg",
+  "label": "Avena con manzana y canela",
+  "keys": [
+   "avena",
+   "manzana",
+   "canela"
+  ]
+ },
+ {
+  "file": "huevo-con-nopales-y-frijoles-9ef72a40.jpg",
+  "label": "Huevo con nopales y frijoles",
+  "keys": [
+   "huevo",
+   "huevos",
+   "nopal",
+   "nopales",
+   "frijol",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "sandwich-de-pavo-con-aguacate-a4a21b69.jpg",
+  "label": "Sándwich de pavo con aguacate",
+  "keys": [
+   "sandwich",
+   "pavo",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "tostadas-de-bistec-con-nopales-a79eebc5.jpg",
+  "label": "Tostadas de bistec con nopales",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "bistec",
+   "nopales",
+   "carne"
+  ]
+ },
+ {
+  "file": "pollo-con-verduras-y-arroz-a906bffe.jpg",
+  "label": "Pollo con verduras y arroz",
+  "keys": [
+   "pollo",
+   "verduras",
+   "arroz",
+   "salteado"
+  ]
+ },
+ {
+  "file": "huevos-rancheros-a9667de8.jpg",
+  "label": "Huevos rancheros",
+  "keys": [
+   "huevos",
+   "huevo",
+   "rancheros",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "cottage-con-durazno-y-granola-abf997b1.jpg",
+  "label": "Cottage con durazno y granola",
+  "keys": [
+   "cottage",
+   "durazno",
+   "granola",
+   "requeson"
+  ]
+ },
+ {
+  "file": "smoothie-de-platano-ad24e82c.jpg",
+  "label": "Smoothie de plátano",
+  "keys": [
+   "smoothie",
+   "platano",
+   "batido",
+   "banana"
+  ]
+ },
+ {
+  "file": "smoothie-de-papaya-af52a9aa.jpg",
+  "label": "Smoothie de papaya",
+  "keys": [
+   "smoothie",
+   "papaya",
+   "batido"
+  ]
+ },
+ {
+  "file": "pera-af849f1b.jpg",
+  "label": "Pera",
+  "keys": [
+   "pera",
+   "fruta"
+  ]
+ },
+ {
+  "file": "wrap-de-pavo-b0a9a5c7.jpg",
+  "label": "Wrap de pavo",
+  "keys": [
+   "wrap",
+   "pavo",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "omelette-de-atun-b11429d5.jpg",
+  "label": "Omelette de atún",
+  "keys": [
+   "omelette",
+   "omelet",
+   "atun",
+   "huevo",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "mango-b118acad.jpg",
+  "label": "Mango",
+  "keys": [
+   "mango",
+   "fruta"
+  ]
+ },
+ {
+  "file": "tostadas-de-atun-con-guacamole-b397194d.jpg",
+  "label": "Tostadas de atún con guacamole",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "atun",
+   "guacamole"
+  ]
+ },
+ {
+  "file": "rice-cake-con-crema-de-cacahuate-b5070045.jpg",
+  "label": "Rice cake con crema de cacahuate",
+  "keys": [
+   "rice",
+   "cake",
+   "cacahuate",
+   "crema",
+   "tostada",
+   "tostadas",
+   "arroz",
+   "tortita",
+   "tortitas"
+  ]
+ },
+ {
+  "file": "omelette-de-espinaca-y-jitomate-b715de38.jpg",
+  "label": "Omelette de espinaca y jitomate",
+  "keys": [
+   "omelette",
+   "omelet",
+   "espinaca",
+   "huevo",
+   "jitomate",
+   "frittata",
+   "omellete",
+   "omele",
+   "omelett",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "hot-cakes-con-arandano-b80ca901.jpg",
+  "label": "Hot cakes con arándano",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "arandano",
+   "blueberry",
+   "hotcake",
+   "panqueque",
+   "panqueques"
+  ]
+ },
+ {
+  "file": "huevo-con-jamon-y-avo-toast-b9a88647.jpg",
+  "label": "Huevo con jamón y avo toast",
+  "keys": [
+   "huevo",
+   "huevos",
+   "jamon",
+   "avo",
+   "toast",
+   "aguacate",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "toast-de-atun-b9a91a9b.jpg",
+  "label": "Toast de atún",
+  "keys": [
+   "toast",
+   "atun",
+   "ceviche",
+   "tostada"
+  ]
+ },
+ {
+  "file": "sandwich-de-crema-de-cacahuate-y-platano-bd60cddf.jpg",
+  "label": "Sándwich de crema de cacahuate y plátano",
+  "keys": [
+   "sandwich",
+   "cacahuate",
+   "platano",
+   "crema",
+   "banana"
+  ]
+ },
+ {
+  "file": "hot-cakes-bf854f36.jpg",
+  "label": "Hot cakes",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "hotcake",
+   "panqueque",
+   "panqueques"
+  ]
+ },
+ {
+  "file": "smoothie-de-pina-c1a08c97.jpg",
+  "label": "Smoothie de piña",
+  "keys": [
+   "smoothie",
+   "pina",
+   "coco",
+   "batido"
+  ]
+ },
+ {
+  "file": "proteina-suplemento-batido-c266d718.jpg",
+  "label": "Proteína / suplemento (batido)",
+  "keys": [
+   "proteina",
+   "suplemento",
+   "whey",
+   "batido"
+  ]
+ },
+ {
+  "file": "avena-con-platano-y-canela-c3abdd78.jpg",
+  "label": "Avena con plátano y canela",
+  "keys": [
+   "avena",
+   "platano",
+   "canela",
+   "banana"
+  ]
+ },
+ {
+  "file": "yogurt-con-mango-y-nuez-c4f24fb1.jpg",
+  "label": "Yogurt con mango y nuez",
+  "keys": [
+   "yogurt",
+   "mango",
+   "nuez",
+   "cashew"
+  ]
+ },
+ {
+  "file": "sandwich-de-pavo-con-aguacate-c661b447.jpg",
+  "label": "Sándwich de pavo con aguacate",
+  "keys": [
+   "sandwich",
+   "pavo",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "batido-de-proteina-chocolate-c81d2be4.jpg",
+  "label": "Batido de proteína (chocolate)",
+  "keys": [
+   "proteina",
+   "batido",
+   "chocolate",
+   "smoothie"
+  ]
+ },
+ {
+  "file": "bowl-de-yogurt-con-granola-y-frutos-rojos-cd77f20f.jpg",
+  "label": "Bowl de yogurt con granola y frutos rojos",
+  "keys": [
+   "yogurt",
+   "granola",
+   "fresa",
+   "arandano",
+   "berries"
+  ]
+ },
+ {
+  "file": "wrap-de-verduras-con-hummus-cfe76798.jpg",
+  "label": "Wrap de verduras con hummus",
+  "keys": [
+   "wrap",
+   "verduras",
+   "hummus",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "bowl-de-quinoa-con-garbanzo-d09489a5.jpg",
+  "label": "Bowl de quinoa con garbanzo",
+  "keys": [
+   "bowl",
+   "quinoa",
+   "garbanzo",
+   "aguacate",
+   "verduras"
+  ]
+ },
+ {
+  "file": "avo-toast-d15de246.jpg",
+  "label": "Avo toast",
+  "keys": [
+   "avo",
+   "toast",
+   "aguacate",
+   "pan"
+  ]
+ },
+ {
+  "file": "arroz-blanco-d1ad870e.jpg",
+  "label": "Arroz blanco",
+  "keys": [
+   "arroz",
+   "blanco"
+  ]
+ },
+ {
+  "file": "hot-cakes-de-espinaca-verdes-d2e17161.jpg",
+  "label": "Hot cakes de espinaca (verdes)",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "espinaca",
+   "verde",
+   "hotcake",
+   "panqueque",
+   "panqueques"
+  ]
+ },
+ {
+  "file": "papas-cambray-d35ee765.jpg",
+  "label": "Papas cambray",
+  "keys": [
+   "papa",
+   "papas",
+   "cambray"
+  ]
+ },
+ {
+  "file": "manzana-verde-d48e8015.jpg",
+  "label": "Manzana verde",
+  "keys": [
+   "manzana",
+   "verde",
+   "fruta"
+  ]
+ },
+ {
+  "file": "yogurt-con-fresa-y-nuez-d494b64f.jpg",
+  "label": "Yogurt con fresa y nuez",
+  "keys": [
+   "yogurt",
+   "fresa",
+   "nuez"
+  ]
+ },
+ {
+  "file": "hot-cakes-de-avena-con-platano-d58f23e3.jpg",
+  "label": "Hot cakes de avena con plátano",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "avena",
+   "platano",
+   "hotcake",
+   "panqueque",
+   "panqueques",
+   "banana"
+  ]
+ },
+ {
+  "file": "palomitas-d80d5a96.jpg",
+  "label": "Palomitas",
+  "keys": [
+   "palomitas",
+   "palomita"
+  ]
+ },
+ {
+  "file": "rollitos-de-jamon-dbbc05e9.jpg",
+  "label": "Rollitos de jamón",
+  "keys": [
+   "rollitos",
+   "jamon",
+   "rollo",
+   "pavo"
+  ]
+ },
+ {
+  "file": "manzana-con-crema-de-cacahuate-e4a7a0ff.jpg",
+  "label": "Manzana con crema de cacahuate",
+  "keys": [
+   "manzana",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "rice-cake-con-cottage-e6671aec.jpg",
+  "label": "Rice cake con cottage",
+  "keys": [
+   "rice",
+   "cake",
+   "cottage",
+   "requeson",
+   "tostada",
+   "tostadas",
+   "arroz",
+   "tortita",
+   "tortitas"
+  ]
+ },
+ {
+  "file": "bowl-de-pollo-con-arroz-y-brocoli-e898f45e.jpg",
+  "label": "Bowl de pollo con arroz y brócoli",
+  "keys": [
+   "bowl",
+   "pollo",
+   "arroz",
+   "brocoli"
+  ]
+ },
+ {
+  "file": "toast-con-crema-de-cacahuate-ec6eb1e1.jpg",
+  "label": "Toast con crema de cacahuate",
+  "keys": [
+   "toast",
+   "pan",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "toast-con-mermelada-f027ec04.jpg",
+  "label": "Toast con mermelada",
+  "keys": [
+   "toast",
+   "pan",
+   "mermelada"
+  ]
+ },
+ {
+  "file": "hot-cakes-de-platano-f37ede98.jpg",
+  "label": "Hot cakes de plátano",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "platano",
+   "hotcake",
+   "panqueque",
+   "panqueques",
+   "banana"
+  ]
+ },
+ {
+  "file": "hot-cakes-con-huevo-y-fresa-f637f683.jpg",
+  "label": "Hot cakes con huevo y fresa",
+  "keys": [
+   "hotcakes",
+   "hot",
+   "cakes",
+   "pancakes",
+   "huevo",
+   "fresa",
+   "hotcake",
+   "panqueque",
+   "panqueques",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "sandwich-de-crema-de-cacahuate-f699f1b0.jpg",
+  "label": "Sándwich de crema de cacahuate",
+  "keys": [
+   "sandwich",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "toast-de-huevo-con-pico-de-gallo-f69ef2e4.jpg",
+  "label": "Toast de huevo con pico de gallo",
+  "keys": [
+   "toast",
+   "pan",
+   "huevo",
+   "aguacate",
+   "pico",
+   "clara",
+   "claras"
+  ]
+ },
+ {
+  "file": "panela-asada-con-nopales-f8411658.jpg",
+  "label": "Panela asada con nopales",
+  "keys": [
+   "panela",
+   "nopales",
+   "queso",
+   "aguacate",
+   "asada"
+  ]
+ },
+ {
+  "file": "tostadas-de-panela-con-frijol-f8c9d66e.jpg",
+  "label": "Tostadas de panela con frijol",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "panela",
+   "frijol",
+   "queso"
+  ]
+ },
+ {
+  "file": "sandwich-de-crema-de-cacahuate-f9f4eadc.jpg",
+  "label": "Sándwich de crema de cacahuate",
+  "keys": [
+   "sandwich",
+   "cacahuate",
+   "crema"
+  ]
+ },
+ {
+  "file": "avena-con-fresa-faa6ce8b.jpg",
+  "label": "Avena con fresa",
+  "keys": [
+   "avena",
+   "fresa"
+  ]
+ },
+ {
+  "file": "tostadas-de-atun-con-aguacate-fb0698d4.jpg",
+  "label": "Tostadas de atún con aguacate",
+  "keys": [
+   "tostadas",
+   "tostada",
+   "atun",
+   "aguacate"
+  ]
+ },
+ {
+  "file": "smoothie-de-frutos-rojos-fd5b3a26.jpg",
+  "label": "Smoothie de frutos rojos",
+  "keys": [
+   "smoothie",
+   "frutos",
+   "berries",
+   "arandano",
+   "fresa",
+   "batido"
+  ]
+ },
+ {
+  "file": "toast-de-hummus-y-aguacate-fe83fefb.jpg",
+  "label": "Toast de hummus y aguacate",
+  "keys": [
+   "toast",
+   "pan",
+   "hummus",
+   "aguacate",
+   "jitomate"
+  ]
+ },
+ {
+  "file": "smoothie-de-pina-ff859ae5.jpg",
+  "label": "Smoothie de piña",
+  "keys": [
+   "smoothie",
+   "pina",
+   "coco",
+   "batido"
+  ]
+ },
+ {
+  "file": "chilaquiles-verdes-457f20d6.jpg",
+  "label": "Chilaquiles verdes",
+  "keys": [
+   "chilaquiles",
+   "chilquiles",
+   "totopos",
+   "verdes"
+  ]
+ },
+ {
+  "file": "sopes-7615428c.jpg",
+  "label": "Sopes",
+  "keys": [
+   "sopes",
+   "sope"
+  ]
+ },
+ {
+  "file": "tlacoyos-a1a334ff.jpg",
+  "label": "Tlacoyos",
+  "keys": [
+   "tlacoyos",
+   "tlacoyo"
+  ]
+ },
+ {
+  "file": "crepa-salada-de-huevo-57d0d5c9.jpg",
+  "label": "Crepa salada de huevo",
+  "keys": [
+   "crepa",
+   "crepas",
+   "crepe",
+   "huevo",
+   "espinaca"
+  ]
+ },
+ {
+  "file": "pasta-a-la-bolonesa-6488fc84.jpg",
+  "label": "Pasta a la boloñesa",
+  "keys": [
+   "pasta",
+   "spaghetti",
+   "espagueti",
+   "bolonesa",
+   "carne"
+  ]
+ },
+ {
+  "file": "pizza-casera-fit-2e5cc603.jpg",
+  "label": "Pizza casera / fit",
+  "keys": [
+   "pizza",
+   "pita"
+  ]
+ },
+ {
+  "file": "hamburguesa-a4f5f420.jpg",
+  "label": "Hamburguesa",
+  "keys": [
+   "hamburguesa",
+   "burger"
+  ]
+ },
+ {
+  "file": "plato-mediterraneo-b180f8b3.jpg",
+  "label": "Plato mediterráneo",
+  "keys": [
+   "mediterraneo",
+   "mediterranea"
+  ]
+ },
+ {
+  "file": "frijoles-refritos-7ba97a98.jpg",
+  "label": "Frijoles refritos",
+  "keys": [
+   "frijoles",
+   "frijol",
+   "refritos"
+  ]
+ },
+ {
+  "file": "cereal-con-leche-556c4682.jpg",
+  "label": "Cereal con leche",
+  "keys": [
+   "cereal",
+   "hojuelas",
+   "proteina"
+  ]
+ },
+ {
+  "file": "bisquet-con-huevo-20ea085e.jpg",
+  "label": "Bisquet con huevo",
+  "keys": [
+   "bisquet",
+   "bagel",
+   "huevo"
+  ]
+ }
 ];
 
 export default BANCO_FOTOS;
