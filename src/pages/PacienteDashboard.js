@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, FB_PROJECT_ID } from '../firebase/config';
+import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { useBranding, aplicarColores } from '../context/BrandingContext';
@@ -11,7 +11,7 @@ import { apegoPorPeriodo } from '../utils/apego';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import { renderRich } from '../utils/richText';
 import { parseDriveLink } from '../utils/drive';
-import { resumenSaldo, venceDeLote, familiaLabel, PAQUETES_DEFAULT } from '../utils/creditos';
+import { resumenSaldo, venceDeLote, familiaLabel, nuevoLote, PAQUETES_DEFAULT } from '../utils/creditos';
 import { REGIMENES_FISCALES, USOS_CFDI, CFDI_DEFAULT } from '../data/catalogosCFDI';
 
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
@@ -42,6 +42,24 @@ function Linea({ data, field, color, unit }) {
     </svg>
   );
 }
+
+/* ===== pliegues (mm) y perímetros (cm) — mismas etiquetas que el panel de la nutrióloga ===== */
+const PLIEGUES_P = [
+  { k: 'triceps', l: 'Tríceps' },
+  { k: 'subescapular', l: 'Subescapular' },
+  { k: 'supraespinal', l: 'Supraespinal / suprailiaco' },
+  { k: 'abdominal', l: 'Abdominal' },
+  { k: 'muslo', l: 'Muslo' },
+  { k: 'pantorrilla', l: 'Pantorrilla' },
+];
+const PERIMETROS_P = [
+  { k: 'brazoRelajado', l: 'Brazo relajado' },
+  { k: 'brazoFuerza', l: 'Brazo con fuerza' },
+  { k: 'cintura', l: 'Cintura' },
+  { k: 'abdomen', l: 'Abdomen' },
+  { k: 'cadera', l: 'Cadera' },
+];
+const ANTRO_COLORS_P = ['var(--gold)', 'var(--stone)', 'var(--sage)', 'var(--danger)', '#5B7C99', '#3E6B5B'];
 
 const D = {
   section: { fontSize: 18, fontWeight: 700, color: 'var(--dark)', margin: '20px 4px 10px' },
@@ -259,15 +277,12 @@ function FacturacionView({ email, citas, creditos }) {
     }
     const ids = items.filter(x => x.tipo === 'lote').map(x => x.id);
     if (ids.length) {
-      // El backend marca los lotes como facturados (el navegador ya no escribe créditos).
       try {
-        const url = process.env.REACT_APP_APPSCRIPT_URL;
-        if (url) {
-          await fetch(url, {
-            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'marcarLoteFacturado', correo, loteIds: ids, uuid, fbProjectId: FB_PROJECT_ID }), redirect: 'follow',
-          });
-        }
+        const snap = await getDoc(doc(db, 'creditosConsultas', correo));
+        const data = snap.exists() ? snap.data() : { lotes: [], usos: [] };
+        const setIds = {}; ids.forEach(id => { setIds[id] = true; });
+        const lotes = (data.lotes || []).map(l => setIds[l.id] ? { ...l, facturaUUID: uuid } : l);
+        await setDoc(doc(db, 'creditosConsultas', correo), { correo, lotes, usos: data.usos || [] }, { merge: true });
       } catch (e) { /* noop */ }
     }
   };
@@ -450,19 +465,30 @@ export default function PacienteDashboard() {
     (async () => {
       try {
         if (compra === 'paquete') {
+          const paqueteId = params.get('paquete');
           const correoC = (user?.email || '').toLowerCase();
-          if (session && url && correoC) {
-            // El BACKEND verifica el pago con Stripe y ACREDITA el crédito.
-            // El navegador del paciente ya NO escribe créditos (evita fraude).
+          if (paqueteId && session && url && correoC) {
             const rv = await fetch(url, {
               method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ action: 'confirmarPagoStripe', sessionId: session, fbProjectId: FB_PROJECT_ID }), redirect: 'follow',
+              body: JSON.stringify({ action: 'verificarPagoStripe', sessionId: session }), redirect: 'follow',
             });
             let dv; try { dv = JSON.parse(await rv.text()); } catch (_) { dv = null; }
-            if (dv && dv.ok && dv.pagado && dv.acreditado) {
-              setPagoMsg('¡Pago confirmado! Tus consultas ya se agregaron a tu saldo. Ya puedes agendarlas.');
-            } else if (dv && dv.ok && dv.pagado) {
-              setPagoMsg('Tu pago se recibió. Si tu saldo no aparece en un momento, avísale a la nutrióloga para acreditarlo.');
+            if (dv && dv.ok && dv.pagado) {
+              let pkgs = PAQUETES_DEFAULT;
+              try { const cs = await getDoc(doc(db, 'config', 'dashboard')); const cd = cs.exists() ? cs.data() : {}; if (Array.isArray(cd.paquetes) && cd.paquetes.length) pkgs = cd.paquetes; } catch (e) {}
+              const pkg = pkgs.find(p => p.id === paqueteId);
+              if (pkg) {
+                const cc = await getDoc(doc(db, 'creditosConsultas', correoC));
+                const cur = cc.exists() ? { lotes: [], usos: [], ...cc.data() } : { lotes: [], usos: [] };
+                // Idempotencia: no acreditar dos veces la misma sesión de pago (p. ej. si recarga la página).
+                if (!(cur.lotes || []).some(l => l.stripeSession === session)) {
+                  const lote = { ...nuevoLote({ familia: pkg.familia, consultas: pkg.consultas, monto: pkg.precio, vigenciaMeses: pkg.vigenciaMeses, origen: 'stripe', paqueteId: pkg.id, paqueteNombre: pkg.nombre }), stripeSession: session };
+                  await setDoc(doc(db, 'creditosConsultas', correoC), { correo: correoC, lotes: [...(cur.lotes || []), lote], usos: cur.usos || [] }, { merge: true });
+                }
+                setPagoMsg('¡Pago confirmado! Se agregaron ' + pkg.consultas + ' consultas a tu saldo. Ya puedes agendarlas.');
+              } else {
+                setPagoMsg('Tu pago se recibió, pero no encontramos el paquete. Avísale a la nutrióloga para acreditarlo.');
+              }
             } else {
               setPagoMsg('Recibimos tu regreso del pago, pero aún no podemos confirmar el cobro. Si el cargo se realizó, tu saldo se reflejará en breve.');
             }
@@ -577,7 +603,7 @@ export default function PacienteDashboard() {
       const cancelUrl = base + '/?compra=cancelada';
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'crearCheckoutStripe', montoCentavos: Math.round(pkg.precio * 100), descripcion: 'Paquete ' + pkg.nombre, correo, citaId: 'pkg_' + pkg.id + '_' + Date.now(), successUrl, cancelUrl, fbProjectId: FB_PROJECT_ID, meta: { tipo: 'paquete', correo, paqueteId: pkg.id, consultas: pkg.consultas, familia: pkg.familia, vigenciaMeses: pkg.vigenciaMeses, monto: pkg.precio, paqueteNombre: pkg.nombre } }), redirect: 'follow',
+        body: JSON.stringify({ action: 'crearCheckoutStripe', montoCentavos: Math.round(pkg.precio * 100), descripcion: 'Paquete ' + pkg.nombre, correo, citaId: 'pkg_' + pkg.id + '_' + Date.now(), successUrl, cancelUrl }), redirect: 'follow',
       });
       let dp; try { dp = JSON.parse(await res.text()); } catch (_) { dp = null; }
       if (dp && dp.ok && dp.url) { window.location.href = dp.url; return; }
@@ -669,6 +695,14 @@ export default function PacienteDashboard() {
   const planes = expediente && Array.isArray(expediente.planes) ? [...expediente.planes].reverse() : [];
   const medics = expediente && Array.isArray(expediente.mediciones) ? expediente.mediciones : [];
   const ultMed = medics.length ? medics[medics.length - 1] : null;
+  // Pliegues y perímetros capturados por la nutrióloga (campo medicionesManual del expediente).
+  const medicManual = expediente && Array.isArray(expediente.medicionesManual) ? expediente.medicionesManual : [];
+  const ultimoValor = (arr, field) => { for (let i = arr.length - 1; i >= 0; i--) { const v = arr[i] && arr[i][field]; if (typeof v === 'number' && !isNaN(v)) return v; } return null; };
+  const dispManual = (field) => { const v = ultimoValor(medicManual, field); return v != null ? v : '—'; };
+  const plieguesConDato = PLIEGUES_P.filter(p => medicManual.some(m => typeof m[p.k] === 'number' && !isNaN(m[p.k])));
+  const perimetrosConDato = PERIMETROS_P.filter(p => medicManual.some(m => typeof m[p.k] === 'number' && !isNaN(m[p.k])));
+  const hayManual = plieguesConDato.length > 0 || perimetrosConDato.length > 0;
+  const ultSuma6 = ultimoValor(medicManual, 'suma6');
   // Apego = promedio de los % diarios del contador de equivalencias entre consultas
   // (con respaldo al apego manual de la bitácora). Mismo dato que ve la nutrióloga.
   const apegoData = apegoPorPeriodo(medics, expediente && expediente.seguimientoEq, expediente && expediente.bitacora);
@@ -998,6 +1032,45 @@ export default function PacienteDashboard() {
                 <Linea data={apegoData} field="apego" color="#3E6B5B" unit="%" />
               </div>
             </div>
+
+            {hayManual && (
+              <>
+                {plieguesConDato.length > 0 && (
+                  <>
+                    <h2 style={D.section}>Pliegues cutáneos <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--stone)' }}>(mm)</span></h2>
+                    {typeof ultSuma6 === 'number' && (
+                      <div style={{ background: 'var(--dark)', color: '#fff', borderRadius: 14, padding: '14px 16px', margin: '0 4px 12px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#E7DECF' }}>Sumatoria de 6 pliegues</span>
+                        <span style={{ fontSize: 24, fontWeight: 800 }}>{ultSuma6}<span style={{ fontSize: 12, fontWeight: 600, color: '#C9BEB4' }}> mm</span></span>
+                      </div>
+                    )}
+                    <div style={D.grid}>
+                      {plieguesConDato.map((p, i) => (
+                        <div key={p.k} style={D.tile}>
+                          <div style={D.tileTitle}>{p.l}</div>
+                          <div style={D.tileValue}>{dispManual(p.k)}<span style={D.tileUnit}> mm</span></div>
+                          <Linea data={medicManual} field={p.k} color={ANTRO_COLORS_P[i % ANTRO_COLORS_P.length]} unit="" />
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {perimetrosConDato.length > 0 && (
+                  <>
+                    <h2 style={D.section}>Perímetros <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--stone)' }}>(cm)</span></h2>
+                    <div style={D.grid}>
+                      {perimetrosConDato.map((p, i) => (
+                        <div key={p.k} style={D.tile}>
+                          <div style={D.tileTitle}>{p.l}</div>
+                          <div style={D.tileValue}>{dispManual(p.k)}<span style={D.tileUnit}> cm</span></div>
+                          <Linea data={medicManual} field={p.k} color={ANTRO_COLORS_P[i % ANTRO_COLORS_P.length]} unit="" />
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
 
             <h2 style={D.section}>Accesos rápidos</h2>
             <div style={D.gridAcc}>
