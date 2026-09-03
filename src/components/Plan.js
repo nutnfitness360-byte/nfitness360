@@ -44,7 +44,6 @@ const GRUPOS = [
 
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 const isFin = (v) => typeof v === 'number' && isFinite(v);
-const redondear05 = (n) => Math.round(n * 2) / 2; // redondea a la media equivalencia más cercana
 const r0 = (n) => Math.round(n);
 const r1 = (n) => Math.round(n * 10) / 10;
 
@@ -165,7 +164,8 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   const [historial, setHistorial] = useState(() => Array.isArray(patient.planesHistorial) ? patient.planesHistorial : []);
   const [exitModal, setExitModal] = useState(null); // { proceed } | null
   const [mantenerEq, setMantenerEq] = useState(false); // modo seguimiento: NO recalcular equivalencias al cambiar las kcal
-  const [segModal, setSegModal] = useState(false);      // diálogo del botón "Crear plan de seguimiento"
+  // Ventana al entrar (solo si el paciente ya tiene un plan previo; en uno nuevo no aplica "seguimiento").
+  const [modoModal, setModoModal] = useState(() => !!(patient.plan && Array.isArray(patient.plan.eq) && patient.plan.eq.some(v => parseFloat(v) > 0)));
   const [menusOverride, setMenusOverride] = useState(null); // menú con gramajes reescritos tras escalar (se guarda en vez del vigente)
   const [escalando, setEscalando] = useState(false);
   const [escalarMsg, setEscalarMsg] = useState('');
@@ -268,45 +268,76 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
     setStatus('nuevo');
   };
 
-  // --- Escalar al objetivo: mismo menú, cantidades escaladas para el nuevo total de kcal ---
-  // Escala proporcionalmente las equivalencias (plan + menú) al valor de "Energía meta" y
-  // pide a la IA que reescriba SOLO los gramajes de los mismos platillos (sin cambiar alimentos).
-  const escalarAlObjetivo = async () => {
-    const objetivo = num(meta.energia);
-    const kcalActual = tot.kcal;
-    if (!(objetivo > 0)) { setEscalarMsg('Escribe primero la energía meta (kcal) a la que quieres llegar.'); return; }
-    if (!(kcalActual > 0)) { setEscalarMsg('Aún no hay equivalencias que escalar.'); return; }
-    const factor = objetivo / kcalActual;
-    setMantenerEq(true); // que el recálculo automático no pise el escalado
+  // --- Modo de trabajo: plan de seguimiento (equivalencias manuales) o plan nuevo desde cero ---
+  const tieneBase = !!(patient.plan && Array.isArray(patient.plan.eq) && patient.plan.eq.some(v => num(v) > 0));
 
+  const elegirModo = (modo) => {
+    setModoModal(false);
+    if (modo === 'seguimiento') {
+      // Carga el plan vigente y APAGA el cálculo automático: la nutrióloga ajusta las equivalencias a mano.
+      const base = patient.plan || {};
+      if (base.meta) {
+        setMeta({
+          pP: base.meta.pP, pL: base.meta.pL, pC: base.meta.pC, factor: base.meta.factor,
+          energia: base.meta.energia != null ? String(base.meta.energia) : '',
+        });
+      }
+      if (Array.isArray(base.eq) && base.eq.length === GRUPOS.length) setEq(base.eq.map(String));
+      setMantenerEq(true);
+    } else {
+      // Plan nuevo desde cero: comportamiento normal (la energía meta genera las equivalencias con la plantilla).
+      setMantenerEq(false);
+    }
+    setStatus('nuevo');
+  };
+
+  // Reparte un total (en pasos de 0.5) entre los tiempos según sus pesos actuales, sumando EXACTAMENTE
+  // ese total (método del mayor residuo). Devuelve null si no hay dónde repartir (grupo ausente del menú).
+  const distribuirGrupo = (total, pesos) => {
+    const sumP = pesos.reduce((a, b) => a + b, 0);
+    const units = Math.round(num(total) / 0.5);
+    if (units <= 0) return pesos.map(() => 0);
+    if (sumP <= 0) return null;
+    const raw = pesos.map(p => units * p / sumP);
+    const base = raw.map(r => Math.floor(r));
+    let resto = units - base.reduce((a, b) => a + b, 0);
+    const orden = raw.map((r, i) => ({ i, frac: r - Math.floor(r) })).sort((a, b) => b.frac - a.frac);
+    for (let k = 0; k < orden.length && resto > 0; k++) { base[orden[k].i]++; resto--; }
+    return base.map(u => u * 0.5);
+  };
+
+  // --- "Aplicar cantidades al menú": lleva las equivalencias que la nutrióloga dejó a mano al menú.
+  //     Reparte cada grupo por tiempo (sumando exacto → la tabla de distribución queda cuadrada) y la IA
+  //     reescribe SOLO los gramajes de los mismos platillos a esas nuevas cantidades.
+  const aplicarCantidadesMenu = async () => {
     const menus = patient.plan && patient.plan.menus;
-    const hayMenu = !!(menus && Array.isArray(menus.tiempos) && menus.tiempos.length);
-
-    if (!hayMenu) {
-      // Sin menú guardado: se escala directamente la tabla del plan (grupos en 0 se quedan en 0).
-      setEq(eq.map(v => { const n = num(v); return n > 0 ? String(redondear05(n * factor)) : '0'; }));
-      setEscalarMsg('Equivalencias escaladas al nuevo objetivo. (Este plan no tiene menú guardado para ajustar gramajes.)');
-      setStatus('nuevo');
+    if (!menus || !Array.isArray(menus.tiempos) || !menus.tiempos.length) {
+      setEscalarMsg('Este paciente aún no tiene un menú guardado para ajustar. Genera primero el menú en la pestaña Menús.');
       return;
     }
-
-    // 1) Escala las equivalencias POR TIEMPO del menú (grupos en 0 se quedan en 0).
-    const tiemposEscalados = menus.tiempos.map(t => {
-      const eqT = Array.isArray(t.eq) ? t.eq : [];
-      const eqEsc = GRUPOS.map((_, i) => { const n = num(eqT[i]); return n > 0 ? redondear05(n * factor) : 0; });
-      return { ...t, eq: eqEsc };
+    const planEqNum = eq.map(num);
+    // 1) Reparte cada grupo entre los tiempos según la forma actual del menú, sumando exacto al total del plan.
+    const nuevos = [];
+    const tiemposAjust = menus.tiempos.map(t => ({ ...t, eq: (Array.isArray(t.eq) ? t.eq.slice() : GRUPOS.map(() => 0)) }));
+    GRUPOS.forEach((_, g) => {
+      const pesos = tiemposAjust.map(t => num(t.eq[g]));
+      const dist = distribuirGrupo(planEqNum[g], pesos);
+      if (dist === null && planEqNum[g] > 0) {
+        nuevos.push(GRUPOS[g][0]);               // grupo nuevo sin lugar en el menú; se avisa
+        tiemposAjust.forEach(t => { t.eq[g] = 0; });
+      } else {
+        const d = dist || pesos.map(() => 0);
+        tiemposAjust.forEach((t, ti) => { t.eq[g] = d[ti]; });
+      }
     });
-    // 2) El PLAN (tabla C) se toma como la SUMA exacta de lo repartido en el menú.
-    //    Así la tabla "Distribución del plan vs. menús" cuadra siempre (nunca queda en rojo).
-    const planNuevoEq = GRUPOS.map((_, i) => tiemposEscalados.reduce((a, t) => a + num(t.eq[i]), 0));
-    setEq(planNuevoEq.map(String));
+    const avisoNuevos = nuevos.length ? (' Nota: ' + nuevos.join(', ') + (nuevos.length === 1 ? ' no estaba' : ' no estaban') + ' en el menú; agrégalo(s) en el tiempo que quieras desde Menús.') : '';
 
-    // 3) La IA reescribe SOLO las cantidades de los mismos platillos.
-    setEscalando(true); setEscalarMsg('Ajustando las cantidades del menú con IA…');
+    // 2) La IA reescribe SOLO las cantidades de los mismos platillos para las nuevas equivalencias por tiempo.
+    setEscalando(true); setEscalarMsg('Actualizando las cantidades del menú con IA…');
     try {
       const url = process.env.REACT_APP_APPSCRIPT_URL;
       if (!url) throw new Error('Falta configurar la conexión (REACT_APP_APPSCRIPT_URL).');
-      const payloadTiempos = tiemposEscalados.map(t => ({
+      const payloadTiempos = tiemposAjust.map(t => ({
         nombre: t.nombre || '',
         equivalentes: GRUPOS.map((g, i) => ({ grupo: g[0], n: num(t.eq[i]) })).filter(x => x.n > 0),
         opciones: (t.opciones || []).map(o => ({ nombre: (o && o.nombre) || '', prep: (o && o.prep) || '' })),
@@ -318,9 +349,7 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
       });
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (!data.ok || !Array.isArray(data.tiempos)) throw new Error(data.error || 'No se recibió el menú ajustado.');
-      // 4) Mezcla: conserva nombre y foto de cada opción; reemplaza solo la preparación (gramajes).
-      //    Actualiza también planEq del menú para que no marque "el plan cambió".
-      const merged = { ...menus, planEq: planNuevoEq, tiempos: tiemposEscalados.map((t, ti) => {
+      const merged = { ...menus, planEq: planEqNum, tiempos: tiemposAjust.map((t, ti) => {
         const rops = (data.tiempos[ti] && Array.isArray(data.tiempos[ti].opciones)) ? data.tiempos[ti].opciones : [];
         const ops = (t.opciones || []).map((o, oi) => {
           const nu = rops[oi];
@@ -329,37 +358,13 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
         return { ...t, opciones: ops };
       }) };
       setMenusOverride(merged);
-      setEscalarMsg('Listo: equivalencias y gramajes ajustados al nuevo objetivo, con los mismos platillos. La distribución del menú queda cuadrada. Revisa y guarda el plan.');
+      setEscalarMsg('Listo: el menú se actualizó a tus equivalencias (gramajes reescritos) y el reparto quedó cuadrado. Revisa y guarda el plan.' + avisoNuevos);
     } catch (e) {
-      // Aunque la IA falle, las equivalencias por tiempo ya quedaron escaladas (el reparto cuadra y el contador también).
-      setMenusOverride({ ...menus, planEq: planNuevoEq, tiempos: tiemposEscalados });
-      setEscalarMsg('Escalé las equivalencias y el reparto (queda cuadrado), pero no pude reescribir los gramajes automáticamente: ' + e.message + ' Puedes ajustarlos a mano en Menús.');
+      // Aunque la IA falle, el reparto por tiempo ya quedó cuadrado con tus equivalencias.
+      setMenusOverride({ ...menus, planEq: planEqNum, tiempos: tiemposAjust });
+      setEscalarMsg('Actualicé el reparto por tiempo (queda cuadrado), pero no pude reescribir los gramajes automáticamente: ' + e.message + ' Puedes ajustarlos a mano en Menús.' + avisoNuevos);
     }
     setEscalando(false);
-    setStatus('nuevo');
-  };
-
-  // --- Plan de seguimiento: copia el plan vigente y decide si conservar equivalencias ---
-  const tieneBase = !!(patient.plan && Array.isArray(patient.plan.eq) && patient.plan.eq.some(v => num(v) > 0));
-  const crearSeguimiento = (conservar) => {
-    setSegModal(false);
-    const base = patient.plan || {};
-    if (base.meta) {
-      setMeta({
-        pP: base.meta.pP, pL: base.meta.pL, pC: base.meta.pC, factor: base.meta.factor,
-        energia: base.meta.energia != null ? String(base.meta.energia) : '',
-      });
-    }
-    if (conservar) {
-      // Conservar: se cargan las equivalencias del plan vigente y se DESVINCULA el recálculo automático.
-      if (Array.isArray(base.eq) && base.eq.length === GRUPOS.length) setEq(base.eq.map(String));
-      setMantenerEq(true);
-    } else {
-      // Empezar de cero: comportamiento normal (al cambiar las kcal se regenera la tabla con la plantilla).
-      setMantenerEq(false);
-      const e = num(base.meta && base.meta.energia);
-      if (e > 0) setEq(plantillaEq(e, num(base.meta.pP), num(base.meta.pL), num(base.meta.pC)).map(String));
-    }
     setStatus('nuevo');
   };
 
@@ -406,26 +411,25 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
           Ver notas de seguimiento
         </button>
         {tieneBase && (
-          <button style={styles.segBtn} onClick={() => setSegModal(true)} title="Crear un plan de seguimiento a partir del plan vigente">
-            + Crear plan de seguimiento
+          <button style={styles.segBtn} onClick={() => setModoModal(true)} title="Elegir entre plan de seguimiento o plan nuevo">
+            Cambiar modo
           </button>
         )}
       </header>
 
-      {segModal && (
-        <div style={styles.segOverlay} onClick={() => setSegModal(false)}>
+      {modoModal && (
+        <div style={styles.segOverlay} onClick={() => setModoModal(false)}>
           <div style={styles.segCard} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.segTitle}>Crear plan de seguimiento</div>
-            <p style={styles.segText}>Se parte del plan vigente del paciente (sus equivalencias y sus menús). ¿Cómo quieres manejar las equivalencias?</p>
-            <button style={styles.segOptPrimary} onClick={() => crearSeguimiento(true)}>
-              Conservar las equivalencias actuales
-              <span style={styles.segOptSub}>Cambia las kcal ajustando a mano los grupos; el menú se mantiene igual. Recomendado para seguimientos.</span>
+            <div style={styles.segTitle}>¿Qué vas a hacer con este paciente?</div>
+            <p style={styles.segText}>Elige cómo trabajar el plan. Puedes cambiar de modo después con “Cambiar modo”.</p>
+            <button style={styles.segOptPrimary} onClick={() => elegirModo('seguimiento')}>
+              Plan de seguimiento
+              <span style={styles.segOptSub}>Se conserva el menú y se apaga el cálculo automático: pones la energía meta y ajustas las equivalencias a mano hasta el 100% de adecuación. Luego “Aplicar cantidades al menú” reescribe los gramajes.</span>
             </button>
-            <button style={styles.segOpt} onClick={() => crearSeguimiento(false)}>
-              Empezar de cero
-              <span style={styles.segOptSub}>Al cambiar la energía meta, las equivalencias se recalculan con la plantilla (como un plan nuevo).</span>
+            <button style={styles.segOpt} onClick={() => elegirModo('nuevo')}>
+              Plan nuevo desde cero
+              <span style={styles.segOptSub}>La energía meta calcula las equivalencias automáticamente con la plantilla (comportamiento normal).</span>
             </button>
-            <button style={styles.segCancel} onClick={() => setSegModal(false)}>Cancelar</button>
           </div>
         </div>
       )}
@@ -452,8 +456,8 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
       <main style={styles.main}>
         {mantenerEq && (
           <div style={styles.segBanner}>
-            <span><b>Modo seguimiento activo.</b> Las equivalencias NO se recalculan al cambiar las kcal: ajústalas a mano en la Tabla de equivalentes (sección C) para subir o bajar las calorías. El menú del plan se conserva.</span>
-            <button style={styles.segBannerBtn} onClick={() => setMantenerEq(false)}>Reactivar cálculo automático</button>
+            <span><b>Modo seguimiento · cálculo automático apagado.</b> Escribe la energía meta y ajusta a mano las equivalencias en la Tabla (sección C) hasta que el % de adecuación quede ~100%. Luego pulsa “Aplicar cantidades al menú” para reescribir los gramajes. El menú se conserva.</span>
+            <button style={styles.segBannerBtn} onClick={() => setMantenerEq(false)}>Cambiar a plan nuevo</button>
           </div>
         )}
         {/* SECCIÓN A */}
@@ -502,15 +506,15 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
             <span style={styles.gramTag}>Meta en gramos: <b>{r1(metaProtG)}</b> P · <b>{r1(metaLipG)}</b> L · <b>{r1(metaCarbG)}</b> HC</span>
           </div>
 
-          {tieneBase && (
+          {mantenerEq && (
             <div style={styles.escalarBox}>
               <div style={styles.escalarHead}>
                 <div>
-                  <div style={styles.escalarTitle}>Escalar al objetivo (mismo menú, más o menos comida)</div>
-                  <div style={styles.escalarHint}>Escribe la nueva energía meta arriba y pulsa Escalar: se ajustan proporcionalmente las equivalencias del plan y del menú, y la IA reescribe solo las cantidades de los mismos platillos (sin cambiar los alimentos). Ideal para seguimientos donde el menú se queda igual.</div>
+                  <div style={styles.escalarTitle}>Aplicar cantidades al menú</div>
+                  <div style={styles.escalarHint}>Cuando termines de ajustar las equivalencias a mano (arriba y en la Tabla de equivalentes), pulsa este botón: reparte esas equivalencias entre los tiempos del menú —dejando la tabla de distribución cuadrada— y la IA reescribe solo las cantidades de los mismos platillos (mismos alimentos y nombres). Ideal para seguimientos donde el menú se queda igual.</div>
                 </div>
-                <button type="button" style={{ ...styles.escalarBtn, ...(escalando ? styles.escalarBtnBusy : null) }} onClick={escalarAlObjetivo} disabled={escalando}>
-                  {escalando ? 'Escalando…' : 'Escalar al objetivo'}
+                <button type="button" style={{ ...styles.escalarBtn, ...(escalando ? styles.escalarBtnBusy : null) }} onClick={aplicarCantidadesMenu} disabled={escalando}>
+                  {escalando ? 'Aplicando…' : 'Aplicar cantidades al menú'}
                 </button>
               </div>
               {escalarMsg && <div style={styles.escalarMsg}>{escalarMsg}</div>}
