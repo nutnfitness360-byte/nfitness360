@@ -277,22 +277,30 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
     if (!(objetivo > 0)) { setEscalarMsg('Escribe primero la energía meta (kcal) a la que quieres llegar.'); return; }
     if (!(kcalActual > 0)) { setEscalarMsg('Aún no hay equivalencias que escalar.'); return; }
     const factor = objetivo / kcalActual;
-    // 1) Escala la tabla del plan. Los grupos en 0 se quedan en 0 (no se cambia la composición del menú).
-    setEq(eq.map(v => { const n = num(v); return n > 0 ? String(redondear05(n * factor)) : '0'; }));
     setMantenerEq(true); // que el recálculo automático no pise el escalado
 
     const menus = patient.plan && patient.plan.menus;
-    if (!menus || !Array.isArray(menus.tiempos) || !menus.tiempos.length) {
+    const hayMenu = !!(menus && Array.isArray(menus.tiempos) && menus.tiempos.length);
+
+    if (!hayMenu) {
+      // Sin menú guardado: se escala directamente la tabla del plan (grupos en 0 se quedan en 0).
+      setEq(eq.map(v => { const n = num(v); return n > 0 ? String(redondear05(n * factor)) : '0'; }));
       setEscalarMsg('Equivalencias escaladas al nuevo objetivo. (Este plan no tiene menú guardado para ajustar gramajes.)');
       setStatus('nuevo');
       return;
     }
-    // 2) Escala las equivalencias por tiempo del menú (para que el contador del paciente cuadre).
+
+    // 1) Escala las equivalencias POR TIEMPO del menú (grupos en 0 se quedan en 0).
     const tiemposEscalados = menus.tiempos.map(t => {
       const eqT = Array.isArray(t.eq) ? t.eq : [];
       const eqEsc = GRUPOS.map((_, i) => { const n = num(eqT[i]); return n > 0 ? redondear05(n * factor) : 0; });
       return { ...t, eq: eqEsc };
     });
+    // 2) El PLAN (tabla C) se toma como la SUMA exacta de lo repartido en el menú.
+    //    Así la tabla "Distribución del plan vs. menús" cuadra siempre (nunca queda en rojo).
+    const planNuevoEq = GRUPOS.map((_, i) => tiemposEscalados.reduce((a, t) => a + num(t.eq[i]), 0));
+    setEq(planNuevoEq.map(String));
+
     // 3) La IA reescribe SOLO las cantidades de los mismos platillos.
     setEscalando(true); setEscalarMsg('Ajustando las cantidades del menú con IA…');
     try {
@@ -311,7 +319,8 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (!data.ok || !Array.isArray(data.tiempos)) throw new Error(data.error || 'No se recibió el menú ajustado.');
       // 4) Mezcla: conserva nombre y foto de cada opción; reemplaza solo la preparación (gramajes).
-      const merged = { ...menus, tiempos: tiemposEscalados.map((t, ti) => {
+      //    Actualiza también planEq del menú para que no marque "el plan cambió".
+      const merged = { ...menus, planEq: planNuevoEq, tiempos: tiemposEscalados.map((t, ti) => {
         const rops = (data.tiempos[ti] && Array.isArray(data.tiempos[ti].opciones)) ? data.tiempos[ti].opciones : [];
         const ops = (t.opciones || []).map((o, oi) => {
           const nu = rops[oi];
@@ -320,11 +329,11 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
         return { ...t, opciones: ops };
       }) };
       setMenusOverride(merged);
-      setEscalarMsg('Listo: equivalencias y gramajes ajustados al nuevo objetivo, con los mismos platillos. Revisa la tabla y guarda el plan.');
+      setEscalarMsg('Listo: equivalencias y gramajes ajustados al nuevo objetivo, con los mismos platillos. La distribución del menú queda cuadrada. Revisa y guarda el plan.');
     } catch (e) {
-      // Aunque la IA falle, las equivalencias por tiempo ya quedaron escaladas (el contador cuadra).
-      setMenusOverride({ ...menus, tiempos: tiemposEscalados });
-      setEscalarMsg('Escalé las equivalencias, pero no pude reescribir los gramajes automáticamente: ' + e.message + ' Puedes ajustarlos a mano en Menús.');
+      // Aunque la IA falle, las equivalencias por tiempo ya quedaron escaladas (el reparto cuadra y el contador también).
+      setMenusOverride({ ...menus, planEq: planNuevoEq, tiempos: tiemposEscalados });
+      setEscalarMsg('Escalé las equivalencias y el reparto (queda cuadrado), pero no pude reescribir los gramajes automáticamente: ' + e.message + ' Puedes ajustarlos a mano en Menús.');
     }
     setEscalando(false);
     setStatus('nuevo');
