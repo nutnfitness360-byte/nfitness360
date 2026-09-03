@@ -1050,7 +1050,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
                     <div style={{ fontSize: 11.5, color: T.inkSoft, marginBottom: 6 }}>Equivalentes estimados por grupo</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {Object.entries(data.dietetica.kcalHabitual.equivalentes).map(([g, n]) => (
-                        <span key={g} style={{ fontSize: 12, background: T.mint, color: T.pine, borderRadius: 7, padding: "4px 10px", fontWeight: 600 }}>{g} · {n}</span>
+                        <span key={g} style={{ fontSize: 12, background: T.mint, color: T.pine, borderRadius: 7, padding: "4px 10px", fontWeight: 600 }}>{g.replace(/_/g, " ")} · {n}</span>
                       ))}
                     </div>
                   </div>
