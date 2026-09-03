@@ -44,6 +44,7 @@ const GRUPOS = [
 
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 const isFin = (v) => typeof v === 'number' && isFinite(v);
+const redondear05 = (n) => Math.round(n * 2) / 2; // redondea a la media equivalencia más cercana
 const r0 = (n) => Math.round(n);
 const r1 = (n) => Math.round(n * 10) / 10;
 
@@ -165,6 +166,9 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   const [exitModal, setExitModal] = useState(null); // { proceed } | null
   const [mantenerEq, setMantenerEq] = useState(false); // modo seguimiento: NO recalcular equivalencias al cambiar las kcal
   const [segModal, setSegModal] = useState(false);      // diálogo del botón "Crear plan de seguimiento"
+  const [menusOverride, setMenusOverride] = useState(null); // menú con gramajes reescritos tras escalar (se guarda en vez del vigente)
+  const [escalando, setEscalando] = useState(false);
+  const [escalarMsg, setEscalarMsg] = useState('');
 
   const setP = (k, v) => { setPp(p => ({ ...p, [k]: v })); setStatus('nuevo'); };
   const setM = (k, v) => { setMeta(m => ({ ...m, [k]: v })); setStatus('nuevo'); };
@@ -233,9 +237,10 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   const guardar = async () => {
     if (sumaPct !== 100) { setStatus('error'); return false; }
     setStatus('guardando');
+    const menusAGuardar = menusOverride || (patient.plan && patient.plan.menus) || null;
     const plan = {
-      // Conservamos el borrador de menús (plan.menus) para que editar el plan no lo borre.
-      ...(patient.plan && patient.plan.menus ? { menus: patient.plan.menus } : {}),
+      // Conservamos el menú (el reescalado si se escaló, o el vigente) para que editar el plan no lo borre.
+      ...(menusAGuardar ? { menus: menusAGuardar } : {}),
       eq: eq.map(num), meta: { energia: num(meta.energia), pP, pL, pC, factor },
       totales: { kcal: r0(tot.kcal), prot: r0(tot.prot), lip: r0(tot.lip), hc: r0(tot.hc), distP: r1(distP), distL: r1(distL), distC: r1(distC) },
       fecha: new Date().toISOString().slice(0, 10),
@@ -260,6 +265,68 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
         energia: item.meta.energia != null ? String(item.meta.energia) : '',
       });
     }
+    setStatus('nuevo');
+  };
+
+  // --- Escalar al objetivo: mismo menú, cantidades escaladas para el nuevo total de kcal ---
+  // Escala proporcionalmente las equivalencias (plan + menú) al valor de "Energía meta" y
+  // pide a la IA que reescriba SOLO los gramajes de los mismos platillos (sin cambiar alimentos).
+  const escalarAlObjetivo = async () => {
+    const objetivo = num(meta.energia);
+    const kcalActual = tot.kcal;
+    if (!(objetivo > 0)) { setEscalarMsg('Escribe primero la energía meta (kcal) a la que quieres llegar.'); return; }
+    if (!(kcalActual > 0)) { setEscalarMsg('Aún no hay equivalencias que escalar.'); return; }
+    const factor = objetivo / kcalActual;
+    // 1) Escala la tabla del plan. Los grupos en 0 se quedan en 0 (no se cambia la composición del menú).
+    setEq(eq.map(v => { const n = num(v); return n > 0 ? String(redondear05(n * factor)) : '0'; }));
+    setMantenerEq(true); // que el recálculo automático no pise el escalado
+
+    const menus = patient.plan && patient.plan.menus;
+    if (!menus || !Array.isArray(menus.tiempos) || !menus.tiempos.length) {
+      setEscalarMsg('Equivalencias escaladas al nuevo objetivo. (Este plan no tiene menú guardado para ajustar gramajes.)');
+      setStatus('nuevo');
+      return;
+    }
+    // 2) Escala las equivalencias por tiempo del menú (para que el contador del paciente cuadre).
+    const tiemposEscalados = menus.tiempos.map(t => {
+      const eqT = Array.isArray(t.eq) ? t.eq : [];
+      const eqEsc = GRUPOS.map((_, i) => { const n = num(eqT[i]); return n > 0 ? redondear05(n * factor) : 0; });
+      return { ...t, eq: eqEsc };
+    });
+    // 3) La IA reescribe SOLO las cantidades de los mismos platillos.
+    setEscalando(true); setEscalarMsg('Ajustando las cantidades del menú con IA…');
+    try {
+      const url = process.env.REACT_APP_APPSCRIPT_URL;
+      if (!url) throw new Error('Falta configurar la conexión (REACT_APP_APPSCRIPT_URL).');
+      const payloadTiempos = tiemposEscalados.map(t => ({
+        nombre: t.nombre || '',
+        equivalentes: GRUPOS.map((g, i) => ({ grupo: g[0], n: num(t.eq[i]) })).filter(x => x.n > 0),
+        opciones: (t.opciones || []).map(o => ({ nombre: (o && o.nombre) || '', prep: (o && o.prep) || '' })),
+      }));
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'escalarGramajesIA', tiempos: payloadTiempos }),
+        redirect: 'follow',
+      });
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      if (!data.ok || !Array.isArray(data.tiempos)) throw new Error(data.error || 'No se recibió el menú ajustado.');
+      // 4) Mezcla: conserva nombre y foto de cada opción; reemplaza solo la preparación (gramajes).
+      const merged = { ...menus, tiempos: tiemposEscalados.map((t, ti) => {
+        const rops = (data.tiempos[ti] && Array.isArray(data.tiempos[ti].opciones)) ? data.tiempos[ti].opciones : [];
+        const ops = (t.opciones || []).map((o, oi) => {
+          const nu = rops[oi];
+          return (nu && nu.prep) ? { ...o, prep: nu.prep } : o;
+        });
+        return { ...t, opciones: ops };
+      }) };
+      setMenusOverride(merged);
+      setEscalarMsg('Listo: equivalencias y gramajes ajustados al nuevo objetivo, con los mismos platillos. Revisa la tabla y guarda el plan.');
+    } catch (e) {
+      // Aunque la IA falle, las equivalencias por tiempo ya quedaron escaladas (el contador cuadra).
+      setMenusOverride({ ...menus, tiempos: tiemposEscalados });
+      setEscalarMsg('Escalé las equivalencias, pero no pude reescribir los gramajes automáticamente: ' + e.message + ' Puedes ajustarlos a mano en Menús.');
+    }
+    setEscalando(false);
     setStatus('nuevo');
   };
 
@@ -425,6 +492,21 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
             </span>
             <span style={styles.gramTag}>Meta en gramos: <b>{r1(metaProtG)}</b> P · <b>{r1(metaLipG)}</b> L · <b>{r1(metaCarbG)}</b> HC</span>
           </div>
+
+          {tieneBase && (
+            <div style={styles.escalarBox}>
+              <div style={styles.escalarHead}>
+                <div>
+                  <div style={styles.escalarTitle}>Escalar al objetivo (mismo menú, más o menos comida)</div>
+                  <div style={styles.escalarHint}>Escribe la nueva energía meta arriba y pulsa Escalar: se ajustan proporcionalmente las equivalencias del plan y del menú, y la IA reescribe solo las cantidades de los mismos platillos (sin cambiar los alimentos). Ideal para seguimientos donde el menú se queda igual.</div>
+                </div>
+                <button type="button" style={{ ...styles.escalarBtn, ...(escalando ? styles.escalarBtnBusy : null) }} onClick={escalarAlObjetivo} disabled={escalando}>
+                  {escalando ? 'Escalando…' : 'Escalar al objetivo'}
+                </button>
+              </div>
+              {escalarMsg && <div style={styles.escalarMsg}>{escalarMsg}</div>}
+            </div>
+          )}
 
           {historial.length > 0 && (
             <div style={styles.histBox}>
@@ -698,6 +780,13 @@ const styles = {
   segOpt: { display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left', background: '#fff', color: T.ink, border: `1px solid ${T.line}`, borderRadius: 12, padding: '13px 15px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: mono },
   segOptSub: { fontSize: 11.5, fontWeight: 500, opacity: 0.9, lineHeight: 1.4 },
   segCancel: { background: 'transparent', color: T.inkSoft, border: 'none', padding: '8px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: mono, marginTop: 2 },
+  escalarBox: { marginTop: 12, border: `1px solid ${T.line}`, borderRadius: 12, padding: '12px 14px', background: 'var(--card)' },
+  escalarHead: { display: 'flex', alignItems: 'flex-start', gap: 12, justifyContent: 'space-between', flexWrap: 'wrap' },
+  escalarTitle: { fontSize: 13.5, fontWeight: 800, color: T.ink },
+  escalarHint: { fontSize: 11.5, color: T.inkSoft, lineHeight: 1.5, marginTop: 3, maxWidth: 560 },
+  escalarBtn: { flexShrink: 0, background: T.amber, color: '#fff', border: 'none', borderRadius: 9, padding: '9px 15px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
+  escalarBtnBusy: { opacity: 0.6, cursor: 'default' },
+  escalarMsg: { marginTop: 10, fontSize: 12, fontWeight: 700, color: T.pine, lineHeight: 1.5 },
   modalWrap: { position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1100 },
   modalCard: { background: T.surface, borderRadius: 16, padding: '22px 22px 20px', width: '100%', maxWidth: 460, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' },
   exitTitle: { fontSize: 18, fontWeight: 800, color: T.pine, marginBottom: 8 },
