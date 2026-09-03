@@ -163,6 +163,8 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   const [verNotas, setVerNotas] = useState(false);
   const [historial, setHistorial] = useState(() => Array.isArray(patient.planesHistorial) ? patient.planesHistorial : []);
   const [exitModal, setExitModal] = useState(null); // { proceed } | null
+  const [mantenerEq, setMantenerEq] = useState(false); // modo seguimiento: NO recalcular equivalencias al cambiar las kcal
+  const [segModal, setSegModal] = useState(false);      // diálogo del botón "Crear plan de seguimiento"
 
   const setP = (k, v) => { setPp(p => ({ ...p, [k]: v })); setStatus('nuevo'); };
   const setM = (k, v) => { setMeta(m => ({ ...m, [k]: v })); setStatus('nuevo'); };
@@ -198,6 +200,7 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   const primeraRender = useRef(true);
   useEffect(() => {
     if (primeraRender.current) { primeraRender.current = false; return; }
+    if (mantenerEq) return; // modo seguimiento: las equivalencias se ajustan a mano, no se regeneran al cambiar las kcal
     const e = num(meta.energia);
     const sumaPctM = num(meta.pP) + num(meta.pL) + num(meta.pC);
     if (e > 0 && sumaPctM === 100) { setEq(plantillaEq(e, num(meta.pP), num(meta.pL), num(meta.pC)).map(String)); setStatus('nuevo'); }
@@ -260,6 +263,30 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
     setStatus('nuevo');
   };
 
+  // --- Plan de seguimiento: copia el plan vigente y decide si conservar equivalencias ---
+  const tieneBase = !!(patient.plan && Array.isArray(patient.plan.eq) && patient.plan.eq.some(v => num(v) > 0));
+  const crearSeguimiento = (conservar) => {
+    setSegModal(false);
+    const base = patient.plan || {};
+    if (base.meta) {
+      setMeta({
+        pP: base.meta.pP, pL: base.meta.pL, pC: base.meta.pC, factor: base.meta.factor,
+        energia: base.meta.energia != null ? String(base.meta.energia) : '',
+      });
+    }
+    if (conservar) {
+      // Conservar: se cargan las equivalencias del plan vigente y se DESVINCULA el recálculo automático.
+      if (Array.isArray(base.eq) && base.eq.length === GRUPOS.length) setEq(base.eq.map(String));
+      setMantenerEq(true);
+    } else {
+      // Empezar de cero: comportamiento normal (al cambiar las kcal se regenera la tabla con la plantilla).
+      setMantenerEq(false);
+      const e = num(base.meta && base.meta.energia);
+      if (e > 0) setEq(plantillaEq(e, num(base.meta.pP), num(base.meta.pL), num(base.meta.pC)).map(String));
+    }
+    setStatus('nuevo');
+  };
+
   // --- Aviso de cambios sin guardar al salir ---
   const hayContenido = num(meta.energia) > 0 || eq.some(v => num(v) > 0);
   const dirty = hayContenido && status !== 'guardado';
@@ -302,7 +329,30 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
         <button style={styles.verHBtn} onClick={() => setVerNotas(true)} title="Consultar las notas de seguimiento sin salir del cálculo">
           Ver notas de seguimiento
         </button>
+        {tieneBase && (
+          <button style={styles.segBtn} onClick={() => setSegModal(true)} title="Crear un plan de seguimiento a partir del plan vigente">
+            + Crear plan de seguimiento
+          </button>
+        )}
       </header>
+
+      {segModal && (
+        <div style={styles.segOverlay} onClick={() => setSegModal(false)}>
+          <div style={styles.segCard} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.segTitle}>Crear plan de seguimiento</div>
+            <p style={styles.segText}>Se parte del plan vigente del paciente (sus equivalencias y sus menús). ¿Cómo quieres manejar las equivalencias?</p>
+            <button style={styles.segOptPrimary} onClick={() => crearSeguimiento(true)}>
+              Conservar las equivalencias actuales
+              <span style={styles.segOptSub}>Cambia las kcal ajustando a mano los grupos; el menú se mantiene igual. Recomendado para seguimientos.</span>
+            </button>
+            <button style={styles.segOpt} onClick={() => crearSeguimiento(false)}>
+              Empezar de cero
+              <span style={styles.segOptSub}>Al cambiar la energía meta, las equivalencias se recalculan con la plantilla (como un plan nuevo).</span>
+            </button>
+            <button style={styles.segCancel} onClick={() => setSegModal(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
 
       {verNotas && (
         <NotasSeguimiento notas={patient.bitacora} nombre={patient.nombre} onClose={() => setVerNotas(false)} closeBtnStyle={styles.verHBtn} />
@@ -324,6 +374,12 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
       )}
 
       <main style={styles.main}>
+        {mantenerEq && (
+          <div style={styles.segBanner}>
+            <span><b>Modo seguimiento activo.</b> Las equivalencias NO se recalculan al cambiar las kcal: ajústalas a mano en la Tabla de equivalentes (sección C) para subir o bajar las calorías. El menú del plan se conserva.</span>
+            <button style={styles.segBannerBtn} onClick={() => setMantenerEq(false)}>Reactivar cálculo automático</button>
+          </div>
+        )}
         {/* SECCIÓN A */}
         <Section n="A" title="Datos y gasto energético" hint="Tomados del expediente / InBody. Puedes ajustarlos para el cálculo.">
           <Grid>
@@ -631,6 +687,17 @@ const styles = {
   primaryBtn: { background: T.amber, color: '#211C17', border: 'none', padding: '12px 24px', borderRadius: 11, fontSize: 14.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
   volverBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.pine}`, padding: '12px 20px', borderRadius: 11, fontSize: 14.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
   verHBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.pine}`, padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
+  segBtn: { background: T.amber, color: '#fff', border: `1px solid ${T.amber}`, padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono },
+  segBanner: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'space-between', background: 'rgba(205,167,136,.14)', border: `1px solid ${T.amber}`, borderRadius: 12, padding: '12px 14px', margin: '0 0 14px', fontSize: 12.5, color: T.ink, lineHeight: 1.5 },
+  segBannerBtn: { flexShrink: 0, background: '#fff', color: T.amber, border: `1px solid ${T.amber}`, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: mono },
+  segOverlay: { position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  segCard: { background: T.surface, borderRadius: 18, padding: 22, width: 'min(460px, 94vw)', boxShadow: '0 20px 50px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: 10 },
+  segTitle: { fontSize: 17, fontWeight: 800, color: T.ink },
+  segText: { fontSize: 13, color: T.inkSoft, lineHeight: 1.5, margin: '0 0 4px' },
+  segOptPrimary: { display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left', background: T.amber, color: '#fff', border: 'none', borderRadius: 12, padding: '13px 15px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: mono },
+  segOpt: { display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left', background: '#fff', color: T.ink, border: `1px solid ${T.line}`, borderRadius: 12, padding: '13px 15px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: mono },
+  segOptSub: { fontSize: 11.5, fontWeight: 500, opacity: 0.9, lineHeight: 1.4 },
+  segCancel: { background: 'transparent', color: T.inkSoft, border: 'none', padding: '8px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: mono, marginTop: 2 },
   modalWrap: { position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1100 },
   modalCard: { background: T.surface, borderRadius: 16, padding: '22px 22px 20px', width: '100%', maxWidth: 460, maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(0,0,0,0.3)' },
   exitTitle: { fontSize: 18, fontWeight: 800, color: T.pine, marginBottom: 8 },
