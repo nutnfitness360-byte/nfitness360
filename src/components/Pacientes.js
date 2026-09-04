@@ -609,6 +609,19 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     }
   };
 
+  // Vista previa del documento tal como lo verá el paciente (mismo HTML que se
+  // convierte en PDF), abierta en una pestaña nueva. NO envía correo ni toca Drive:
+  // es solo para revisar desde el perfil del nutriólogo.
+  const abrirReco = (reco) => {
+    if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales || reco.analisis)) {
+      setRecoPdfMsg('No hay recomendación para previsualizar.'); return;
+    }
+    const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: reco.fecha || Date.now(), suplementacion: reco.suplementacionTabla || null });
+    const win = window.open('', '_blank');
+    if (win) { win.document.open(); win.document.write(html); win.document.close(); }
+    else { window.open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank', 'noopener'); }
+  };
+
   // Contexto del paciente que se manda a la IA (resumen y chat).
   const construirContextoIA = () => ({
     nombre: sel.nombre, edad: sel.edad, sexo: sel.sexo, estatura: sel.estatura,
@@ -1654,8 +1667,9 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                               </div>))
                             : <div className="reco-rich" style={S.recoText} dangerouslySetInnerHTML={{ __html: renderRich(r.texto || '') }} />}
                         </div>
+                        <button style={S.smallBtn} onClick={() => abrirReco(r)} title="Ver cómo se verá el documento (sin enviar correo)">Abrir</button>
                         <button style={S.smallBtn} onClick={() => editarReco(idx)} title="Editar esta recomendación">Editar</button>
-                        <button style={S.smallBtn} onClick={() => generarPDFReco(r)} title="Generar PDF de esta recomendación">PDF</button>
+                        <button style={S.smallBtn} onClick={() => generarPDFReco(r)} title="Generar PDF y enviarlo por correo al paciente">PDF</button>
                         <button style={S.rm} onClick={() => removeReco(idx)} title="Eliminar">×</button>
                       </div>
                     );
