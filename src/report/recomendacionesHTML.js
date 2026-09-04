@@ -14,6 +14,16 @@ const LOGO_NF = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAEhCAYAAADs2
 // Logo por instancia: Aretia usa su logo; Natalia conserva el suyo (idéntico a hoy).
 const LOGO = ES_ARETIA_R ? LOGO_ARETIA : LOGO_NF;
 
+// Paleta del documento por instancia. Natalia conserva EXACTO sus valores cálidos
+// (rama ": ..."); Aretia usa marino + ámbar + tonos fríos (rama "ES_ARETIA_R ? ...").
+const R_TXT    = ES_ARETIA_R ? '#1F2A38' : '#4A443E'; // texto base
+const R_STRONG = ES_ARETIA_R ? '#14202E' : '#3A332C'; // texto fuerte / celdas
+const R_SOFT   = ES_ARETIA_R ? '#5B6B7A' : '#6E645C'; // meta / notas
+const R_MUTE   = ES_ARETIA_R ? '#7C9BBE' : '#A1968C'; // etiquetas atenuadas
+const R_ACC    = ES_ARETIA_R ? '#E0913F' : '#CDA788'; // acento: barras, títulos, borde, web
+const R_RECOBG = ES_ARETIA_R ? '#EEF3FA' : '#FAF6F1'; // fondo del bloque de recomendación
+const R_LINE   = ES_ARETIA_R ? '#D4E1EF' : '#E0D6CB'; // líneas / bordes
+
 // esc() y renderRich() viven en utils/richText.js (fuente única, compartida con la
 // vista en pantalla) para que el PDF y las pantallas nunca se separen.
 
@@ -91,43 +101,51 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suple
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     * { box-sizing: border-box; }
-    body { margin:0; font-family: Arial, Helvetica, sans-serif; color:#4A443E; background:#FFFFFF; }
+    body { margin:0; font-family: Arial, Helvetica, sans-serif; color:${R_TXT}; background:#FFFFFF; }
     .doc { padding:34px 40px; }
     .hdr { display:flex; align-items:center; }
     .hdr img { height:53px; width:auto; display:block; }
-    .gold { height:2px; background:#CDA788; margin:20px 0 22px; }
-    .eyebrow { font-size:11px; letter-spacing:4px; color:#A1968C; font-weight:bold; }
-    .rule { height:2px; width:46px; background:#CDA788; margin:9px 0 18px; }
-    .meta { display:flex; justify-content:space-between; font-size:12px; color:#6E645C; margin-bottom:20px; }
-    .meta b { color:#3A332C; }
-    .reco { border-left:3px solid #CDA788; background:#FAF6F1; padding:13px 16px; margin-bottom:11px; }
-    .rdate { font-size:10px; letter-spacing:1px; color:#A1968C; font-weight:bold; text-transform:uppercase; margin-bottom:5px; }
+    .gold { height:2px; background:${R_ACC}; margin:20px 0 22px; }
+    .eyebrow { font-size:11px; letter-spacing:4px; color:${R_MUTE}; font-weight:bold; }
+    .rule { height:2px; width:46px; background:${R_ACC}; margin:9px 0 18px; }
+    .meta { display:flex; justify-content:space-between; font-size:12px; color:${R_SOFT}; margin-bottom:20px; }
+    .meta b { color:${R_STRONG}; }
+    .reco { border-left:3px solid ${R_ACC}; background:${R_RECOBG}; padding:13px 16px; margin-bottom:11px; }
+    .rdate { font-size:10px; letter-spacing:1px; color:${R_MUTE}; font-weight:bold; text-transform:uppercase; margin-bottom:5px; }
     .rsec { margin-bottom:9px; }
     .rsec:last-child { margin-bottom:0; }
-    .rst { font-size:10px; letter-spacing:1px; color:#CDA788; font-weight:bold; text-transform:uppercase; margin-bottom:3px; }
-    .rtext { font-size:13px; line-height:1.55; white-space:pre-wrap; color:#3A332C; }
+    .rst { font-size:10px; letter-spacing:1px; color:${R_ACC}; font-weight:bold; text-transform:uppercase; margin-bottom:3px; }
+    .rtext { font-size:13px; line-height:1.55; white-space:pre-wrap; color:${R_STRONG}; }
     .rtext ul, .rtext ol { margin:4px 0 4px 20px; padding:0; }
     .rtext li { margin:2px 0; }
     .rtext b, .rtext strong { font-weight:700; }
-    .empty { font-size:13px; color:#A1968C; padding:20px 0; }
+    .empty { font-size:13px; color:${R_MUTE}; padding:20px 0; }
     .suptable { width:100%; border-collapse:collapse; margin-bottom:6px; }
-    .suptable th { text-align:left; font-size:9.5px; letter-spacing:0.5px; text-transform:uppercase; color:#A1968C; padding:6px 8px; border-bottom:1.5px solid #CDA788; }
-    .suptable td { font-size:12px; color:#3A332C; padding:7px 8px; border-bottom:1px solid #E0D6CB; }
+    .suptable th { text-align:left; font-size:9.5px; letter-spacing:0.5px; text-transform:uppercase; color:${R_MUTE}; padding:6px 8px; border-bottom:1.5px solid ${R_ACC}; }
+    .suptable td { font-size:12px; color:${R_STRONG}; padding:7px 8px; border-bottom:1px solid ${R_LINE}; }
     .suptable tr:last-child td { border-bottom:none; }
-    .supnotas { font-size:11.5px; color:#6E645C; margin:8px 0 4px; }
+    .supnotas { font-size:11.5px; color:${R_SOFT}; margin:8px 0 4px; }
     .anatable { width:100%; border-collapse:collapse; margin:6px 0 4px; }
-    .anatable th { text-align:left; font-size:9.5px; letter-spacing:0.5px; text-transform:uppercase; color:#A1968C; padding:6px 8px; border-bottom:1.5px solid #CDA788; }
-    .anatable td { font-size:12px; color:#3A332C; padding:7px 8px; border-bottom:1px solid #E0D6CB; vertical-align:middle; }
+    .anatable th { text-align:left; font-size:9.5px; letter-spacing:0.5px; text-transform:uppercase; color:${R_MUTE}; padding:6px 8px; border-bottom:1.5px solid ${R_ACC}; }
+    .anatable td { font-size:12px; color:${R_STRONG}; padding:7px 8px; border-bottom:1px solid ${R_LINE}; vertical-align:middle; }
     .anatable tr:last-child td { border-bottom:none; }
     .anabadge { display:inline-block; padding:1px 9px; border-radius:999px; font-size:10px; font-weight:bold; color:#FFFFFF; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    .ananorm { font-size:12px; color:#3A332C; padding:4px 0; }
-    .anafoot { font-size:10.5px; color:#A1968C; margin-top:6px; }
-    .ftr { display:flex; justify-content:space-between; align-items:flex-end; border-top:1px solid #E0D6CB; margin-top:18px; padding-top:14px; }
-    .fnut { font-size:10.5px; color:#A1968C; line-height:1.5; }
-    .fweb { font-size:10px; color:#CDA788; font-weight:bold; }
+    .ananorm { font-size:12px; color:${R_STRONG}; padding:4px 0; }
+    .anafoot { font-size:10.5px; color:${R_MUTE}; margin-top:6px; }
+    .ftr { display:flex; justify-content:space-between; align-items:flex-end; border-top:1px solid ${R_LINE}; margin-top:18px; padding-top:14px; }
+    .fnut { font-size:10.5px; color:${R_MUTE}; line-height:1.5; }
+    .fweb { font-size:10px; color:${R_ACC}; font-weight:bold; }${ES_ARETIA_R ? `
+    /* ===== Membrete Aretia (solo esta instancia) ===== */
+    .leadR { display:flex; align-items:center; gap:12px; background:#1E3A5F; color:#fff; margin:-34px -40px 22px; padding:18px 40px; }
+    .leadR .leadRlogo { height:40px; width:40px; flex-shrink:0; display:block; }
+    .leadR .leadRname { font-size:22px; font-weight:800; letter-spacing:1px; line-height:1; }
+    .leadR .leadRtag { font-size:8.5px; letter-spacing:3px; text-transform:uppercase; color:#9FB8D4; margin-top:4px; }
+    .gold { display:none; }` : ''}
   </style></head><body>
     <div class="doc">
-      <div class="hdr"><img src="${LOGO}" alt="NFITNESS 360"/></div>
+      ${ES_ARETIA_R
+        ? `<div class="leadR"><svg class="leadRlogo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" stroke-width="9" stroke-linejoin="miter"/><path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" stroke-width="9" stroke-linejoin="miter"/></svg><div class="leadRtxt"><div class="leadRname">Aretia</div><div class="leadRtag">Del plan al resultado</div></div></div>`
+        : `<div class="hdr"><img src="${LOGO}" alt="NFITNESS 360"/></div>`}
       <div class="gold"></div>
       <div class="eyebrow">RECOMENDACIONES</div>
       <div class="rule"></div>
