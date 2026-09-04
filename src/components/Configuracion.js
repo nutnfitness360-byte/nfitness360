@@ -610,20 +610,20 @@ export default function Configuracion() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5, gridColumn: '1 / -1' }}>
             <span style={B.label}>Nombre / razón social del emisor (como en el SAT)</span>
             <input value={cfdi.emisorNombre} onChange={e => setCfdiCampo('emisorNombre', e.target.value)}
-              placeholder="NATALIA E FLORES BONILLA" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+              placeholder="Nombre o razón social como aparece en el SAT" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <span style={B.label}>Código postal del emisor (lugar de expedición)</span>
             <input value={cfdi.lugarExpedicion} onChange={e => setCfdiCampo('lugarExpedicion', e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
-              inputMode="numeric" placeholder="64000" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+              inputMode="numeric" placeholder="Código postal (5 dígitos)" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <span style={B.label}>Precio de la consulta a facturar (MXN)</span>
             <input value={cfdi.precioConsulta} onChange={e => setCfdiCampo('precioConsulta', e.target.value.replace(/[^0-9.]/g, ''))}
-              inputMode="decimal" placeholder="800" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
+              inputMode="decimal" placeholder="Ej. 800" style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)' }} />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5, gridColumn: '1 / -1' }}>
-            <span style={B.label}>Régimen fiscal del emisor (Natalia)</span>
+            <span style={B.label}>Régimen fiscal del emisor</span>
             <select value={cfdi.regimenEmisor} onChange={e => setCfdiCampo('regimenEmisor', e.target.value)}
               style={{ padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'var(--font)', background: '#fff' }}>
               <option value="">Selecciona…</option>
