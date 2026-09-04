@@ -120,7 +120,11 @@ const nuevaOpcion = () => ({ nombre: '', prep: '', fotoKey: '', fotoAuto: true }
 // Asegura que una opción tenga foto: si no la tiene (o está en "auto"), la empareja por su nombre.
 function conFotoAuto(o) {
   const base = { nombre: '', prep: '', fotoAuto: true, ...o };
-  if (base.fotoAuto !== false && !base.fotoKey) base.fotoKey = matchFotoKey(base.nombre);
+  // Autoasigna foto SIEMPRE que la opción no tenga ya una: una opción sin foto no
+  // tiene nada manual que proteger, así que se empareja por su nombre (aunque venga
+  // guardada con fotoAuto:false). Las fotos elegidas a mano tienen fotoKey con valor,
+  // por lo que quedan intactas. El candado de confianza de matchFoto sigue aplicando.
+  if (!base.fotoKey) { base.fotoKey = matchFotoKey(base.nombre); base.fotoAuto = true; }
   return base;
 }
 const opcionesArr = (n) => Array.from({ length: Math.max(1, n || 1) }, nuevaOpcion);
@@ -523,9 +527,10 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       const nueva = data && data.ok && Array.isArray(data.tiempos) && data.tiempos[0] && Array.isArray(data.tiempos[0].opciones) ? data.tiempos[0].opciones[0] : null;
       if (!nueva) throw new Error((data && data.error) || 'No se recibió la opción.');
-      const prevOp = (tiempos[idx].opciones[oi]) || {};
       const patchOp = { nombre: tituloOracion(nueva.nombre), prep: nueva.prep || '' };
-      if (prevOp.fotoAuto !== false) { patchOp.fotoKey = matchFotoKey(patchOp.nombre); patchOp.fotoAuto = true; }
+      // Al regenerar se obtiene un platillo NUEVO, así que la foto anterior ya no
+      // aplica: se re-empareja siempre por el nuevo nombre (sin importar fotoAuto).
+      patchOp.fotoKey = matchFotoKey(patchOp.nombre); patchOp.fotoAuto = true;
       setOpcion(idx, oi, patchOp);
       setRep('Opción ' + (oi + 1) + ' de ' + t.nombre + ' regenerada. Revísala antes de guardar.');
     } catch (e) {
