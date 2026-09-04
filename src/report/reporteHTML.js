@@ -184,7 +184,7 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
   // y la promesa de marca. Natalia: el encabezado clásico (idéntico al de siempre).
   const headerHTML = ES_ARETIA
     ? `<div class="lead">
-        <div class="leadbrand"><img class="leadlogo" src="${LOGO}"/><div class="leadtxt"><div class="leadname">Aretia</div><div class="leadtag">Del plan al resultado</div></div></div>
+        <div class="leadbrand"><svg class="leadlogo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" stroke-width="9" stroke-linejoin="miter"/><path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" stroke-width="9" stroke-linejoin="miter"/></svg><div class="leadtxt"><div class="leadname">Aretia</div><div class="leadtag">Del plan al resultado</div></div></div>
         <div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">Objetivo: ${esc(objetivo || '—')} · ${kcal} kcal ${distrib}</div></div>
       </div>`
     : `<div class="hdr">
@@ -305,7 +305,7 @@ ${FONT_CSS}
 /* ===== Piel Aretia (solo esta instancia) ===== */
 .lead{display:flex;justify-content:space-between;align-items:center;gap:16px;background:#1E3A5F;color:#fff;padding:6mm 12mm;margin:-13mm -15mm 6mm;}
 .lead .leadbrand{display:flex;align-items:center;gap:12px;}
-.lead .leadlogo{height:36px;display:block;}
+.lead .leadlogo{height:42px;width:42px;display:block;flex-shrink:0;}
 .lead .leadname{font-size:24px;font-weight:800;letter-spacing:1px;line-height:1;}
 .lead .leadtag{font-size:8.5px;letter-spacing:3px;text-transform:uppercase;color:#9FB8D4;margin-top:4px;}
 .lead .leadmeta{text-align:right;}
