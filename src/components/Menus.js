@@ -281,6 +281,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   const [verHistoria, setVerHistoria] = useState(false);
   const [verNotas, setVerNotas] = useState(false);
   const [opBusy, setOpBusy] = useState(''); // "idx:oi" de la opción que se está generando
+  const [ajuBusy, setAjuBusy] = useState(''); // "idx:oi" de la opción cuyos gramajes se están ajustando
   const [listas, setListas] = useState(null);
   const [listaBusy, setListaBusy] = useState(false);
   const [showLista, setShowLista] = useState(false);
@@ -344,6 +345,66 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     if (f.receta) patch.prep = f.receta;
     setOpcion(idx, oi, patch);
     setSugerFoto(null);
+  };
+  // Al TECLEAR (no solo al elegir del desplegable) el nombre de un platillo que existe
+  // en el recetario CON receta, carga su receta base (ingredientes + preparación) si la
+  // preparación está vacía. Así, escribir un platillo conocido trae sus ingredientes e
+  // instrucciones sin tener que abrir el desplegable. Solo con coincidencia EXACTA del
+  // nombre (normalizado) para no cargar una receta equivocada a medio escribir; y nunca
+  // pisa una preparación ya escrita. Usa el estado más reciente (updater funcional) para
+  // no chocar con una elección del desplegable hecha un instante antes.
+  const autocargarRecetaSiVacia = (idx, oi) => {
+    let cambio = false;
+    setTiempos(ts => {
+      const t = ts[idx]; if (!t) return ts;
+      const o = (t.opciones && t.opciones[oi]) || {};
+      const nombre = (o.nombre || '').trim();
+      if (!nombre || (o.prep || '').trim()) return ts;   // ya tiene preparación o no hay nombre
+      const sug = buscarFotos(nombre, 6);
+      if (!sug || !sug.length) return ts;
+      const norm = (s) => (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      const cand = sug.find(f => norm(f.label) === norm(nombre) && f.receta);
+      if (!cand || !cand.receta) return ts;
+      cambio = true;
+      return ts.map((tt, i) => i !== idx ? tt : {
+        ...tt,
+        opciones: (tt.opciones || []).map((oo, k) => {
+          if (k !== oi) return oo;
+          const patch = { ...oo, prep: cand.receta };
+          if (!oo.fotoKey && cand.file) { patch.fotoKey = cand.file; patch.fotoAuto = true; }
+          return patch;
+        }),
+      });
+    });
+    if (cambio) touch();
+  };
+  // Reescribe SOLO los gramajes de una opción para que cuadren con las equivalencias de
+  // su tiempo (mismo platillo, mismos alimentos). Reusa el motor escalarGramajesIA del
+  // backend, aplicado a una sola opción, así el ajuste es rápido y acotado.
+  const ajustarGramajesOpcion = async (idx, oi) => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setRep('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    const t = tiempos[idx];
+    const o = (t && t.opciones && t.opciones[oi]) || {};
+    if (!(o.nombre || '').trim() && !(o.prep || '').trim()) { setRep('Escribe o carga primero el platillo (nombre y preparación) para poder ajustar sus gramajes.'); return; }
+    const equivalentes = t.eq.map((n, g) => ({ grupo: GRUPOS[g][0], n: round2(num(n)) })).filter(x => x.n > 0);
+    if (!equivalentes.length) { setRep('Este tiempo no tiene equivalentes asignados; no hay a qué ajustar los gramajes.'); return; }
+    setAjuBusy(idx + ':' + oi); setRep('Ajustando los gramajes de la opción ' + (oi + 1) + ' de ' + t.nombre + ' a las equivalencias del tiempo…');
+    try {
+      const res = await fetchIA(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'escalarGramajesIA', tiempos: [{ nombre: t.nombre, equivalentes, opciones: [{ nombre: o.nombre || '', prep: o.prep || '' }] }] }),
+        redirect: 'follow',
+      });
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      const nueva = data && data.ok && Array.isArray(data.tiempos) && data.tiempos[0] && Array.isArray(data.tiempos[0].opciones) ? data.tiempos[0].opciones[0] : null;
+      if (!nueva) throw new Error((data && data.error) || 'No se recibió la preparación ajustada.');
+      setOpcion(idx, oi, { prep: (nueva.prep || o.prep || '') });
+      setRep('Gramajes de la opción ' + (oi + 1) + ' de ' + t.nombre + ' ajustados a las equivalencias. Revísalos antes de guardar.');
+    } catch (e) {
+      setRep('No se pudieron ajustar los gramajes: ' + e.message);
+    }
+    setAjuBusy('');
   };
   const [fotoPicker, setFotoPicker] = useState(null);   // { idx, oi } de la opción cuya foto se está eligiendo
   const [fotoQuery, setFotoQuery] = useState('');
@@ -1083,13 +1144,25 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                   <div key={oi} style={S.opt}>
                     <div style={S.optHead}>
                       <span style={S.optTag}>Opción {oi + 1}</span>
-                      <button style={S.optIaBtn} onClick={() => generarOpcionIA(idx, oi)} disabled={iaBusy || opBusy === (idx + ':' + oi)}>{opBusy === (idx + ':' + oi) ? 'Generando…' : 'IA ✦'}</button>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <button style={S.optIaBtn}
+                          onClick={() => ajustarGramajesOpcion(idx, oi)}
+                          disabled={iaBusy || ajuBusy === (idx + ':' + oi) || opBusy === (idx + ':' + oi)}
+                          title="Reescribe los gramajes de esta preparación para que cuadren con las equivalencias de este tiempo (mismo platillo, mismos alimentos)">
+                          {ajuBusy === (idx + ':' + oi) ? 'Ajustando…' : 'Ajustar gramajes ✦'}
+                        </button>
+                        <button style={S.optIaBtn}
+                          onClick={() => generarOpcionIA(idx, oi)}
+                          disabled={iaBusy || opBusy === (idx + ':' + oi) || ajuBusy === (idx + ':' + oi)}>
+                          {opBusy === (idx + ':' + oi) ? 'Generando…' : 'IA ✦'}
+                        </button>
+                      </div>
                     </div>
                     <div style={{ position: 'relative' }}>
                       <input style={S.optName} placeholder="Nombre del platillo" value={o.nombre}
                         onChange={e => setOpcionNombre(idx, oi, e.target.value)}
                         onFocus={() => setSugerFoto({ idx, oi })}
-                        onBlur={() => setTimeout(() => setSugerFoto(s => (s && s.idx === idx && s.oi === oi) ? null : s), 150)} />
+                        onBlur={() => setTimeout(() => { setSugerFoto(s => (s && s.idx === idx && s.oi === oi) ? null : s); autocargarRecetaSiVacia(idx, oi); }, 150)} />
                       {sugerFoto && sugerFoto.idx === idx && sugerFoto.oi === oi && (o.nombre || '').trim().length >= 2 && (() => {
                         const sug = buscarFotos(o.nombre, 6);
                         if (!sug.length) return null;
