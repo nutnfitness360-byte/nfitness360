@@ -51,12 +51,16 @@ export default function LoginPage() {
   // sitio: la instancia de venta (sistemanutricio...) muestra su propio texto; cualquier
   // otra instancia (la de Natalia) conserva el suyo. Así el código es compartido pero
   // cada sitio muestra lo que le toca, sin base de datos de por medio.
+  // Marca por INSTANCIA: variable de entorno REACT_APP_MARCA → respaldo por dominio → Natalia.
+  // El título/subtítulo de portada se pueden fijar por instancia con REACT_APP_PORTADA_*.
+  // Natalia: sin variables y en su dominio → conserva EXACTAMENTE su portada.
   const host = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
-  const esSistemaNutricio = host.indexOf('sistemanutricio') !== -1;
-  const portadaTitulo = esSistemaNutricio ? 'Bienvenido a Aretia' : 'Agenda tu cita con Natalia';
-  const portadaSubtitulo = esSistemaNutricio
+  const _marca = (process.env.REACT_APP_MARCA || '').toLowerCase();
+  const esSistemaNutricio = _marca ? (_marca !== 'natalia') : (host.indexOf('sistemanutricio') !== -1 || host.indexOf('aretia') !== -1);
+  const portadaTitulo = process.env.REACT_APP_PORTADA_TITULO || (esSistemaNutricio ? 'Bienvenido a Aretia' : 'Agenda tu cita con Natalia');
+  const portadaSubtitulo = process.env.REACT_APP_PORTADA_SUBTITULO || (esSistemaNutricio
     ? 'Del plan al resultado: reserva tus consultas, confírmalas y da seguimiento a tu plan.'
-    : 'Este es tu portal para reservar tus consultas, confirmarlas y dar seguimiento a tu plan.';
+    : 'Este es tu portal para reservar tus consultas, confirmarlas y dar seguimiento a tu plan.');
   const [puerta, setPuerta] = useState('paciente'); // nutri | paciente
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
