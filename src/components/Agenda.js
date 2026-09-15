@@ -510,6 +510,11 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                     </div>
                   );
                 })()}
+                {mPaciente.trim() && !mPacienteEmail && (
+                  <div style={{ fontSize: 11.5, color: 'var(--danger)', marginTop: 5, lineHeight: 1.4 }}>
+                    Selecciona el paciente de la lista para poder guardar la cita.
+                  </div>
+                )}
               </div>
             )}
 
@@ -597,7 +602,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
 
             <div className="btn-row">
               <button className="btn-cancel" onClick={cerrarModal}>Cancelar</button>
-              <button className="btn-save" onClick={guardar} disabled={saving || !servSel || !mHora || (isNutri && !mPacienteEmail)}>
+              <button className="btn-save" onClick={guardar} disabled={saving}>
                 {saving ? 'Guardando...' : (usarPaqueteActivo ? 'Agendar con paquete' : (isNutri ? 'Guardar cita' : (((servSel && servSel.online) || mMetodoPago === 'stripe') ? 'Pagar y agendar' : 'Confirmar cita')))}
               </button>
             </div>
