@@ -30,8 +30,12 @@ export function aplicarColores(colors) {
   // 3 llaves, así que sin esto los encabezados de tabla y bordes del Plan/Menús saldrían en el café
   // por defecto de Nfitness. Solo corre en el dominio de Aretia → Natalia queda EXACTAMENTE igual.
   try {
+    // Marca por INSTANCIA: variable de entorno REACT_APP_MARCA → respaldo por dominio → Natalia.
+    // Natalia: sin variable y en su dominio → esAretia=false → sin override → idéntico a hoy.
+    const _marca = (process.env.REACT_APP_MARCA || '').toLowerCase();
     const host = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
-    if (host.indexOf('sistemanutricio') !== -1) {
+    const esAretia = _marca ? (_marca !== 'natalia') : (host.indexOf('sistemanutricio') !== -1 || host.indexOf('aretia') !== -1);
+    if (esAretia) {
       const s = document.documentElement.style;
       if (!colors.pine || colors.pine === DEFAULT_COLORS.pine) s.setProperty('--pine', '#1E3A5F');
       if (!colors.line || colors.line === DEFAULT_COLORS.line) s.setProperty('--line', '#CBD8E6');
