@@ -354,6 +354,10 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
           });
           let d; try { d = JSON.parse(await res.text()); } catch (_) { d = null; }
           if (d && d.eventId) { try { await updateDoc(doc(db, 'citas', ref.id), { eventId: d.eventId }); } catch (e) {} }
+          // Avisar si el correo de confirmación NO se pudo enviar (la cita ya quedó agendada de todos modos).
+          if (d && d.ok && d.correoEnviado === false) {
+            alert('La cita quedó agendada, pero no se pudo enviar el correo de confirmación al paciente. Revisa que el correo del paciente sea correcto y los permisos de Gmail en el servidor.');
+          }
         } catch (e) { /* el evento/correo es secundario; la cita ya quedó guardada */ }
       }
       // Si venimos de "Reagendar": cancelar la cita anterior ahora que la nueva ya quedó.
