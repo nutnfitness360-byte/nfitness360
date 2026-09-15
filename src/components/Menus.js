@@ -51,6 +51,30 @@ const round2 = (n) => Math.round((num(n) + Number.EPSILON) * 100) / 100;
 const fmt = (n) => String(round2(n)); // muestra decimales tal cual (2.5, 2, 0.6) sin redondear a entero
 const uid = () => Math.random().toString(36).slice(2, 9);
 
+// fetch con RED DE SEGURIDAD de tiempo: NO es para cortar generaciones normales
+// (una generación real suele tardar bastante menos de un minuto). Es solo el tope
+// máximo (3 min por defecto) para el caso en que la conexión se cae de verdad y la
+// petición se queda colgada para siempre: en vez de dejar el overlay pegado
+// obligando a recargar, se aborta y se muestra un mensaje. La espera normal se
+// acompaña con la barra de actividad y el cronómetro de la ventana de carga.
+async function fetchIA(url, opts, ms = 180000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } catch (e) {
+    if (e && (e.name === 'AbortError' || e.code === 20)) {
+      throw new Error('la conexión tardó demasiado y se canceló. Revisa tu internet e inténtalo de nuevo.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// Formatea segundos como m:ss para el cronómetro de la ventana de carga.
+const mmss = (s) => Math.floor(s / 60) + ':' + String(Math.max(0, s) % 60).padStart(2, '0');
+
 // Clasifica un tiempo a una columna de GW [Desayuno, Col AM, Comida, Col PM, Cena]
 // según su NOMBRE (y la hora como respaldo), NO según su posición.
 function tiempoCol(nombre, hora) {
@@ -251,6 +275,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   }, [patient.id]);
   const [rep, setRep] = useState('');
   const [iaBusy, setIaBusy] = useState(false);
+  const [cargaSeg, setCargaSeg] = useState(0);   // cronómetro de la ventana de carga
   // Consideración GENERAL para la IA (aplica a todo el plan, no a un tiempo puntual).
   const [consideracionGral, setConsideracionGral] = useState('');
   const [verHistoria, setVerHistoria] = useState(false);
@@ -428,7 +453,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         // literal y devuelve siempre el mismo platillo.
         return { nombre: t.nombre, hora: t.hora, indicacion: ind, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) }, evitar };
       });
-      const res = await fetch(url, {
+      const res = await fetchIA(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'generarMenusIA', objetivo: patient.objetivo || '', consideraciones: (consideracionGral || '').trim(), totales: plan.totales || {}, tiempos: payloadTiempos, nOpciones, gustos: ((patient.historia && patient.historia.dietetica && patient.historia.dietetica.leGusta) || '').trim(), disgustos: ((patient.historia && patient.historia.dietetica && patient.historia.dietetica.noLeGusta) || '').trim(), alergias: ((patient.historia && patient.historia.dietetica && patient.historia.dietetica.alergias) || '').trim() }),
         redirect: 'follow',
@@ -476,7 +501,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         const t = tiempos[i];
         return { nombre: t.nombre, hora: t.hora, opciones: (t.opciones || []).map(o => ({ nombre: o.nombre || '', prep: o.prep || '' })) };
       });
-      const res = await fetch(url, {
+      const res = await fetchIA(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'ajustarMenuIA', objetivo: patient.objetivo || '', nota, tiempos: payloadTiempos }),
         redirect: 'follow',
@@ -519,7 +544,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       const evitar = (t.opciones || []).map(o => (o.nombre || '').trim()).filter(Boolean);
       const indOp = (t.indicacion || '').trim();
       const payloadTiempos = [{ nombre: t.nombre, hora: t.hora, indicacion: indOp, equivalentes, objetivoMacros: { kcal: r0(en.kcal), prot: r0(en.prot), lip: r0(en.lip), hc: r0(en.hc) }, evitar }];
-      const res = await fetch(url, {
+      const res = await fetchIA(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'generarMenusIA', regenerar: true, objetivo: patient.objetivo || '', consideraciones: (consideracionGral || '').trim(), totales: plan.totales || {}, tiempos: payloadTiempos, nOpciones: 1, gustos: ((patient.historia && patient.historia.dietetica && patient.historia.dietetica.leGusta) || '').trim(), disgustos: ((patient.historia && patient.historia.dietetica && patient.historia.dietetica.noLeGusta) || '').trim(), alergias: ((patient.historia && patient.historia.dietetica && patient.historia.dietetica.alergias) || '').trim() }),
         redirect: 'follow',
@@ -556,7 +581,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     if (!url) throw new Error('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.');
     const opciones = construirOpcionesLista();
     if (!opciones.length) return [];
-    const res = await fetch(url, {
+    const res = await fetchIA(url, {
       method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'listaSuperIA', dias: 5, objetivo: patient.objetivo || '', opciones }),
       redirect: 'follow',
@@ -661,10 +686,10 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       const fechaTxt = new Date().toLocaleDateString('es-MX').replace(/\//g, '-');
       const baseNombre = 'Plan nutricional ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt;
       const filename = baseNombre + '.pdf';
-      const res = await fetch(url, {
+      const res = await fetchIA(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'savePlan', patient: patient.nombre, correo: (patient.correo || ''), filename, html }), redirect: 'follow',
-      });
+      }, 180000);
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (data.ok && data.link) {
         const nuevo = { nombre: baseNombre, fecha: new Date().toISOString().slice(0, 10), link: data.link };
@@ -677,10 +702,10 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
             setRep('Generando la tabla de equivalencias…');
             const htmlEq = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos, incluirMenus: false, incluirEquivalencias: true, listas: null, fotoData: {} });
             const baseEq = 'Tabla de equivalencias ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt;
-            const resEq = await fetch(url, {
+            const resEq = await fetchIA(url, {
               method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
               body: JSON.stringify({ action: 'savePlan', patient: patient.nombre, correo: (patient.correo || ''), filename: baseEq + '.pdf', html: htmlEq, enviarCorreo: false }), redirect: 'follow',
-            });
+            }, 180000);
             let dEq; try { dEq = JSON.parse(await resEq.text()); } catch (_) { dEq = { ok: false }; }
             if (dEq.ok && dEq.link) archivosNuevos.push({ nombre: baseEq, fecha: new Date().toISOString().slice(0, 10), link: dEq.link });
           } catch (e) { /* la tabla de equivalencias es adicional; no bloquea el guardado del plan */ }
@@ -711,6 +736,19 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   // Mostrar la ventana de carga mientras la IA trabaja o se guarda el plan (incluida la tabla de equivalencias).
   const cargando = iaBusy || listaBusy || status === 'guardando';
   const cargaTexto = (rep && rep.trim()) ? rep : 'Trabajando…';
+  // Cronómetro + mensajes escalonados: mientras trabaja, cuenta los segundos y va
+  // cambiando el texto para que se vea que sigue activo (y no colgado).
+  useEffect(() => {
+    if (!cargando) { setCargaSeg(0); return undefined; }
+    setCargaSeg(0);
+    const t = setInterval(() => setCargaSeg(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [cargando]);
+  const cargaFase =
+    cargaSeg < 12 ? 'Esto puede tardar unos segundos.'
+    : cargaSeg < 35 ? 'Seguimos trabajando… la IA está armando la información.'
+    : cargaSeg < 75 ? 'Aún en proceso, no cierres ni recargues la ventana.'
+    : 'Casi listo, gracias por tu paciencia…';
 
   if (!planEq || usados.length === 0) {
     return (
@@ -733,7 +771,9 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
           <div style={S.cargaCard}>
             <div style={S.cargaSpin} />
             <div style={S.cargaMsg}>{cargaTexto}</div>
-            <div style={S.cargaSub}>Esto puede tardar unos segundos. No cierres ni recargues la ventana.</div>
+            <div style={S.cargaBarTrack}><div style={S.cargaBarFill} /></div>
+            <div style={S.cargaSub}>{cargaFase} No cierres ni recargues la ventana.</div>
+            <div style={S.cargaTimer}>Tiempo transcurrido: {mmss(cargaSeg)}</div>
           </div>
         </div>
       )}
@@ -1201,7 +1241,10 @@ const styles = {
   cargaCard: { background: 'var(--card)', borderRadius: 16, padding: '30px 34px', width: 'min(340px, 88vw)', textAlign: 'center', boxShadow: '0 18px 50px rgba(20,40,63,0.30)', fontFamily: mono },
   cargaSpin: { width: 42, height: 42, margin: '0 auto 16px', borderRadius: '50%', border: '4px solid var(--line)', borderTopColor: 'var(--gold)', animation: 'nfspin 0.8s linear infinite' },
   cargaMsg: { fontSize: 14, fontWeight: 700, color: 'var(--pine)', lineHeight: 1.5 },
+  cargaBarTrack: { position: 'relative', width: '100%', height: 6, borderRadius: 999, background: 'var(--line)', overflow: 'hidden', margin: '14px 0 10px' },
+  cargaBarFill: { position: 'absolute', top: 0, bottom: 0, width: '40%', borderRadius: 999, background: 'var(--gold)', animation: 'nfbar 1.15s ease-in-out infinite' },
   cargaSub: { fontSize: 12, color: 'var(--stone)', marginTop: 8, lineHeight: 1.5 },
+  cargaTimer: { fontSize: 11, color: 'var(--stone)', marginTop: 6, fontWeight: 600 },
   // Foto por opción
   optFotoRow: { display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 },
   optFotoThumb: { width: 120, height: 120, borderRadius: 12, objectFit: 'cover', border: '2px solid ' + T.amber, flexShrink: 0, boxShadow: '0 4px 14px rgba(0,0,0,0.12)' },
@@ -1310,6 +1353,7 @@ const styles = {
 
 const css = `
 @keyframes nfspin { to { transform: rotate(360deg); } }
+@keyframes nfbar { 0% { left: -42%; } 100% { left: 100%; } }
 .nf-primary:hover { background: #C0986F; }
 input:focus, textarea:focus { outline: none; border-color: ${T.amber} !important; box-shadow: 0 0 0 3px rgba(205,167,136,0.25); }
 `;
