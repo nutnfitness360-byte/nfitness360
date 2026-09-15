@@ -9,9 +9,12 @@ import Configuracion from '../components/Configuracion';
 
 function initials(name) { return name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'NU'; }
 const SERVICIOS_NOMBRES_DEFAULT = ['Primera vez', 'Seguimiento', 'Deportivo', 'Seguimiento deportivo', 'Online', 'Deportivo online'];
-// Marca por instancia (por dominio): Aretia en la instancia de venta; Natalia en la suya.
-const ES_ARETIA_D = (typeof window !== 'undefined' && window.location && window.location.hostname.indexOf('sistemanutricio') !== -1);
-const MARCA_NOMBRE = ES_ARETIA_D ? 'Aretia' : 'Nfitness 360';
+// Marca por INSTANCIA: variable de entorno REACT_APP_MARCA → respaldo por dominio → Natalia.
+// Natalia: sin variable y en su dominio → ES_ARETIA_D=false, MARCA_NOMBRE='Nfitness 360' (idéntico a hoy).
+const _MARCA_D = (process.env.REACT_APP_MARCA || '').toLowerCase();
+const _HOST_D = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
+const ES_ARETIA_D = _MARCA_D ? (_MARCA_D !== 'natalia') : (_HOST_D.indexOf('sistemanutricio') !== -1 || _HOST_D.indexOf('aretia') !== -1);
+const MARCA_NOMBRE = process.env.REACT_APP_MARCA_NOMBRE || (ES_ARETIA_D ? 'Aretia' : 'Nfitness 360');
 const money = (n) => '$' + Math.round(n || 0).toLocaleString('es-MX');
 const uid = () => Math.random().toString(36).slice(2, 9);
 
