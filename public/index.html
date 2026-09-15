@@ -20,7 +20,8 @@
          EXACTAMENTE igual. */
       (function () {
         try {
-          if (location.hostname.indexOf('sistemanutricio') === -1) return;
+          var h = location.hostname;
+          if (h.indexOf('sistemanutricio') === -1 && h.indexOf('aretia') === -1) return;
           function setLink(rel, href, type, sizes) {
             var sel = 'link[rel="' + rel + '"]' + (sizes ? '[sizes="' + sizes + '"]' : '');
             var l = document.querySelector(sel);
