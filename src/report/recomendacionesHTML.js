@@ -2,10 +2,19 @@ import { esc, renderRich } from '../utils/richText';
 import { LOGO_ARETIA } from "./logoAretia";
 
 // Firma del pie por instancia (por dominio): Aretia genérica (sin cédula); Natalia conserva la suya.
-const ES_ARETIA_R = (typeof window !== 'undefined' && window.location && window.location.hostname.indexOf('sistemanutricio') !== -1);
-const FIRMA_NOMBRE = ES_ARETIA_R ? 'Aretia' : 'MSc. Natalia E. Flores Bonilla';
-const FIRMA_LINEA2 = ES_ARETIA_R ? 'Del plan al resultado' : 'Céd. Prof. 12278012 · natalia.db@live.com';
-const FIRMA_WEB = ES_ARETIA_R ? 'aretia.mx' : 'nfitness360.com';
+// Marca por INSTANCIA (variable de entorno REACT_APP_MARCA → respaldo por dominio → Natalia).
+// Natalia: sin variable y en su dominio → ES_ARETIA_R=false → firma/pie idénticos a hoy.
+const _MARCA_R = (process.env.REACT_APP_MARCA || '').toLowerCase();
+const _HOST_R = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
+const ES_ARETIA_R = _MARCA_R ? (_MARCA_R !== 'natalia') : (_HOST_R.indexOf('sistemanutricio') !== -1 || _HOST_R.indexOf('aretia') !== -1);
+const _CED_R = process.env.REACT_APP_NUTRI_CEDULA || 'Céd. Prof. 12278012';
+const _COR_R = process.env.REACT_APP_NUTRI_CORREO || 'natalia.db@live.com';
+const FIRMA_NOMBRE = process.env.REACT_APP_NUTRI_NOMBRE || (ES_ARETIA_R ? 'Aretia' : 'MSc. Natalia E. Flores Bonilla');
+const FIRMA_LINEA2 = process.env.REACT_APP_NUTRI_LINEA2
+  || ((ES_ARETIA_R && !process.env.REACT_APP_NUTRI_CEDULA) ? 'Del plan al resultado' : `${_CED_R} · ${_COR_R}`);
+const FIRMA_WEB = process.env.REACT_APP_MARCA_WEB || (ES_ARETIA_R ? 'aretia.mx' : 'nfitness360.com');
+const MARCA_NOMBRE_R = process.env.REACT_APP_MARCA_NOMBRE || 'Aretia';
+const MARCA_TAG_R = process.env.REACT_APP_MARCA_TAG || 'Del plan al resultado';
 
 // PDF de Recomendaciones (HTML -> Google lo convierte a PDF en Apps Script).
 // Formato vertical, fondo BLANCO, identidad de marca NF360 (logo real + acento dorado).
@@ -144,7 +153,7 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suple
   </style></head><body>
     <div class="doc">
       ${ES_ARETIA_R
-        ? `<div class="leadR"><svg class="leadRlogo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" stroke-width="9" stroke-linejoin="miter"/><path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" stroke-width="9" stroke-linejoin="miter"/></svg><div class="leadRtxt"><div class="leadRname">Aretia</div><div class="leadRtag">Del plan al resultado</div></div></div>`
+        ? `<div class="leadR"><svg class="leadRlogo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" stroke-width="9" stroke-linejoin="miter"/><path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" stroke-width="9" stroke-linejoin="miter"/></svg><div class="leadRtxt"><div class="leadRname">${esc(MARCA_NOMBRE_R)}</div><div class="leadRtag">${esc(MARCA_TAG_R)}</div></div></div>`
         : `<div class="hdr"><img src="${LOGO}" alt="NFITNESS 360"/></div>`}
       <div class="gold"></div>
       <div class="eyebrow">RECOMENDACIONES</div>
