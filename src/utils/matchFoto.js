@@ -11,6 +11,7 @@
 // devuelve la mejor coincidencia + alternativas.
 
 import BANCO_FOTOS from '../data/bancoFotos';
+import RECETARIO from '../data/recetario';
 
 // Carpeta pública donde se sirven las imágenes estáticas (Vercel).
 export const FOTO_BASE = '/menu-images/';
@@ -27,6 +28,23 @@ function norm(s) {
 }
 function tokens(s) {
   return norm(s).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w && !FILLERS.has(w));
+}
+
+// ─── Receta por nombre de platillo ───────────────────────────────────────────
+// RECETARIO es un mapa { nombre-normalizado : preparación } (src/data/recetario.js).
+// recetaDe() devuelve la preparación (ingredientes + gramajes) de un platillo cuyo
+// nombre coincide EXACTO con el recetario (normalizado). Si no está, devuelve ''.
+function recetaDe(label) {
+  const k = norm(String(label == null ? '' : label).trim());
+  return (k && Object.prototype.hasOwnProperty.call(RECETARIO, k)) ? RECETARIO[k] : '';
+}
+// Adjunta .receta (si existe en el recetario) a una entrada del banco, sin pisar
+// una receta que la propia entrada ya traiga. No muta la entrada original.
+function conReceta(it) {
+  if (!it) return it;
+  if (it.receta) return it;
+  const r = recetaDe(it.label);
+  return r ? { ...it, receta: r } : it;
 }
 
 // ─── Fruta predominante como imagen ──────────────────────────────────────────
@@ -168,7 +186,7 @@ export function buscarFotos(q, limit = 40) {
   const f = norm(q);
   const fJoin = f.replace(/[^a-z0-9]/g, '');   // forma pegada del texto buscado
   const banco = [...customEntries(), ...BANCO_FOTOS];
-  if (!f) return banco.slice(0, limit);
+  if (!f) return banco.slice(0, limit).map(conReceta);
   const qToks = tokens(q);
   // Puntúa cada foto por relevancia para que la MEJOR salga primero:
   // igual exacto > empieza con > contiene la frase > palabras sueltas > claves.
@@ -191,7 +209,7 @@ export function buscarFotos(q, limit = 40) {
     if (score > 0) scored.push({ it, score });
   });
   scored.sort((a, b) => b.score - a.score || (a.it.label || '').length - (b.it.label || '').length);
-  return scored.slice(0, limit).map(x => x.it);
+  return scored.slice(0, limit).map(x => conReceta(x.it));
 }
 
 // ---- Para el PDF: convierte una foto a data URL (base64) ----
