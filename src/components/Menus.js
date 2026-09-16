@@ -333,6 +333,8 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     const patch = { nombre: val };
     if (o.fotoAuto !== false) { patch.fotoKey = matchFotoKey(val); patch.fotoAuto = true; }
     setOpcion(idx, oi, patch);
+    // Mientras reescribe el nombre, quita el aviso de "elige de la lista" de esa opción.
+    setAvisoReceta(a => (a && a.idx === idx && a.oi === oi) ? null : a);
   };
   // Foto elegida a mano (deja de ser "auto").
   const setOpcionFoto = (idx, oi, key) => setOpcion(idx, oi, { fotoKey: key || '', fotoAuto: false });
@@ -345,6 +347,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     if (f.receta) patch.prep = f.receta;
     setOpcion(idx, oi, patch);
     setSugerFoto(null);
+    setAvisoReceta(a => (a && a.idx === idx && a.oi === oi) ? null : a);
   };
   // Al TECLEAR (no solo al elegir del desplegable) el nombre de un platillo que existe
   // en el recetario CON receta, carga su receta base (ingredientes + preparación) si la
@@ -355,6 +358,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   // no chocar con una elección del desplegable hecha un instante antes.
   const autocargarRecetaSiVacia = (idx, oi) => {
     let cambio = false;
+    let sugerirLista = false;   // hay platillos con receta pero ninguno coincide EXACTO → avisar
     setTiempos(ts => {
       const t = ts[idx]; if (!t) return ts;
       const o = (t.opciones && t.opciones[oi]) || {};
@@ -364,7 +368,12 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       if (!sug || !sug.length) return ts;
       const norm = (s) => (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
       const cand = sug.find(f => norm(f.label) === norm(nombre) && f.receta);
-      if (!cand || !cand.receta) return ts;
+      if (!cand || !cand.receta) {
+        // No hubo coincidencia exacta. Si en la lista hay platillos CON receta, marcamos
+        // que se muestre el aviso para que la persona elija uno (no cargamos nada solos).
+        if (sug.some(f => f.receta)) sugerirLista = true;
+        return ts;
+      }
       cambio = true;
       return ts.map((tt, i) => i !== idx ? tt : {
         ...tt,
@@ -376,7 +385,8 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         }),
       });
     });
-    if (cambio) touch();
+    if (cambio) { setAvisoReceta(a => (a && a.idx === idx && a.oi === oi) ? null : a); touch(); }
+    else setAvisoReceta(sugerirLista ? { idx, oi } : (a => (a && a.idx === idx && a.oi === oi) ? null : a));
   };
   // Reescribe SOLO los gramajes de una opción para que cuadren con las equivalencias de
   // su tiempo (mismo platillo, mismos alimentos). Reusa el motor escalarGramajesIA del
@@ -416,6 +426,11 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   // guarda { idx, oi } de la opción cuyo input está enfocado (para mostrar
   // el desplegable de sugerencias solo en esa opción).
   const [sugerFoto, setSugerFoto] = useState(null);
+  // { idx, oi } de la opción donde se tecleó un nombre que NO coincide EXACTO con un
+  // platillo del recetario con receta, pero sí hay sugerencias con receta disponibles.
+  // Mantiene la lista abierta con un aviso para que la persona elija de ahí. Se limpia
+  // al elegir un platillo, al retomar el nombre o cuando ya hay preparación.
+  const [avisoReceta, setAvisoReceta] = useState(null);
   // Banco de fotos DINÁMICO (fotos que sube la nutrióloga), guardado en Firestore.
   useEffect(() => onSnapshot(collection(db, 'bancoFotos'), snap => {
     const arr = snap.docs.map(d => d.data());
@@ -1163,12 +1178,19 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                         onChange={e => setOpcionNombre(idx, oi, e.target.value)}
                         onFocus={() => setSugerFoto({ idx, oi })}
                         onBlur={() => setTimeout(() => { setSugerFoto(s => (s && s.idx === idx && s.oi === oi) ? null : s); autocargarRecetaSiVacia(idx, oi); }, 150)} />
-                      {sugerFoto && sugerFoto.idx === idx && sugerFoto.oi === oi && (o.nombre || '').trim().length >= 2 && (() => {
+                      {(() => {
+                        const enfocado = sugerFoto && sugerFoto.idx === idx && sugerFoto.oi === oi;
+                        const avisando = avisoReceta && avisoReceta.idx === idx && avisoReceta.oi === oi;
+                        if ((!enfocado && !avisando) || (o.nombre || '').trim().length < 2) return null;
                         const sug = buscarFotos(o.nombre, 6);
                         if (!sug.length) return null;
                         return (
                           <div style={S.sugBox}>
-                            <div style={S.sugHint}>Platillos del banco — toca uno para cargar foto, nombre y receta</div>
+                            <div style={avisando && !enfocado ? { ...S.sugHint, color: '#B45309', fontWeight: 600 } : S.sugHint}>
+                              {avisando && !enfocado
+                                ? 'No encontré ese platillo en tu recetario — elige uno de la lista para cargar su receta:'
+                                : 'Platillos del banco — toca uno para cargar foto, nombre y receta'}
+                            </div>
                             {sug.map(f => (
                               <button key={f.file} type="button" style={S.sugItem}
                                 onMouseDown={e => { e.preventDefault(); elegirPlatilloSugerido(idx, oi, f); }}>
