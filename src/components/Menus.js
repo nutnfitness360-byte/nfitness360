@@ -98,7 +98,13 @@ function prepConGramajes(nombre, eq, recetaOriginal){
       out.push(_CLBL[g]+': '+base+' — '+c);
     }
     if (!out.length) return recetaOriginal || '';
-    return out.join('\n') + (recetaOriginal ? ('\n\nPreparación: '+recetaOriginal) : '');
+    // Extraer SOLO el método: si recetaOriginal ya trae una lista de componentes seguida de
+    // "\n\nPreparación:", nos quedamos con lo que va después (evita duplicar la lista).
+    var metodo = String(recetaOriginal || '');
+    var _pi = metodo.indexOf('\n\nPreparación:');
+    if (_pi !== -1) metodo = metodo.slice(_pi + 2).replace(/^Preparación:\s*/, '');
+    metodo = metodo.trim();
+    return out.join('\n') + (metodo ? ('\n\nPreparación: ' + metodo) : '');
   } catch (e) { return recetaOriginal || ''; }
 }
 
@@ -452,6 +458,14 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
     if (!(o.nombre || '').trim() && !(o.prep || '').trim()) { setRep('Escribe o carga primero el platillo (nombre y preparación) para poder ajustar sus gramajes.'); return; }
     const equivalentes = t.eq.map((n, g) => ({ grupo: GRUPOS[g][0], n: round2(num(n)) })).filter(x => x.n > 0);
     if (!equivalentes.length) { setRep('Este tiempo no tiene equivalentes asignados; no hay a qué ajustar los gramajes.'); return; }
+    // Si el platillo está estructurado, ajustamos con el MOTOR DETERMINISTA (mismo formato que el
+    // auto-cargado, instantáneo y sin IA). Solo caemos a la IA para platillos no estructurados.
+    if (COMPONENTES[_cnorm(o.nombre || '')]) {
+      const prepDet = prepConGramajes(o.nombre || '', t.eq, o.prep || '');
+      setOpcion(idx, oi, { prep: prepDet }); touch();
+      setRep('Gramajes de la opción ' + (oi + 1) + ' de ' + t.nombre + ' ajustados a las equivalencias (cálculo exacto). Revísalos antes de guardar.');
+      return;
+    }
     setAjuBusy(idx + ':' + oi); setRep('Ajustando los gramajes de la opción ' + (oi + 1) + ' de ' + t.nombre + ' a las equivalencias del tiempo…');
     try {
       const res = await fetchIA(url, {
