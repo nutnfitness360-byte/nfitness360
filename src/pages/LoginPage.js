@@ -47,9 +47,6 @@ export default function LoginPage() {
   const [vista, setVista] = useState('inicio');     // inicio | acceso | email | crear | denegado
   const { logo } = useBranding();
   const logoSrc = (logo === undefined) ? (process.env.REACT_APP_LOGO_URL || '/logo.png') : logo;
-  // ¿Estamos usando el logo por instancia (env)? Suele ser un logotipo ANCHO (banner),
-  // así que se limita por alto y ancho para que no se encime con la columna de la derecha.
-  const usaLogoEnv = (logo === undefined) && !!process.env.REACT_APP_LOGO_URL;
   // Título de portada FIJO por instancia (no editable). Se decide por el dominio del
   // sitio: la instancia de venta (sistemanutricio...) muestra su propio texto; cualquier
   // otra instancia (la de Natalia) conserva el suyo. Así el código es compartido pero
@@ -253,7 +250,10 @@ export default function LoginPage() {
 
             {/* Columna izquierda: mensaje + pasos */}
             <div>
-              {logoSrc ? <img src={logoSrc} alt="" style={usaLogoEnv ? { ...S.lLogo, height: 'auto', width: 'auto', maxHeight: 72, maxWidth: 300 } : { ...S.lLogo, height: esSistemaNutricio ? 88 : S.lLogo.height }} /> : null}
+              {/* Logo de portada: limitado por ALTO y ANCHO (sin deformar) venga de env o de config/branding.
+                  Natalia/Aretia usan su alto de siempre (maxHeight) y su logo compacto no llega al tope de ancho;
+                  un logo ANCHO (p. ej. Fitmeal) se topa en maxWidth y ya no se encima con la columna derecha. */}
+              {logoSrc ? <img src={logoSrc} alt="" style={{ ...S.lLogo, height: 'auto', width: 'auto', maxHeight: esSistemaNutricio ? 88 : S.lLogo.height, maxWidth: 260 }} /> : null}
               <div style={S.lHead}>{portadaTitulo}</div>
               <div style={S.lSub}>{portadaSubtitulo}</div>
               <div style={S.lStepsLbl}>CÓMO AGENDAR</div>
