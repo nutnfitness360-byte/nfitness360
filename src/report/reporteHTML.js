@@ -1,4 +1,5 @@
 import { LOGO_ARETIA } from "./logoAretia";
+import { LOGO_FITMEAL } from "./logoFitmeal";
 /* ============================================================
    NFITNESS 360 — Generador del reporte horizontal (HTML)
    Se envía al Apps Script, que lo convierte a PDF y lo sube a
@@ -14,6 +15,8 @@ const LOGO_NF = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAEhCAYAAADs2
 const _MARCA = (process.env.REACT_APP_MARCA || '').toLowerCase();
 const _HOST = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
 const ES_ARETIA = _MARCA ? (_MARCA !== 'natalia') : (_HOST.indexOf('sistemanutricio') !== -1 || _HOST.indexOf('aretia') !== -1);
+// Instancia Fitmeal: usa su logo OSCURO en los PDF (papel blanco). Se detecta por el nombre de marca.
+const ES_FITMEAL = (process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'fitmeal';
 // Nombre de marca y promesa del membrete (configurables por instancia; por defecto Aretia).
 const MARCA_NOMBRE = process.env.REACT_APP_MARCA_NOMBRE || 'Aretia';
 const MARCA_TAG = process.env.REACT_APP_MARCA_TAG || 'Del plan al resultado';
@@ -30,7 +33,7 @@ const TOTBG  = ES_ARETIA ? '#EAF1F8' : '#FBF7F2';   // fondo de la fila "Total" 
 
 // Marca por instancia (por dominio): la instancia de venta (sistemanutricio…) es
 // Aretia; cualquier otra (Natalia) conserva su membrete y logo. (ES_ARETIA se define arriba.)
-export const LOGO = ES_ARETIA ? LOGO_ARETIA : LOGO_NF;
+export const LOGO = ES_FITMEAL ? LOGO_FITMEAL : (ES_ARETIA ? LOGO_ARETIA : LOGO_NF);
 
 // Datos de membrete, mostrados en cada página del reporte.
 export const NUTRI_NOMBRE = process.env.REACT_APP_NUTRI_NOMBRE || (ES_ARETIA ? 'Aretia' : 'MSc. Natalia E. Flores Bonilla');
@@ -40,7 +43,8 @@ export const NUTRI_CORREO = process.env.REACT_APP_NUTRI_CORREO || 'natalia.db@li
 // legal obligatorio). Aretia sin cédula propia: la promesa de marca. Natalia: cédula + correo (idéntico a hoy).
 export const NUTRI_LINEA2 = process.env.REACT_APP_NUTRI_LINEA2
   || ((ES_ARETIA && !process.env.REACT_APP_NUTRI_CEDULA) ? 'Del plan al resultado' : `${NUTRI_CEDULA} · ${NUTRI_CORREO}`);
-const CORNER_BLOCK = `<div class="corner"><img src="${LOGO}"/><div class="signature">${NUTRI_NOMBRE}<br/>${NUTRI_LINEA2}</div></div>`;
+// El bloque de firma/membrete ahora se arma POR LLAMADA dentro de buildReportHTML,
+// para soportar un `perfil` por nutriólogo (multi-inquilino). Sin perfil = datos de la instancia.
 
 const GSHORT = ['Cereales', 'Cereales c/grasa', 'Leguminosas', 'Verdura', 'Fruta', 'P. animal MB', 'P. animal B', 'P. animal M', 'P. animal A', 'Leche desc.', 'Leche semi', 'Leche entera', 'Leche c/az.', 'Grasas', 'Grasas c/prot', 'Azúcares', 'Az. c/grasa', 'Libres'];
 
@@ -169,7 +173,12 @@ function mealRow(t, nCols, fotoData) {
   </div>`;
 }
 
-export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus = true, incluirEquivalencias = true, listas = null, fotoData = {} }) {
+export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus = true, incluirEquivalencias = true, listas = null, fotoData = {}, perfil = null }) {
+  // Identidad del PDF: con `perfil` (multi-nutriólogo) usa SUS datos; sin él, los de la instancia (env).
+  const _logo = (perfil && perfil.logo) || LOGO;
+  const _nombre = (perfil && perfil.nombre) || NUTRI_NOMBRE;
+  const _linea2 = (perfil && perfil.linea2) || NUTRI_LINEA2;
+  const cornerBlock = `<div class="corner"><img src="${_logo}"/><div class="signature">${_nombre}<br/>${_linea2}</div></div>`;
   plan = plan || {};
   tiempos = Array.isArray(tiempos) ? tiempos : [];
   const planEq = Array.isArray(plan.eq) ? plan.eq.map(num) : Array(18).fill(0);
@@ -212,7 +221,7 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
     menuPages.push(`<div class="page">
       ${headerHTML}
       ${chunk}
-      ${CORNER_BLOCK}
+      ${cornerBlock}
     </div>`);
   }
 
@@ -227,7 +236,7 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
   const eqPage = `<div class="page">
     <div class="ptitle">EQUIVALENCIAS POR TIEMPO</div>
     <table class="eqt">${head}${rows}</table>
-    ${CORNER_BLOCK}
+    ${cornerBlock}
   </div>`;
 
   // Página de referencia: base de equivalencias de alimentos (1 ración = 1 equivalente)
@@ -237,7 +246,7 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
   const refPage = `<div class="page">
     <div class="ptitle">EQUIVALENCIAS · 1 RACIÓN EQUIVALE A:</div>
     <div class="gwrap" style="grid-template-columns:repeat(${Object.keys(EQUIV_DB).length},1fr);">${refCols}</div>
-    ${CORNER_BLOCK}
+    ${cornerBlock}
   </div>`;
 
   // páginas de lista del súper: una por opción (solo si se incluyen menús y hay listas)
@@ -251,7 +260,7 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
           <div class="ptitle">LISTA DEL SÚPER</div>
           <div class="lhead">OPCIÓN ${esc(String(L.opcion || ''))} · 5 DÍAS</div>
           <div class="lwrap">${cats}</div>
-          ${CORNER_BLOCK}
+          ${cornerBlock}
         </div>`;
       })
     : [];
@@ -330,7 +339,7 @@ ${FONT_CSS}
 .pcbox,.eqt{border-radius:9px;overflow:hidden;}
 .ptitle{color:${TAUPE};}` : ''}
 </style></head><body>
-<div class="page cover"><div class="cdate">${esc(fechaLarga())}</div><img class="clogo" src="${LOGO}"/><div class="cname">${esc(nom)}</div>${CORNER_BLOCK}</div>
+<div class="page cover"><div class="cdate">${esc(fechaLarga())}</div><img class="clogo" src="${_logo}"/><div class="cname">${esc(nom)}</div>${cornerBlock}</div>
 ${incluirMenus ? menuPages.join('') : ''}
 ${incluirEquivalencias ? (eqPage + refPage) : ''}
 ${listaPages.join('')}

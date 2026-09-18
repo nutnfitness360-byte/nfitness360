@@ -29,12 +29,17 @@ const fechaLarga = (iso) => {
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
 };
 
-// Bloque de firma/logo en la esquina inferior.
-const cornerBlock = () => `
+// Bloque de firma/logo en la esquina inferior. Con `perfil` (multi-nutriólogo) usa SUS datos.
+const cornerBlock = (perfil) => {
+  const nom = (perfil && perfil.nombre) || NUTRI_NOMBRE;
+  const l2 = (perfil && perfil.linea2) || NUTRI_LINEA2;
+  const lg = (perfil && perfil.logo) || LOGO;
+  return `
   <table class="corner"><tr>
-    <td><img src="${LOGO}" class="clogo"/></td>
-    <td class="csig">${esc(NUTRI_NOMBRE)}<br/>${esc(NUTRI_LINEA2)}</td>
+    <td><img src="${lg}" class="clogo"/></td>
+    <td class="csig">${esc(nom)}<br/>${esc(l2)}</td>
   </tr></table>`;
+};
 
 // Bandera a cuadros (fuera del círculo de meta), como tabla b/n: robusta en el convertidor.
 const banderaCuadros = () => {
@@ -73,7 +78,7 @@ const estacionCell = (est, esMeta) => {
 const flechaCell = () => `<td class="arrow">&rsaquo;</td>`;
 
 // ---------------- Página de DISTANCIA ----------------
-function paginaDistancia(comp, p) {
+function paginaDistancia(comp, p, perfil) {
   const ests = Array.isArray(p.estaciones) ? p.estaciones : [];
   const cols = [];
   ests.forEach((e, i) => {
@@ -107,7 +112,7 @@ function paginaDistancia(comp, p) {
     <table class="timeline"><tr>${cols.join('')}</tr></table>
 
     ${post}${notas}
-    ${cornerBlock()}
+    ${cornerBlock(perfil)}
   </div>`;
 }
 
@@ -122,7 +127,7 @@ function comidaBox(label, m) {
   return `<div class="cbox"><div class="cbhead">${esc(label)} <span class="tag">${tag}</span></div>${img}${ind}${eq}</div>`;
 }
 
-function paginaCarga(comp, p) {
+function paginaCarga(comp, p, perfil) {
   const c = p.comidas || {};
   const left = [comidaBox('Desayuno', c.desayuno), comidaBox('Snacks', c.snacks)].filter(Boolean).join('');
   const right = [comidaBox('Comida', c.comida), comidaBox('Cena', c.cena)].filter(Boolean).join('');
@@ -134,22 +139,22 @@ function paginaCarga(comp, p) {
     <div class="chead">CARGA DE CARBOHIDRATOS <span class="csub">${esc(p.dias || '')} ${(p.dias === '1') ? 'día' : 'días'}</span></div>
     <table class="cgrid"><tr>
       <td class="ccol">${left}</td>
-      <td class="cring"><div class="ringwrap"><img src="${LOGO}" class="ringlogo"/></div></td>
+      <td class="cring"><div class="ringwrap"><img src="${(perfil && perfil.logo) || LOGO}" class="ringlogo"/></div></td>
       <td class="ccol">${right}</td>
     </tr></table>
     ${hid}${evi}${notas}
-    ${cornerBlock()}
+    ${cornerBlock(perfil)}
   </div>`;
 }
 
 // ---------------- Documento completo ----------------
-export function buildDeportivoHTML({ comp, paginas }) {
+export function buildDeportivoHTML({ comp, paginas, perfil = null }) {
   comp = comp || {};
   paginas = Array.isArray(paginas) ? paginas : [];
 
   // Portada breve
   const portada = `<div class="page cover">
-    <img src="${LOGO}" class="covlogo"/>
+    <img src="${(perfil && perfil.logo) || LOGO}" class="covlogo"/>
     <div class="covt">NUTRICIÓN DEPORTIVA</div>
     <div class="covname">${esc(comp.nombre || '')}</div>
     <table class="covmeta"><tr>
@@ -157,10 +162,10 @@ export function buildDeportivoHTML({ comp, paginas }) {
       ${comp.fecha ? `<td><span>Fecha</span>${fechaLarga(comp.fecha)}</td>` : ''}
       ${comp.objetivo ? `<td><span>Objetivo</span>${esc(comp.objetivo)}</td>` : ''}
     </tr></table>
-    ${cornerBlock()}
+    ${cornerBlock(perfil)}
   </div>`;
 
-  const cuerpo = paginas.map(p => p.tipo === 'carga' ? paginaCarga(comp, p) : paginaDistancia(comp, p)).join('');
+  const cuerpo = paginas.map(p => p.tipo === 'carga' ? paginaCarga(comp, p, perfil) : paginaDistancia(comp, p, perfil)).join('');
 
   return `<!doctype html><html><head><meta charset="utf-8"/><style>
 ${FONT_CSS}
