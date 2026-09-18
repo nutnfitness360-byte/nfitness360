@@ -46,7 +46,7 @@ const POSIBLE_SIN_CUENTA = ['auth/user-not-found', 'auth/invalid-credential', 'a
 export default function LoginPage() {
   const [vista, setVista] = useState('inicio');     // inicio | acceso | email | crear | denegado
   const { logo } = useBranding();
-  const logoSrc = (logo === undefined) ? '/logo.png' : logo;
+  const logoSrc = (logo === undefined) ? (process.env.REACT_APP_LOGO_URL || '/logo.png') : logo;
   // Título de portada FIJO por instancia (no editable). Se decide por el dominio del
   // sitio: la instancia de venta (sistemanutricio...) muestra su propio texto; cualquier
   // otra instancia (la de Natalia) conserva el suyo. Así el código es compartido pero

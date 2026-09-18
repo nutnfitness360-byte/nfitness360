@@ -20,6 +20,22 @@ const VARMAP = {
   line: '--line', lineSoft: '--line-soft', pine: '--pine',
 };
 
+// Marca por instancia vía variable de entorno: si REACT_APP_BRAND_COLORS trae un JSON de
+// variables CSS (p. ej. {"--dark":"#32363a","--gold":"#ba007c"}), esos colores se vuelven la
+// BASE (además del anti-destello que aplica App.js). Sin la variable, la base es la de Nfitness,
+// así que Natalia y Aretia quedan EXACTAMENTE igual.
+function _envBrandColors() {
+  try {
+    const raw = process.env.REACT_APP_BRAND_COLORS;
+    if (!raw) return {};
+    const css = JSON.parse(raw);
+    const out = {};
+    Object.keys(VARMAP).forEach(k => { if (css[VARMAP[k]]) out[k] = css[VARMAP[k]]; });
+    return out;
+  } catch (e) { return {}; }
+}
+const BASE_COLORS = { ...DEFAULT_COLORS, ..._envBrandColors() };
+
 // Aplica un set de colores a las variables CSS de :root (recolorea la app en vivo).
 export function aplicarColores(colors) {
   if (!colors) return;
@@ -46,13 +62,13 @@ export const useBranding = () => useContext(BrandingContext);
 export function BrandingProvider({ children }) {
   // logo: undefined = sin configurar (usa el logo por defecto) · '' = quitado · string = imagen cargada
   const [logo, setLogo] = useState(undefined);
-  const [colors, setColors] = useState(DEFAULT_COLORS);
+  const [colors, setColors] = useState(BASE_COLORS);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'config', 'branding'), snap => {
       const d = snap.exists() ? snap.data() : {};
       setLogo(Object.prototype.hasOwnProperty.call(d, 'logo') ? (d.logo || '') : undefined);
-      const c = { ...DEFAULT_COLORS, ...(d.colors || {}) };
+      const c = { ...BASE_COLORS, ...(d.colors || {}) };
       setColors(c);
       aplicarColores(c);
     }, () => { /* sin acceso a la config → se usan los valores por defecto */ });

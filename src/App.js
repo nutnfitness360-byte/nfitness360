@@ -23,6 +23,26 @@ function esInstanciaAretia() {
 // (Natalia) conserva lo de index.html sin cambios.
 function aplicarMarcaPorDominio() {
   try {
+    // Marca por VARIABLES (env) — reproducible por instancia (p.ej. Fitmeal).
+    // Si la instancia define REACT_APP_BRAND_COLORS (JSON de variables CSS), se aplica su
+    // paleta + favicon + título y se IGNORA la ruta Aretia. Natalia (sin nada) y Aretia
+    // (con REACT_APP_MARCA pero sin BRAND_COLORS) NO cambian.
+    var _brandRaw = process.env.REACT_APP_BRAND_COLORS;
+    if (_brandRaw) {
+      try {
+        var CB = JSON.parse(_brandRaw);
+        var rsb = document.documentElement.style;
+        Object.keys(CB).forEach(function (k) { rsb.setProperty(k, CB[k]); });
+      } catch (e) { /* JSON inválido → se ignora, se conservan los defaults */ }
+      if (process.env.REACT_APP_MARCA_NOMBRE) document.title = process.env.REACT_APP_MARCA_NOMBRE;
+      var favB = process.env.REACT_APP_FAVICON;
+      if (favB) {
+        var lb = document.querySelector("link[rel~='icon']");
+        if (!lb) { lb = document.createElement('link'); lb.rel = 'icon'; document.head.appendChild(lb); }
+        lb.setAttribute('href', favB);
+      }
+      return;
+    }
     if (!esInstanciaAretia()) return; // solo instancias Aretia; Natalia intacta
     // Colores Aretia al INSTANTE (antes de pintar), para que no se vea el destello de la
     // paleta por defecto mientras carga la config desde la base de datos.
@@ -49,7 +69,7 @@ function AppContent() {
   if (loading) {
     return (
       <div className="loading">
-        <div className="loading-n">{esInstanciaAretia() ? 'A' : 'N'}</div>
+        <div className="loading-n">{((process.env.REACT_APP_MARCA_NOMBRE || '').trim().charAt(0).toUpperCase()) || (esInstanciaAretia() ? 'A' : 'N')}</div>
       </div>
     );
   }
