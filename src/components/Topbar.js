@@ -3,7 +3,7 @@ import { auth } from '../firebase/config';
 import { signOut } from 'firebase/auth';
 import { useBranding } from '../context/BrandingContext';
 
-const LOGO = '/logo.png';
+const LOGO = process.env.REACT_APP_LOGO_URL || '/logo.png';
 
 export default function Topbar({ role, user, onPerfil }) {
   const [menuOpen, setMenuOpen] = useState(false);

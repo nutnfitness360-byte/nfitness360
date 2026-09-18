@@ -32,7 +32,10 @@ function aplicarMarcaPorDominio() {
       try {
         var CB = JSON.parse(_brandRaw);
         var rsb = document.documentElement.style;
-        Object.keys(CB).forEach(function (k) { rsb.setProperty(k, CB[k]); });
+        // Los "#" de los hex van codificados como %23 en la variable de entorno para que
+        // NINGÚN importador de .env los trate como comentario y trunque el valor. Aquí se
+        // decodifican de vuelta a "#" antes de aplicarlos. (Valores sin %23 quedan igual.)
+        Object.keys(CB).forEach(function (k) { rsb.setProperty(k, String(CB[k]).replace(/%23/g, '#')); });
       } catch (e) { /* JSON inválido → se ignora, se conservan los defaults */ }
       if (process.env.REACT_APP_MARCA_NOMBRE) document.title = process.env.REACT_APP_MARCA_NOMBRE;
       var favB = process.env.REACT_APP_FAVICON;

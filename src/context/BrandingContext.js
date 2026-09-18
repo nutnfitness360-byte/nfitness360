@@ -30,7 +30,8 @@ function _envBrandColors() {
     if (!raw) return {};
     const css = JSON.parse(raw);
     const out = {};
-    Object.keys(VARMAP).forEach(k => { if (css[VARMAP[k]]) out[k] = css[VARMAP[k]]; });
+    // %23 → # (los hex se guardan con %23 para que ningún importador de .env los trunque en el "#").
+    Object.keys(VARMAP).forEach(k => { if (css[VARMAP[k]]) out[k] = String(css[VARMAP[k]]).replace(/%23/g, '#'); });
     return out;
   } catch (e) { return {}; }
 }

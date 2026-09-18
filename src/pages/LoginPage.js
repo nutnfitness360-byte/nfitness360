@@ -47,6 +47,9 @@ export default function LoginPage() {
   const [vista, setVista] = useState('inicio');     // inicio | acceso | email | crear | denegado
   const { logo } = useBranding();
   const logoSrc = (logo === undefined) ? (process.env.REACT_APP_LOGO_URL || '/logo.png') : logo;
+  // ¿Estamos usando el logo por instancia (env)? Suele ser un logotipo ANCHO (banner),
+  // así que se limita por alto y ancho para que no se encime con la columna de la derecha.
+  const usaLogoEnv = (logo === undefined) && !!process.env.REACT_APP_LOGO_URL;
   // Título de portada FIJO por instancia (no editable). Se decide por el dominio del
   // sitio: la instancia de venta (sistemanutricio...) muestra su propio texto; cualquier
   // otra instancia (la de Natalia) conserva el suyo. Así el código es compartido pero
@@ -206,7 +209,7 @@ export default function LoginPage() {
     ok: { background: '#E9F1ED', color: '#3E6B5B', fontSize: 11.5, padding: '9px 11px', borderRadius: 8, marginBottom: 12, lineHeight: 1.45 },
     linkBtn: { background: 'none', border: 'none', color: 'var(--gold)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: '10px 0 2px', fontFamily: 'var(--font)', width: '100%', textAlign: 'center' },
     googleHint: { fontSize: 11, color: 'var(--stone)', lineHeight: 1.45, marginTop: 6, textAlign: 'center' },
-    aviso: { background: 'rgba(205,167,136,0.14)', border: '1px solid var(--gold)', color: 'var(--dark)', fontSize: 11.5, padding: '10px 12px', borderRadius: 9, marginBottom: 14, lineHeight: 1.5 },
+    aviso: { background: 'var(--aviso-bg, rgba(205,167,136,0.14))', border: '1px solid var(--gold)', color: 'var(--dark)', fontSize: 11.5, padding: '10px 12px', borderRadius: 9, marginBottom: 14, lineHeight: 1.5 },
     avisoT: { fontWeight: 700, display: 'block', marginBottom: 3 },
     orLbl: { fontSize: 10, color: 'var(--stone)', textAlign: 'center', margin: '12px 0 9px', letterSpacing: '0.4px' },
     hintMini: { fontSize: 10.5, color: 'var(--stone)', lineHeight: 1.45, marginTop: 8, textAlign: 'center' },
@@ -218,14 +221,14 @@ export default function LoginPage() {
     lLogo: { height: 42, width: 'auto', objectFit: 'contain', marginBottom: 16 },
     lHead: { color: 'var(--cream)', fontSize: 23, fontWeight: 700, lineHeight: 1.2, textAlign: 'left' },
     lSub: { color: '#B7ABA2', fontSize: 12.5, lineHeight: 1.55, margin: '12px 0 20px', textAlign: 'left', maxWidth: 300 },
-    lStepsLbl: { color: 'var(--gold)', fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', marginBottom: 13, textAlign: 'left' },
+    lStepsLbl: { color: 'var(--nav-accent)', fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', marginBottom: 13, textAlign: 'left' },
     lStep: { display: 'flex', gap: 11, alignItems: 'flex-start', marginBottom: 13, textAlign: 'left' },
-    lStepN: { minWidth: 22, height: 22, borderRadius: '50%', background: 'var(--gold)', color: 'var(--dark)', fontSize: 11, fontWeight: 700, lineHeight: '22px', textAlign: 'center' },
+    lStepN: { minWidth: 22, height: 22, borderRadius: '50%', background: 'var(--gold)', color: 'var(--on-accent)', fontSize: 11, fontWeight: 700, lineHeight: '22px', textAlign: 'center' },
     lStepT: { color: 'var(--cream)', fontSize: 12.5, lineHeight: 1.4, paddingTop: 1 },
     rLbl: { color: '#8a7f76', fontSize: 10, fontWeight: 600, letterSpacing: '0.6px', marginBottom: 12, textTransform: 'uppercase', textAlign: 'left' },
-    cardPat: { background: 'rgba(205,167,136,0.10)', border: '1.5px solid var(--gold)', borderRadius: 16, padding: '18px 16px', position: 'relative', marginBottom: 14, cursor: 'pointer' },
+    cardPat: { background: 'var(--card-hi, rgba(205,167,136,0.10))', border: '1.5px solid var(--gold)', borderRadius: 16, padding: '18px 16px', position: 'relative', marginBottom: 14, cursor: 'pointer' },
     cardNut: { background: 'rgba(255,255,255,0.03)', border: '1px solid #3a352f', borderRadius: 16, padding: '18px 16px', cursor: 'pointer' },
-    badge: { position: 'absolute', top: -9, left: 18, background: 'var(--gold)', color: 'var(--dark)', fontSize: 8, fontWeight: 700, letterSpacing: '0.5px', padding: '2px 9px', borderRadius: 8 },
+    badge: { position: 'absolute', top: -9, left: 18, background: 'var(--gold)', color: 'var(--on-accent)', fontSize: 8, fontWeight: 700, letterSpacing: '0.5px', padding: '2px 9px', borderRadius: 8 },
     cardRow: { display: 'flex', alignItems: 'center', gap: 13 },
     cTitle: { fontSize: 15, fontWeight: 700 },
     cDesc: { fontSize: 11, marginTop: 2 },
@@ -250,7 +253,7 @@ export default function LoginPage() {
 
             {/* Columna izquierda: mensaje + pasos */}
             <div>
-              {logoSrc ? <img src={logoSrc} alt="" style={{ ...S.lLogo, height: esSistemaNutricio ? 88 : S.lLogo.height }} /> : null}
+              {logoSrc ? <img src={logoSrc} alt="" style={usaLogoEnv ? { ...S.lLogo, height: 'auto', width: 'auto', maxHeight: 72, maxWidth: 300 } : { ...S.lLogo, height: esSistemaNutricio ? 88 : S.lLogo.height }} /> : null}
               <div style={S.lHead}>{portadaTitulo}</div>
               <div style={S.lSub}>{portadaSubtitulo}</div>
               <div style={S.lStepsLbl}>CÓMO AGENDAR</div>
