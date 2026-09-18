@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db, FB_PROJECT_ID } from '../firebase/config';
-import { collection, query, onSnapshot, addDoc, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, updateDoc, doc, Timestamp, orderBy, where } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import { MULTI_NUTRI, filtroDueno, selloDueno } from '../utils/multiTenant';
 import { familiaDeServicio, saldoDisponible } from '../utils/creditos';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -148,7 +149,9 @@ function generarSlots(dateKey, durMin, citasDelDia, hor, exc, esOnline) {
 }
 
 export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSolicitarCancelar }) {
-  const { user } = useAuth();
+  const { user, nutriDueno } = useAuth();
+  // Dueño del paciente logueado (multi-inquilino): se resuelve de SU expediente.
+  const [duenoPac, setDuenoPac] = useState(null);
   const hoy = new Date();
   const [view, setView] = useState({ y: hoy.getFullYear(), m: hoy.getMonth() });
   const [selDate, setSelDate] = useState(toKey(proxDisponible(hoy)));
@@ -180,18 +183,32 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const [saldoCred, setSaldoCred] = useState({ lotes: [], usos: [] });
   const [mUsarPaquete, setMUsarPaquete] = useState(true);
 
+  // Multi-inquilino: dueño "activo" para filtrar/sellar. Nutrióloga = ella misma;
+  // paciente = el dueño de su expediente (se resuelve abajo). null → sin filtro (como hoy).
+  const duenoActivo = isNutri ? nutriDueno : duenoPac;
+
+  // Resolver el dueño del paciente logueado desde su expediente (solo multi-inquilino).
   useEffect(() => {
-    // Se cargan TODAS las citas para calcular la disponibilidad real (slots ocupados).
-    // Los datos de otros pacientes nunca se muestran: la lista del día filtra por dueño.
-    const q = query(collection(db, 'citas'), orderBy('fecha', 'asc'));
-    return onSnapshot(q, snap => setCitas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    if (!MULTI_NUTRI || isNutri || !(user && user.email)) { setDuenoPac(null); return undefined; }
+    const qp = query(collection(db, 'pacientes'), where('correo', '==', user.email.toLowerCase()));
+    return onSnapshot(qp, snap => {
+      const d = snap.docs[0] && snap.docs[0].data();
+      setDuenoPac((d && d.nutriDueno) || null);
+    }, () => setDuenoPac(null));
   }, [isNutri, user]);
 
   useEffect(() => {
+    // Se cargan las citas para calcular la disponibilidad real (slots ocupados).
+    // Multi-inquilino: solo la agenda del dueño activo (cada nutriólogo su calendario).
+    const q = query(collection(db, 'citas'), ...filtroDueno(duenoActivo), orderBy('fecha', 'asc'));
+    return onSnapshot(q, snap => setCitas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }, [isNutri, user, duenoActivo]);
+
+  useEffect(() => {
     if (!isNutri) return undefined;
-    const qp = query(collection(db, 'pacientes'), orderBy('codigo', 'asc'));
+    const qp = query(collection(db, 'pacientes'), ...filtroDueno(nutriDueno), orderBy('codigo', 'asc'));
     return onSnapshot(qp, snap => setPacientesList(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
-  }, [isNutri]);
+  }, [isNutri, nutriDueno]);
 
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
@@ -274,6 +291,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
     try {
       // 1) Guardar la cita en la base de datos (rápido y prioritario).
       const ref = await addDoc(collection(db, 'citas'), {
+        ...selloDueno(duenoActivo),
         fecha: selDate,
         hora: mHora,
         tipo: servSel.id,

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase/config';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { MULTI_NUTRI } from '../utils/multiTenant';
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -74,8 +75,14 @@ export function AuthProvider({ children }) {
     return unsub;
   }, []);
 
+  // Multi-inquilino (opt-in): el "dueño" del nutriólogo logueado es su propio correo.
+  // Para pacientes es null aquí; su dueño se resuelve donde se necesita (agendado) a
+  // partir de su expediente. Con la bandera apagada, nutriDueno queda null y no se usa.
+  const _email = (user && user.email ? user.email : '').toLowerCase();
+  const nutriDueno = (MULTI_NUTRI && role === 'nutriologa' && _email) ? _email : null;
+
   return (
-    <AuthContext.Provider value={{ user, role, loading }}>
+    <AuthContext.Provider value={{ user, role, loading, multiNutri: MULTI_NUTRI, nutriDueno }}>
       {!loading && children}
     </AuthContext.Provider>
   );

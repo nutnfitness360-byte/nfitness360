@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { collection, query, onSnapshot, orderBy, doc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import { filtroDueno } from '../utils/multiTenant';
 import Agenda from '../components/Agenda';
 import Topbar from '../components/Topbar';
 import Pacientes from '../components/Pacientes';
@@ -33,7 +34,7 @@ function diasDesde(fechaStr, hoy) {
 }
 
 export default function NutriDashboard() {
-  const { user } = useAuth();
+  const { user, nutriDueno } = useAuth();
   const [tab, setTab] = useState('inicio');
   const exitGuardRef = useRef(null);
   const registerExitGuard = useCallback((fn) => { exitGuardRef.current = fn || null; }, []);
@@ -64,27 +65,27 @@ export default function NutriDashboard() {
   const mesKey = hoyKey.slice(0, 7);
 
   useEffect(() => {
-    const q = query(collection(db, 'citas'), orderBy('fecha', 'asc'));
+    const q = query(collection(db, 'citas'), ...filtroDueno(nutriDueno), orderBy('fecha', 'asc'));
     return onSnapshot(q, snap => setCitas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-  }, []);
+  }, [nutriDueno]);
 
   useEffect(() => {
-    return onSnapshot(collection(db, 'pacientes'), snap => setPacientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-  }, []);
+    return onSnapshot(query(collection(db, 'pacientes'), ...filtroDueno(nutriDueno)), snap => setPacientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }, [nutriDueno]);
 
   // Usuarios de la app (colección `suscriptores`): trae correo, creado y ultimoAcceso.
   useEffect(() => {
-    return onSnapshot(collection(db, 'suscriptores'),
+    return onSnapshot(query(collection(db, 'suscriptores'), ...filtroDueno(nutriDueno)),
       snap => setSuscriptores(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       () => setSuscriptores([]));
-  }, []);
+  }, [nutriDueno]);
 
   // Compras de paquetes / saldos (colección `creditosConsultas`): para el ingreso REAL cobrado.
   useEffect(() => {
-    return onSnapshot(collection(db, 'creditosConsultas'),
+    return onSnapshot(query(collection(db, 'creditosConsultas'), ...filtroDueno(nutriDueno)),
       snap => setCreditos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       () => setCreditos([]));
-  }, []);
+  }, [nutriDueno]);
 
   useEffect(() => {
     return onSnapshot(doc(db, 'config', 'dashboard'), snap => {

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { db } from '../firebase/config';
 import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { selloDueno } from '../utils/multiTenant';
 import { mapearPaciente } from '../utils/mapearSistemaMP';
 
 const hoyISO = () => {
@@ -12,7 +13,7 @@ const sinId = (p) => { const o = { ...p }; delete o.id; return o; };
 // Normaliza un nombre para comparar (sin mayúsculas ni espacios de más).
 const normNombre = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-export default function ImportarPacientes({ open, onClose, pacientes, prefix = 'NF-' }) {
+export default function ImportarPacientes({ open, onClose, pacientes, prefix = 'NF-', nutriDueno = null }) {
   const [raws, setRaws] = useState(null);      // array de registros crudos del archivo
   const [nombreArch, setNombreArch] = useState('');
   const [busy, setBusy] = useState(false);
@@ -136,9 +137,9 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
         } else {
           rec.importCreado = true;
           rec.codigo = prefix + String(++mx).padStart(4, '0');
-          const ref = await addDoc(collection(db, 'pacientes'), rec);
+          const ref = await addDoc(collection(db, 'pacientes'), { ...rec, ...selloDueno(nutriDueno) });
           if (historia) {
-            try { await setDoc(doc(db, 'historias', ref.id), historia); } catch (e) { /* la historia es secundaria; el paciente ya quedó */ }
+            try { await setDoc(doc(db, 'historias', ref.id), { ...historia, ...selloDueno(nutriDueno) }); } catch (e) { /* la historia es secundaria; el paciente ya quedó */ }
           }
           creados++;
         }

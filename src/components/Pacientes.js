@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, query, orderBy } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
+import { filtroDueno, selloDueno } from '../utils/multiTenant';
 import { PAQUETES_DEFAULT, FAMILIAS, familiaLabel, resumenSaldo, venceDeLote, nuevoLote } from '../utils/creditos';
 import Plan from './Plan';
 import Menus from './Menus';
@@ -148,21 +150,22 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [manualBusy, setManualBusy] = useState(false);
   const [manualMsg, setManualMsg] = useState('');
   const [err, setErr] = useState('');
+  const { nutriDueno } = useAuth();   // dueño (multi-inquilino); null si la bandera está apagada
 
   useEffect(() => {
-    const q = query(collection(db, 'pacientes'), orderBy('codigo', 'asc'));
+    const q = query(collection(db, 'pacientes'), ...filtroDueno(nutriDueno), orderBy('codigo', 'asc'));
     return onSnapshot(q, snap => setPacientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       e => setErr('No se pudieron cargar los pacientes: ' + e.message));
-  }, []);
+  }, [nutriDueno]);
 
   // Historias clínicas: viven en la colección aparte 'historias' (reglas: SOLO nutrióloga),
   // para que los datos clínicos y las notas profesionales NO viajen al navegador del paciente
   // dentro de su documento de 'pacientes'. Se cargan aquí y se adjuntan al paciente en 'sel'.
   useEffect(() => {
-    return onSnapshot(collection(db, 'historias'),
+    return onSnapshot(query(collection(db, 'historias'), ...filtroDueno(nutriDueno)),
       snap => { const m = {}; snap.docs.forEach(d => { m[d.id] = d.data(); }); setHistorias(m); },
       () => { /* si las reglas aún no permiten leer historias/, no rompas la vista */ });
-  }, []);
+  }, [nutriDueno]);
 
   // Enlaces rápidos personalizados de recomendaciones (compartidos entre todos los pacientes).
   useEffect(() => {
@@ -282,6 +285,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
         correo: c,
         ...(sexo ? { sexo } : {}),
         ...(nombre ? { nombre } : {}),
+        ...selloDueno(nutriDueno),
       }, { merge: true });
     } catch (e) { /* secundario */ }
   };
@@ -293,9 +297,10 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     const ref = await addDoc(collection(db, 'pacientes'), {
       codigo: (h.datos && h.datos.pacienteNo) || nextCodigo(), ...der,
       inicio: hoyISO(), mediciones: [], planes: [], creado: Date.now(),
+      ...selloDueno(nutriDueno),
     });
     // La historia clínica va en la colección aparte 'historias' (solo-nutrióloga).
-    await setDoc(doc(db, 'historias', ref.id), h);
+    await setDoc(doc(db, 'historias', ref.id), { ...h, ...selloDueno(nutriDueno) });
     mirrorSuscriptor(der.correo, der.sexo, der.nombre);
     setNuevo(false); setErr(''); setSelId(ref.id); setSub('dash');
   };
@@ -305,7 +310,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     // Datos derivados (nombre, edad, correo…) sí van en pacientes/; la historia clínica, no.
     await updateDoc(doc(db, 'pacientes', sel.id), { ...der });
     // La historia clínica va en la colección aparte 'historias' (solo-nutrióloga).
-    await setDoc(doc(db, 'historias', sel.id), h);
+    await setDoc(doc(db, 'historias', sel.id), { ...h, ...selloDueno(sel.nutriDueno || nutriDueno) });
     mirrorSuscriptor(der.correo, der.sexo, der.nombre);
     setErr('');
   };
@@ -355,7 +360,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       await updateDoc(doc(db, 'pacientes', sel.id), patch);
       // Vincula/actualiza la cuenta del paciente (para que vea su plan al entrar con ese correo).
       if (correo && correo.indexOf('@') >= 0) {
-        try { await setDoc(doc(db, 'suscriptores', correo), { correo, sexo: infoForm.sexo || sel.sexo || '', nombre: sel.nombre || '' }, { merge: true }); } catch (e) {}
+        try { await setDoc(doc(db, 'suscriptores', correo), { correo, sexo: infoForm.sexo || sel.sexo || '', nombre: sel.nombre || '', ...selloDueno(sel.nutriDueno || nutriDueno) }, { merge: true }); } catch (e) {}
       }
       setOpenInfo(false); setErr('');
     } catch (e) { setErr('No se pudo guardar: ' + e.message); }
@@ -1726,6 +1731,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
         onClose={() => setOpenImport(false)}
         pacientes={pacientes}
         prefix={CODE_PREFIX}
+        nutriDueno={nutriDueno}
       />
 
 
@@ -1842,7 +1848,7 @@ function SaldoConsultas({ patient }) {
     setBusy(true); setSt('');
     try {
       const lote = nuevoLote({ familia, consultas, monto, vigenciaMeses, origen, paqueteId: pkg ? pkg.id : null, paqueteNombre: pkg ? pkg.nombre : null });
-      const next = { correo, lotes: [...(cred.lotes || []), lote], usos: cred.usos || [] };
+      const next = { correo, lotes: [...(cred.lotes || []), lote], usos: cred.usos || [], ...selloDueno(patient && patient.nutriDueno) };
       await setDoc(doc(db, 'creditosConsultas', correo), next, { merge: true });
       setSt('Abonado ✓'); setSel(''); setCustom({ familia: 'normal', consultas: '', monto: '', vigenciaMeses: '' });
     } catch (e) { setSt('Error: ' + e.message); }
@@ -1851,7 +1857,7 @@ function SaldoConsultas({ patient }) {
   const quitarLote = async (loteId) => {
     if (typeof window !== 'undefined' && !window.confirm('¿Quitar este lote de consultas del saldo del paciente?')) return;
     try {
-      const next = { correo, lotes: (cred.lotes || []).filter(l => l.id !== loteId), usos: cred.usos || [] };
+      const next = { correo, lotes: (cred.lotes || []).filter(l => l.id !== loteId), usos: cred.usos || [], ...selloDueno(patient && patient.nutriDueno) };
       await setDoc(doc(db, 'creditosConsultas', correo), next, { merge: true });
     } catch (e) { setSt('Error: ' + e.message); }
   };

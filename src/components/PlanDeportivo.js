@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { selloDueno } from '../utils/multiTenant';
 import { buildDeportivoHTML } from '../report/deportivoHTML';
 
 /* ============================================================
@@ -166,6 +167,7 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
     try {
       await setDoc(doc(db, 'deportivo', patient.id), {
         competencia: comp, paginas, actualizado: Date.now(),
+        ...selloDueno(patient && patient.nutriDueno),
       });
       dirtyRef.current = false;
       setStatus('guardado');
@@ -184,7 +186,7 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
     setPdfBusy(true); setPdfLink(''); setMsg('Guardando y generando el PDF…');
     try {
       // Guarda primero para no perder cambios.
-      await setDoc(doc(db, 'deportivo', patient.id), { competencia: comp, paginas, actualizado: Date.now() });
+      await setDoc(doc(db, 'deportivo', patient.id), { competencia: comp, paginas, actualizado: Date.now(), ...selloDueno(patient && patient.nutriDueno) });
       dirtyRef.current = false;
 
       const html = buildDeportivoHTML({ comp, paginas });
