@@ -14,7 +14,7 @@ const _COR_R = process.env.REACT_APP_NUTRI_CORREO || 'natalia.db@live.com';
 const FIRMA_NOMBRE = process.env.REACT_APP_NUTRI_NOMBRE || (ES_ARETIA_R ? 'Aretia' : 'MSc. Natalia E. Flores Bonilla');
 const FIRMA_LINEA2 = process.env.REACT_APP_NUTRI_LINEA2
   || ((ES_ARETIA_R && !process.env.REACT_APP_NUTRI_CEDULA) ? 'Del plan al resultado' : `${_CED_R} · ${_COR_R}`);
-const FIRMA_WEB = process.env.REACT_APP_MARCA_WEB || (ES_ARETIA_R ? 'aretia.mx' : 'nfitness360.com');
+const FIRMA_WEB = process.env.REACT_APP_MARCA_WEB || (ES_FITMEAL_R ? '' : (ES_ARETIA_R ? 'aretia.mx' : 'nfitness360.com'));
 const MARCA_NOMBRE_R = process.env.REACT_APP_MARCA_NOMBRE || 'Aretia';
 const MARCA_TAG_R = process.env.REACT_APP_MARCA_TAG || 'Del plan al resultado';
 
