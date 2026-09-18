@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
-import { selloDueno } from '../utils/multiTenant';
+import { selloDueno, cargarPerfilPdf } from '../utils/multiTenant';
 import { buildDeportivoHTML } from '../report/deportivoHTML';
 
 /* ============================================================
@@ -189,7 +189,8 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
       await setDoc(doc(db, 'deportivo', patient.id), { competencia: comp, paginas, actualizado: Date.now(), ...selloDueno(patient && patient.nutriDueno) });
       dirtyRef.current = false;
 
-      const html = buildDeportivoHTML({ comp, paginas });
+      const perfil = await cargarPerfilPdf(db, patient && patient.nutriDueno);
+      const html = buildDeportivoHTML({ comp, paginas, perfil });
       const fechaTxt = new Date().toLocaleDateString('es-MX').replace(/\//g, '-');
       const filename = 'Plan deportivo ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt + '.pdf';
       const res = await fetch(url, {

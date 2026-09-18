@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { doc, updateDoc, getDoc, setDoc, collection, onSnapshot } from 'firebase/firestore';
 import { buildReportHTML, generarPorcionesTexto, esPorciones } from '../report/reporteHTML';
+import { cargarPerfilPdf } from '../utils/multiTenant';
 import { matchFotoKey, buscarFotos, fotoUrl, fotosDataMap, setBancoCustom, keysDeNombre, slugPlatillo } from '../utils/matchFoto';
 import HistoriaClinica from './HistoriaClinica';
 import { gridKeyDown } from '../utils/gridNav';
@@ -825,7 +826,8 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         const keysFotos = tiempos.flatMap(t => (t.opciones || []).map(o => o.fotoKey)).filter(Boolean);
         fotoData = await fotosDataMap(keysFotos);
       } catch (_) { fotoData = {}; }
-      const html = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos, incluirMenus, incluirEquivalencias, listas: listasReporte, fotoData });
+      const perfil = await cargarPerfilPdf(db, patient && patient.nutriDueno);
+      const html = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos, incluirMenus, incluirEquivalencias, listas: listasReporte, fotoData, perfil });
       const fechaTxt = new Date().toLocaleDateString('es-MX').replace(/\//g, '-');
       const baseNombre = 'Plan nutricional ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt;
       const filename = baseNombre + '.pdf';
@@ -843,7 +845,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         if (hayEq) {
           try {
             setRep('Generando la tabla de equivalencias…');
-            const htmlEq = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos, incluirMenus: false, incluirEquivalencias: true, listas: null, fotoData: {} });
+            const htmlEq = buildReportHTML({ nombre: patient.nombre, objetivo: patient.objetivo, plan: patient.plan, tiempos, incluirMenus: false, incluirEquivalencias: true, listas: null, fotoData: {}, perfil });
             const baseEq = 'Tabla de equivalencias ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt;
             const resEq = await fetchIA(url, {
               method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },

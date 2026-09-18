@@ -9,6 +9,7 @@ import Agenda from '../components/Agenda';
 import ContadorEquivalencias from '../components/ContadorEquivalencias';
 import { apegoPorPeriodo } from '../utils/apego';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
+import { cargarPerfilPdf } from '../utils/multiTenant';
 import { renderRich } from '../utils/richText';
 import { parseDriveLink } from '../utils/drive';
 import { resumenSaldo, venceDeLote, familiaLabel, nuevoLote, PAQUETES_DEFAULT } from '../utils/creditos';
@@ -623,7 +624,8 @@ export default function PacienteDashboard() {
       const nombrePac = expediente?.nombre || user?.displayName || 'Paciente';
       // La tabla de suplementos debe salir de ESTA recomendación (la que llenó la nutrióloga),
       // no de los suplementos globales de la historia clínica; así coincide con el PDF que se envía por correo.
-      const html = buildRecomendacionesHTML({ nombre: nombrePac, recomendaciones: [reco], fecha: Date.now(), suplementacion: reco.suplementacionTabla || null });
+      const perfil = await cargarPerfilPdf(db, expediente && expediente.nutriDueno);
+      const html = buildRecomendacionesHTML({ nombre: nombrePac, recomendaciones: [reco], fecha: Date.now(), suplementacion: reco.suplementacionTabla || null, perfil });
       const stamp = (reco.fecha && !isNaN(new Date(reco.fecha).getTime())) ? new Date(reco.fecha).getTime() : Date.now();
       const filename = `Recomendacion_${String(nombrePac).replace(/[^\w-]+/g, '_')}_${stamp}.pdf`;
       const res = await fetch(url, {

@@ -22,14 +22,14 @@ const MARCA_NOMBRE = process.env.REACT_APP_MARCA_NOMBRE || 'Aretia';
 const MARCA_TAG = process.env.REACT_APP_MARCA_TAG || 'Del plan al resultado';
 // Paleta por instancia. Natalia conserva EXACTAMENTE sus valores cálidos (rama ": ...").
 // Aretia (rama "ES_ARETIA ? ...") usa Azul Marino + Ámbar + fondo claro frío.
-const TAUPE  = ES_ARETIA ? '#1E3A5F' : '#8E837B';   // títulos y acento de texto fuerte
-const TAUPE2 = ES_ARETIA ? '#1E3A5F' : '#978C87';   // bandas de encabezado
-const TAN    = ES_ARETIA ? '#E0913F' : '#CDA788';   // acentos (hora, marcos de foto, viñetas)
-const CREAM  = ES_ARETIA ? '#F7FAFD' : '#EEE4DA';   // fondo de página
-const INK    = ES_ARETIA ? '#14202E' : '#4A443E';   // texto principal
-const LINE   = ES_ARETIA ? '#D4E1EF' : '#E0D6CB';   // líneas/bordes
-const SOFT   = ES_ARETIA ? '#64726B' : '#6E645C';   // texto secundario
-const TOTBG  = ES_ARETIA ? '#EAF1F8' : '#FBF7F2';   // fondo de la fila "Total" de la tabla
+const TAUPE  = ES_FITMEAL ? '#86085D' : (ES_ARETIA ? '#1E3A5F' : '#8E837B');   // títulos y acento de texto fuerte
+const TAUPE2 = ES_FITMEAL ? '#86085D' : (ES_ARETIA ? '#1E3A5F' : '#978C87');   // bandas de encabezado
+const TAN    = ES_FITMEAL ? '#BA007C' : (ES_ARETIA ? '#E0913F' : '#CDA788');   // acentos (hora, marcos de foto, viñetas)
+const CREAM  = ES_FITMEAL ? '#FBF7FA' : (ES_ARETIA ? '#F7FAFD' : '#EEE4DA');   // fondo de página
+const INK    = ES_FITMEAL ? '#32363A' : (ES_ARETIA ? '#14202E' : '#4A443E');   // texto principal
+const LINE   = ES_FITMEAL ? '#EAD9E4' : (ES_ARETIA ? '#D4E1EF' : '#E0D6CB');   // líneas/bordes
+const SOFT   = ES_FITMEAL ? '#7C7A85' : (ES_ARETIA ? '#64726B' : '#6E645C');   // texto secundario
+const TOTBG  = ES_FITMEAL ? '#FBEFF6' : (ES_ARETIA ? '#EAF1F8' : '#FBF7F2');   // fondo de la fila "Total" de la tabla
 
 // Marca por instancia (por dominio): la instancia de venta (sistemanutricio…) es
 // Aretia; cualquier otra (Natalia) conserva su membrete y logo. (ES_ARETIA se define arriba.)

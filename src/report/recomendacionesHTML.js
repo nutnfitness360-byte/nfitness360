@@ -27,13 +27,13 @@ const LOGO = ES_FITMEAL_R ? LOGO_FITMEAL : (ES_ARETIA_R ? LOGO_ARETIA : LOGO_NF)
 
 // Paleta del documento por instancia. Natalia conserva EXACTO sus valores cálidos
 // (rama ": ..."); Aretia usa marino + ámbar + tonos fríos (rama "ES_ARETIA_R ? ...").
-const R_TXT    = ES_ARETIA_R ? '#1F2A38' : '#4A443E'; // texto base
-const R_STRONG = ES_ARETIA_R ? '#14202E' : '#3A332C'; // texto fuerte / celdas
-const R_SOFT   = ES_ARETIA_R ? '#5B6B7A' : '#6E645C'; // meta / notas
-const R_MUTE   = ES_ARETIA_R ? '#7C9BBE' : '#A1968C'; // etiquetas atenuadas
-const R_ACC    = ES_ARETIA_R ? '#E0913F' : '#CDA788'; // acento: barras, títulos, borde, web
-const R_RECOBG = ES_ARETIA_R ? '#EEF3FA' : '#FAF6F1'; // fondo del bloque de recomendación
-const R_LINE   = ES_ARETIA_R ? '#D4E1EF' : '#E0D6CB'; // líneas / bordes
+const R_TXT    = ES_FITMEAL_R ? '#3B3540' : (ES_ARETIA_R ? '#1F2A38' : '#4A443E'); // texto base
+const R_STRONG = ES_FITMEAL_R ? '#32363A' : (ES_ARETIA_R ? '#14202E' : '#3A332C'); // texto fuerte / celdas
+const R_SOFT   = ES_FITMEAL_R ? '#7C7A85' : (ES_ARETIA_R ? '#5B6B7A' : '#6E645C'); // meta / notas
+const R_MUTE   = ES_FITMEAL_R ? '#A99AB0' : (ES_ARETIA_R ? '#7C9BBE' : '#A1968C'); // etiquetas atenuadas
+const R_ACC    = ES_FITMEAL_R ? '#BA007C' : (ES_ARETIA_R ? '#E0913F' : '#CDA788'); // acento: barras, títulos, borde, web
+const R_RECOBG = ES_FITMEAL_R ? '#FBF1F7' : (ES_ARETIA_R ? '#EEF3FA' : '#FAF6F1'); // fondo del bloque de recomendación
+const R_LINE   = ES_FITMEAL_R ? '#EAD9E4' : (ES_ARETIA_R ? '#D4E1EF' : '#E0D6CB'); // líneas / bordes
 
 // esc() y renderRich() viven en utils/richText.js (fuente única, compartida con la
 // vista en pantalla) para que el PDF y las pantallas nunca se separen.

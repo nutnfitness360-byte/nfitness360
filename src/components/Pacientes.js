@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, query, orderBy } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
-import { filtroDueno, selloDueno } from '../utils/multiTenant';
+import { filtroDueno, selloDueno, cargarPerfilPdf } from '../utils/multiTenant';
 import { PAQUETES_DEFAULT, FAMILIAS, familiaLabel, resumenSaldo, venceDeLote, nuevoLote } from '../utils/creditos';
 import Plan from './Plan';
 import Menus from './Menus';
@@ -597,7 +597,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales || reco.analisis)) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
     setRecoPdfMsg('Generando PDF…');
     try {
-      const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now(), suplementacion: reco.suplementacionTabla || null });
+      const perfil = await cargarPerfilPdf(db, sel && sel.nutriDueno);
+      const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now(), suplementacion: reco.suplementacionTabla || null, perfil });
       const fechaImp = hoyISO(); // fecha de impresión (AAAA-MM-DD)
       const filename = `Recomendacion_${(sel.nombre || 'paciente').replace(/[^\w-]+/g, '_')}_${fechaImp}.pdf`;
       const res = await fetch(url, {
@@ -617,12 +618,13 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   // Vista previa del documento tal como lo verá el paciente (mismo HTML que se
   // convierte en PDF), abierta en una pestaña nueva. NO envía correo ni toca Drive:
   // es solo para revisar desde el perfil del nutriólogo.
-  const abrirReco = (reco) => {
+  const abrirReco = async (reco) => {
     if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales || reco.analisis)) {
       setRecoPdfMsg('No hay recomendación para previsualizar.'); return;
     }
-    const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: reco.fecha || Date.now(), suplementacion: reco.suplementacionTabla || null });
-    const win = window.open('', '_blank');
+    const win = window.open('', '_blank');   // abrir ANTES del await, para no gatillar el bloqueador de popups
+    const perfil = await cargarPerfilPdf(db, sel && sel.nutriDueno);
+    const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: reco.fecha || Date.now(), suplementacion: reco.suplementacionTabla || null, perfil });
     if (win) { win.document.open(); win.document.write(html); win.document.close(); }
     else { window.open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank', 'noopener'); }
   };

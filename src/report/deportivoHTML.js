@@ -1,4 +1,6 @@
 import { FONT_CSS, LOGO, NUTRI_NOMBRE, NUTRI_LINEA2 } from './reporteHTML';
+// Instancia Fitmeal: paleta del PDF deportivo en colores de marca.
+const ES_FITMEAL_D = (process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'fitmeal';
 
 /* ============================================================
    NFITNESS 360 — PDF del plan deportivo (alto rendimiento)
@@ -10,13 +12,13 @@ import { FONT_CSS, LOGO, NUTRI_NOMBRE, NUTRI_LINEA2 } from './reporteHTML';
    nada de flexbox complejo.
    ============================================================ */
 
-const CREAM = '#F2ECE3';
-const TAN = '#CDA788';
-const INK = '#1a1612';
-const SOFT = '#4a443e';
-const STONE = '#8a7d70';
-const META = '#7d7368';
-const LINE = '#e0d6cb';
+const CREAM = ES_FITMEAL_D ? '#FBF7FA' : '#F2ECE3';
+const TAN = ES_FITMEAL_D ? '#BA007C' : '#CDA788';
+const INK = ES_FITMEAL_D ? '#32363A' : '#1a1612';
+const SOFT = ES_FITMEAL_D ? '#46414B' : '#4a443e';
+const STONE = ES_FITMEAL_D ? '#7C7A85' : '#8a7d70';
+const META = ES_FITMEAL_D ? '#86085D' : '#7d7368';
+const LINE = ES_FITMEAL_D ? '#EAD9E4' : '#e0d6cb';
 
 const esc = (v) => String(v == null ? '' : v)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
