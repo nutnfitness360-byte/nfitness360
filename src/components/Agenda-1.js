@@ -1,0 +1,696 @@
+import React, { useState, useEffect } from 'react';
+import { db, FB_PROJECT_ID } from '../firebase/config';
+import { collection, query, onSnapshot, addDoc, updateDoc, doc, Timestamp, orderBy, where } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
+import { MULTI_NUTRI, filtroDueno, selloDueno } from '../utils/multiTenant';
+import { familiaDeServicio, saldoDisponible } from '../utils/creditos';
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
+
+// Tipos de consulta (definen la duración de la cita)
+export const SERVICIOS_DEFAULT = [
+  { id: 'primera',       nombre: 'Primera vez',           dur: 60, online: false },
+  { id: 'seguimiento',   nombre: 'Seguimiento',           dur: 30, online: false },
+  { id: 'deportivo',     nombre: 'Deportivo',             dur: 60, online: false },
+  { id: 'seg_deportivo', nombre: 'Seguimiento deportivo', dur: 30, online: false },
+  { id: 'online',        nombre: 'Online',                dur: 40, online: true  },
+  { id: 'online_dep',    nombre: 'Deportivo online',      dur: 40, online: true  },
+];
+const DUR_POR_ID = Object.fromEntries(SERVICIOS_DEFAULT.map(s => [s.id, s.dur]));
+
+// Objetivo (independiente del tipo de consulta)
+const OBJETIVOS = ['Aumento de masa muscular','Baja de grasa','Recomposición corporal','Salud','Rendimiento deportivo','Otro'];
+
+// Etiqueta legible del método de pago (para mostrarlo en el renglón de la cita)
+const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
+
+// ---- Disponibilidad ----
+// Horario por defecto (se usa si aún no se ha configurado en Configuración → Horarios de atención).
+// Bloqueados: domingo (0), martes (2) y jueves (4). Abre 09:00; cierra 18:00 (sábado 13:00).
+// semanas: [] = todas las semanas del mes. [1,3] = solo 1ª y 3ª semana (p. ej. 1er y 3er sábado).
+// franjas: cada día puede tener varias franjas horarias, cada una con su modalidad:
+//          mod = 'ambas' | 'presencial' | 'online'
+export const HORARIO_DEFAULT = {
+  0: { activo: false, semanas: [], franjas: [{ ini: '09:00', fin: '14:00', mod: 'ambas' }] }, // Domingo
+  1: { activo: true,  semanas: [], franjas: [{ ini: '09:00', fin: '18:00', mod: 'ambas' }] }, // Lunes
+  2: { activo: false, semanas: [], franjas: [{ ini: '09:00', fin: '18:00', mod: 'ambas' }] }, // Martes
+  3: { activo: true,  semanas: [], franjas: [{ ini: '09:00', fin: '18:00', mod: 'ambas' }] }, // Miércoles
+  4: { activo: false, semanas: [], franjas: [{ ini: '09:00', fin: '18:00', mod: 'ambas' }] }, // Jueves
+  5: { activo: true,  semanas: [], franjas: [{ ini: '09:00', fin: '18:00', mod: 'ambas' }] }, // Viernes
+  6: { activo: true,  semanas: [], franjas: [{ ini: '09:00', fin: '13:00', mod: 'ambas' }] }, // Sábado
+};
+
+export const MODALIDADES = [
+  ['ambas', 'Ambas'],
+  ['presencial', 'Presencial'],
+  ['online', 'En línea'],
+];
+
+// Devuelve las franjas de una config de día (soporta el formato antiguo apertura/cierre).
+export function franjasDe(cfg) {
+  if (!cfg) return [];
+  if (Array.isArray(cfg.franjas) && cfg.franjas.length) return cfg.franjas;
+  if (cfg.apertura && cfg.cierre) return [{ ini: cfg.apertura, fin: cfg.cierre, mod: 'ambas' }]; // compatibilidad
+  return [];
+}
+
+// ¿La franja sirve para la modalidad pedida? (esOnline = true / false / null = cualquiera)
+function franjaSirve(f, esOnline) {
+  const mod = f.mod || 'ambas';
+  if (esOnline === null || esOnline === undefined) return true;
+  if (mod === 'ambas') return true;
+  return esOnline ? (mod === 'online') : (mod === 'presencial');
+}
+
+// Qué ocurrencia del día es dentro del mes: el 3er sábado del mes → 3.
+function ocurrenciaEnMes(key) {
+  const d = parseInt(key.split('-')[2], 10);
+  return Math.floor((d - 1) / 7) + 1;
+}
+
+function toKey(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function dowDe(key) { const [y,m,d] = key.split('-'); return new Date(+y,+m-1,+d).getDay(); }
+// Config del día según el horario semanal.
+function diaCfg(hor, key) { const h = (hor || HORARIO_DEFAULT)[dowDe(key)] || HORARIO_DEFAULT[dowDe(key)]; return h || { activo: false, semanas: [], franjas: [] }; }
+
+// Franjas efectivas del día. Prioridad:
+//  1) Excepción por fecha  (exc[fecha] = 'cerrado' | { franjas } | { apertura, cierre })  → manda sobre todo
+//  2) Regla de semanas del mes (p. ej. sábado solo 1ª y 3ª semana)
+//  3) Día activo/inactivo del horario semanal
+// esOnline: true (solo online) | false (solo presencial) | null (cualquiera)
+function franjasDelDia(key, hor, exc, esOnline) {
+  const e = (exc || {})[key];
+  let fr = [];
+  if (e === 'cerrado') return [];                                     // cerrado extraordinario
+  if (e && typeof e === 'object') {
+    fr = franjasDe(e);                                                // abierto extraordinario
+  } else {
+    const c = diaCfg(hor, key);
+    if (!c.activo) return [];
+    const sem = Array.isArray(c.semanas) ? c.semanas : [];
+    if (sem.length && sem.indexOf(ocurrenciaEnMes(key)) === -1) return []; // no toca esta semana
+    fr = franjasDe(c);
+  }
+  return fr.filter(f => f && f.ini && f.fin && f.ini < f.fin && franjaSirve(f, esOnline));
+}
+
+// ¿Hay atención ese día? (sin filtrar modalidad → para pintar el calendario)
+function diaAbierto(key, hor, exc, esOnline) {
+  return franjasDelDia(key, hor, exc, (esOnline === undefined ? null : esOnline)).length > 0;
+}
+
+function bloqueado(key, hor, exc) { return !diaAbierto(key, hor, exc, null); }
+function fmtDate(key) {
+  const [y,m,d] = key.split('-');
+  return new Date(+y,+m-1,+d).toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'}).replace(/^\w/,c=>c.toUpperCase());
+}
+function toMin(h) { const [H,M] = h.split(':').map(Number); return H*60+M; }
+// Una cita ya pasó si su fecha+hora de inicio es anterior a este momento.
+function citaPasada(c) {
+  if (!c || !c.fecha) return false;
+  const dt = new Date(c.fecha + 'T' + (c.hora || '23:59') + ':00');
+  return !isNaN(dt.getTime()) && dt.getTime() < Date.now();
+}
+function fromMin(m) { return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function proxDisponible(date, hor, exc) {
+  const d = new Date(date);
+  for (let i = 0; i < 60; i++) { if (diaAbierto(toKey(d), hor, exc)) return d; d.setDate(d.getDate()+1); }
+  return date;
+}
+// Duración (min) de una cita existente (compatibilidad con citas viejas que solo tienen 'motivo')
+function durDeCita(c) {
+  if (c.dur) return c.dur;
+  if (c.tipo && DUR_POR_ID[c.tipo]) return DUR_POR_ID[c.tipo];
+  const legacy = { 'Primera vez':60,'Seguimiento':30,'Deportiva primera vez':60,'Seguimiento deportiva':30,'Online primera vez':40,'Online seguimiento':40 };
+  return legacy[c.motivo] || 60;
+}
+
+// Genera los horarios candidatos del día: rejilla base de 30 min + puntos de
+// continuación (cada 10 min) tras cada cita existente. Marca cuáles caben para
+// la duración elegida (sin traslaparse con citas existentes).
+function generarSlots(dateKey, durMin, citasDelDia, hor, exc, esOnline) {
+  const franjas = franjasDelDia(dateKey, hor, exc, (esOnline === undefined ? null : esOnline));
+  if (!franjas.length) return [];
+  const ocup = citasDelDia.map(c => { const s = toMin(c.hora); return { s, e: s + durDeCita(c) }; });
+  const set = new Set();
+  franjas.forEach(f => {
+    const ini = toMin(f.ini), fin = toMin(f.fin);
+    for (let t = ini; t <= fin; t += 30) set.add(t);                                             // rejilla base 30 min
+    ocup.forEach(o => { let c = o.e; while (c % 30 !== 0 && c <= fin) { if (c >= ini) set.add(c); c += 10; } }); // continuación 10 min
+  });
+  // La cita debe caber COMPLETA dentro de alguna franja válida.
+  const cabe = (t, d) => franjas.some(f => t >= toMin(f.ini) && (t + d) <= toMin(f.fin));
+  const choca = (s, d) => ocup.some(o => s < o.e && o.s < s + d);
+  const cand = [...set].sort((a, b) => a - b);
+  return cand
+    .filter(t => (durMin ? cabe(t, durMin) : franjas.some(f => t >= toMin(f.ini) && t <= toMin(f.fin))))
+    .map(t => ({ hora: fromMin(t), disponible: durMin ? !choca(t, durMin) : false }));
+}
+
+export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSolicitarCancelar }) {
+  const { user, nutriDueno } = useAuth();
+  // Dueño del paciente logueado (multi-inquilino): se resuelve de SU expediente.
+  const [duenoPac, setDuenoPac] = useState(null);
+  const hoy = new Date();
+  const [view, setView] = useState({ y: hoy.getFullYear(), m: hoy.getMonth() });
+  const [selDate, setSelDate] = useState(toKey(proxDisponible(hoy)));
+  const [citas, setCitas] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // Modal interno de cancelar/reagendar (se usa cuando no hay callback externo, p. ej. la nutrióloga)
+  const [localModal, setLocalModal] = useState(null);   // cita o null
+  const [localConfirm, setLocalConfirm] = useState(false);
+  const [reagendarLocal, setReagendarLocal] = useState(null);
+
+  // Campos del modal (unificados para nutrióloga y paciente)
+  const [mPaciente, setMPaciente] = useState('');
+  const [mPacienteEmail, setMPacienteEmail] = useState('');
+  const [mPacienteTel, setMPacienteTel] = useState(''); // tel del paciente elegido (nutrióloga) → aviso interno
+  const [miTelefono, setMiTelefono] = useState('');      // tel del paciente logueado (cuando él mismo agenda)
+  const [mTipo, setMTipo] = useState(null);
+  const [mObjetivo, setMObjetivo] = useState(OBJETIVOS[0]);
+  const [mObjetivoOtro, setMObjetivoOtro] = useState('');
+  const [mHora, setMHora] = useState(null);
+  const [mNotas, setMNotas] = useState('');
+
+  // Autocompletado de pacientes (solo nutrióloga)
+  const [pacientesList, setPacientesList] = useState([]);
+  const [showSug, setShowSug] = useState(false);
+  const [precios, setPrecios] = useState({});
+  const [servicios, setServicios] = useState(SERVICIOS_DEFAULT);
+  const [horario, setHorario] = useState(HORARIO_DEFAULT);
+  const [excepciones, setExcepciones] = useState({});
+  const [mMetodoPago, setMMetodoPago] = useState('efectivo');
+  const [saldoCred, setSaldoCred] = useState({ lotes: [], usos: [] });
+  const [mUsarPaquete, setMUsarPaquete] = useState(true);
+
+  // Multi-inquilino: dueño "activo" para filtrar/sellar. Nutrióloga = ella misma;
+  // paciente = el dueño de su expediente (se resuelve abajo). null → sin filtro (como hoy).
+  const duenoActivo = isNutri ? nutriDueno : duenoPac;
+
+  // Resolver el dueño del paciente logueado desde su expediente (solo multi-inquilino).
+  useEffect(() => {
+    if (!MULTI_NUTRI || isNutri || !(user && user.email)) { setDuenoPac(null); return undefined; }
+    const qp = query(collection(db, 'pacientes'), where('correo', '==', user.email.toLowerCase()));
+    return onSnapshot(qp, snap => {
+      const d = snap.docs[0] && snap.docs[0].data();
+      setDuenoPac((d && d.nutriDueno) || null);
+    }, () => setDuenoPac(null));
+  }, [isNutri, user]);
+
+  // Teléfono del paciente logueado (para incluirlo en el aviso a la nutrióloga
+  // cuando el propio paciente agenda su cita). Solo lectura de su expediente.
+  useEffect(() => {
+    if (isNutri || !(user && user.email)) { setMiTelefono(''); return undefined; }
+    const qp = query(collection(db, 'pacientes'), where('correo', '==', user.email.toLowerCase()));
+    return onSnapshot(qp, snap => {
+      const d = snap.docs[0] && snap.docs[0].data();
+      setMiTelefono((d && d.telefono) || '');
+    }, () => setMiTelefono(''));
+  }, [isNutri, user]);
+
+  useEffect(() => {
+    // Se cargan las citas para calcular la disponibilidad real (slots ocupados).
+    // Multi-inquilino: solo la agenda del dueño activo (cada nutriólogo su calendario).
+    const q = query(collection(db, 'citas'), ...filtroDueno(duenoActivo), orderBy('fecha', 'asc'));
+    return onSnapshot(q, snap => setCitas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }, [isNutri, user, duenoActivo]);
+
+  useEffect(() => {
+    if (!isNutri) return undefined;
+    const qp = query(collection(db, 'pacientes'), ...filtroDueno(nutriDueno), orderBy('codigo', 'asc'));
+    return onSnapshot(qp, snap => setPacientesList(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+  }, [isNutri, nutriDueno]);
+
+  useEffect(() => {
+    return onSnapshot(doc(db, 'config', 'dashboard'), snap => {
+      const d = (snap && snap.data()) || {};
+      setPrecios(d.precios || {});
+      setServicios(Array.isArray(d.servicios) && d.servicios.length ? d.servicios : SERVICIOS_DEFAULT);
+      setHorario({ ...HORARIO_DEFAULT, ...(d.horario || {}) });
+      setExcepciones(d.excepciones || {});
+    }, () => {});
+  }, []);
+
+  // Saldo de consultas (paquetes) del paciente en cuestión: el propio (paciente) o el elegido (nutrióloga).
+  useEffect(() => {
+    const correo = (isNutri ? mPacienteEmail : (user.email || '')).toLowerCase();
+    if (!correo) { setSaldoCred({ lotes: [], usos: [] }); return undefined; }
+    return onSnapshot(doc(db, 'creditosConsultas', correo), snap => {
+      setSaldoCred(snap.exists() ? { lotes: [], usos: [], ...snap.data() } : { lotes: [], usos: [] });
+    }, () => setSaldoCred({ lotes: [], usos: [] }));
+  }, [isNutri, mPacienteEmail, user]);
+
+  // Si el día seleccionado quedó en un día sin atención (según el horario configurado), salta al siguiente hábil.
+  useEffect(() => {
+    if (bloqueado(selDate, horario, excepciones)) {
+      const [y, m, d] = selDate.split('-');
+      const prox = proxDisponible(new Date(+y, +m - 1, +d), horario, excepciones);
+      const key = toKey(prox);
+      if (key !== selDate) setSelDate(key);
+    }
+    // eslint-disable-next-line
+  }, [horario, excepciones]);
+
+  const emailUser = (user.email || '').toLowerCase();
+  const esPropia = (c) => isNutri || (c.pacienteEmail || '').toLowerCase() === emailUser;
+  const citasDelDia = citas.filter(c => c.fecha === selDate);
+  // Para los SLOTS solo cuentan las citas NO canceladas (la cancelada libera el horario)
+  const ocupadasDia = citasDelDia.filter(c => c.estado !== 'cancelada');
+  // Para MOSTRAR (lista del día y puntos del calendario) solo las propias del paciente
+  const citasDia = citasDelDia.filter(esPropia).slice().sort((a,b) => a.hora.localeCompare(b.hora));
+  const citaDates = new Set(citas.filter(c => c.estado !== 'cancelada').filter(esPropia).map(c => c.fecha));
+
+  const servSel = servicios.find(s => s.id === mTipo) || null;
+  const slots = generarSlots(selDate, servSel ? servSel.dur : 0, ocupadasDia, horario, excepciones, servSel ? !!servSel.online : null);
+  const reagActivo = !!(reagendarDe || reagendarLocal);
+  const familiaSel = familiaDeServicio(servSel);
+  const saldoFamilia = (servSel && !reagActivo) ? saldoDisponible(saldoCred, familiaSel, new Date().toISOString()) : 0;
+  const usarPaqueteActivo = saldoFamilia > 0 && mUsarPaquete && !reagActivo;
+
+  const abrirModal = () => {
+    setMPaciente(''); setMPacienteEmail(''); setMPacienteTel(''); setMTipo(null);
+    setMObjetivo(OBJETIVOS[0]); setMObjetivoOtro(''); setMHora(null); setMNotas('');
+    setMMetodoPago('efectivo'); setMUsarPaquete(true);
+    setShowSug(false); setShowModal(true);
+  };
+  const cerrarModal = () => setShowModal(false);
+
+  const guardar = async () => {
+    if (isNutri && !mPaciente.trim()) { alert('Selecciona el paciente.'); return; }
+    if (isNutri && !mPacienteEmail) {
+      alert('Elige un paciente de la lista (debe tener correo registrado). Si es nuevo, primero debe crear su cuenta / darse de alta.');
+      return;
+    }
+    if (!servSel) { alert('Selecciona el tipo de consulta.'); return; }
+    if (bloqueado(selDate, horario, excepciones)) { alert('Ese día no hay atención. Elige otro día.'); return; }
+    if (!mHora) { alert('Selecciona un horario.'); return; }
+    const objetivoFinal = mObjetivo === 'Otro' ? (mObjetivoOtro.trim() || 'Otro') : mObjetivo;
+    const correo = (isNutri ? mPacienteEmail : user.email || '').toLowerCase();
+    const pacienteNombre = isNutri ? mPaciente.trim() : (user.displayName || user.email.split('@')[0]);
+    const telefono = (isNutri ? mPacienteTel : miTelefono || '').toString().trim();
+    const reagOrigen = reagendarDe || reagendarLocal;
+    const nowISO = new Date().toISOString();
+    const familia = familiaDeServicio(servSel);
+    const saldoFam = !reagOrigen ? saldoDisponible(saldoCred, familia, nowISO) : 0;
+    // Usar crédito de paquete: hay saldo de la familia, se eligió usarlo, y no es reagendado.
+    const usarPaquete = saldoFam > 0 && mUsarPaquete && !reagOrigen;
+    // Pago en línea (Stripe) cuando: lo agenda el paciente, NO usa paquete, no es reagendado, y es online (obligatorio) o eligió "Pagar en línea".
+    const usaStripe = !usarPaquete && !isNutri && !reagOrigen && (servSel.online || mMetodoPago === 'stripe');
+    const metodo = usarPaquete ? 'paquete' : (isNutri ? 'consultorio' : (reagOrigen ? 'reagendado' : (servSel.online ? 'stripe' : mMetodoPago)));
+    const precio = precios[servSel.nombre] || 0;
+    if (usaStripe && !(precio > 0)) { alert('Esta consulta aún no tiene precio configurado. Avísale a la nutrióloga para poder cobrar en línea.'); return; }
+    setSaving(true);
+    try {
+      // 1) Guardar la cita en la base de datos (rápido y prioritario).
+      const ref = await addDoc(collection(db, 'citas'), {
+        ...selloDueno(duenoActivo),
+        fecha: selDate,
+        hora: mHora,
+        tipo: servSel.id,
+        tipoNombre: servSel.nombre,
+        dur: servSel.dur,
+        online: servSel.online,
+        objetivo: objetivoFinal,
+        motivo: servSel.nombre, // compatibilidad con vistas previas
+        notas: mNotas,
+        estado: usaStripe ? 'pendiente_pago' : 'confirmada',
+        metodoPago: metodo,
+        estadoPago: usarPaquete ? 'pagado' : 'pendiente',
+        monto: usarPaquete ? null : (precio || null),
+        pacienteEmail: correo,
+        pacienteNombre: pacienteNombre,
+        pacienteTelefono: telefono, // para el aviso a la nutrióloga y contacto rápido
+        creadoEn: Timestamp.now(),
+      });
+      // Descontar 1 consulta del saldo de paquete (si aplica). Si algo falla, la cita ya quedó confirmada.
+      if (usarPaquete) {
+        // El BACKEND descuenta el crédito (el navegador ya no escribe créditos).
+        try {
+          const urlC = process.env.REACT_APP_APPSCRIPT_URL;
+          if (urlC) {
+            const rc = await fetch(urlC, {
+              method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'consumirCreditoCita', correo, familia, citaId: ref.id, fbProjectId: FB_PROJECT_ID }), redirect: 'follow',
+            });
+            let dc; try { dc = JSON.parse(await rc.text()); } catch (_) { dc = null; }
+            if (dc && dc.ok && dc.loteId) {
+              try { await updateDoc(doc(db, 'citas', ref.id), { loteId: dc.loteId }); } catch (e) {}
+            }
+          }
+        } catch (e) { /* el saldo es secundario; la cita ya quedó */ }
+      }
+      // Pago en línea (Stripe): crea la sesión y redirige; la cita se confirma al volver (en el inicio del paciente).
+      if (usaStripe) {
+        const urlAS = process.env.REACT_APP_APPSCRIPT_URL;
+        try {
+          const base = window.location.origin;
+          const successUrl = base + '/?pago=ok&cita=' + ref.id + '&session={CHECKOUT_SESSION_ID}';
+          const cancelUrl = base + '/?pago=cancelado&cita=' + ref.id;
+          const res = await fetch(urlAS, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'crearCheckoutStripe', montoCentavos: Math.round(precio * 100), descripcion: 'Consulta ' + servSel.nombre, correo: correo, citaId: ref.id, successUrl: successUrl, cancelUrl: cancelUrl, fbProjectId: FB_PROJECT_ID }), redirect: 'follow',
+          });
+          let dp; try { dp = JSON.parse(await res.text()); } catch (_) { dp = null; }
+          if (dp && dp.ok && dp.url) { window.location.href = dp.url; return; }
+          alert('No se pudo iniciar el pago: ' + ((dp && dp.error) || 'intenta de nuevo.'));
+          try { await updateDoc(doc(db, 'citas', ref.id), { estado: 'cancelada', estadoPago: 'cancelado' }); } catch (e) {}
+          setSaving(false);
+          return;
+        } catch (e) {
+          alert('No se pudo iniciar el pago. Intenta de nuevo.');
+          try { await updateDoc(doc(db, 'citas', ref.id), { estado: 'cancelada', estadoPago: 'cancelado' }); } catch (e2) {}
+          setSaving(false);
+          return;
+        }
+      }
+      // 2) Crear el evento en Google Calendar + enviar el correo (vía Apps Script).
+      //    Guardamos el eventId devuelto para poder cancelar (borrar) el evento luego.
+      const url = process.env.REACT_APP_APPSCRIPT_URL;
+      if (url && correo) {
+        try {
+          const res = await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'crearCita',
+              paciente: pacienteNombre,
+              correo: correo,
+              telefono: telefono,
+              fecha: selDate,
+              hora: mHora,
+              dur: servSel.dur,
+              tipoNombre: servSel.nombre,
+              online: servSel.online,
+              objetivo: objetivoFinal,
+              notas: mNotas,
+            }), redirect: 'follow',
+          });
+          let d; try { d = JSON.parse(await res.text()); } catch (_) { d = null; }
+          if (d && d.eventId) { try { await updateDoc(doc(db, 'citas', ref.id), { eventId: d.eventId }); } catch (e) {} }
+          // Avisar si el correo de confirmación NO se pudo enviar (la cita ya quedó agendada de todos modos).
+          if (d && d.ok && d.correoEnviado === false) {
+            alert('La cita quedó agendada, pero no se pudo enviar el correo de confirmación al paciente. Revisa que el correo del paciente sea correcto y los permisos de Gmail en el servidor.');
+          }
+        } catch (e) { /* el evento/correo es secundario; la cita ya quedó guardada */ }
+      }
+      // Si venimos de "Reagendar": cancelar la cita anterior ahora que la nueva ya quedó.
+      if (reagOrigen && reagOrigen.id) {
+        try { await cancelarEnServidor(reagOrigen, isNutri ? 'nutriologa' : 'paciente'); } catch (e) { /* la nueva ya quedó; el aviso de cancelación es secundario */ }
+      }
+      cerrarModal();
+      if (reagendarLocal) setReagendarLocal(null);
+      if (reagendarDe && onReagendado) onReagendado();
+    } catch (e) { alert('Error: ' + e.message); }
+    setSaving(false);
+  };
+
+  const cancelarEnServidor = async (c, quien) => {
+    await updateDoc(doc(db, 'citas', c.id), { estado: 'cancelada' });
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (url) {
+      try {
+        await fetch(url, {
+          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'cancelarCita',
+            eventId: c.eventId || '',
+            correo: (c.pacienteEmail || '').toLowerCase(),
+            paciente: c.pacienteNombre || '',
+            fecha: c.fecha,
+            hora: c.hora,
+            tipoNombre: c.tipoNombre || c.motivo || '',
+            online: !!c.online,
+            canceladoPor: quien,
+          }), redirect: 'follow',
+        });
+      } catch (e) { /* el correo/borrado de evento es secundario; ya quedó cancelada */ }
+    }
+  };
+
+  const reagendarActivo = reagendarDe || reagendarLocal;
+
+  const renderCal = () => {
+    const first = new Date(view.y, view.m, 1).getDay();
+    const days = new Date(view.y, view.m+1, 0).getDate();
+    const cells = [];
+    for (let i=0; i<first; i++) cells.push(<div key={'e'+i} className="cal-day empty" />);
+    for (let d=1; d<=days; d++) {
+      const key = view.y+'-'+String(view.m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      const bloq = bloqueado(key, horario, excepciones);
+      let cls = 'cal-day';
+      if (bloq) cls += ' sunday';                       // reutiliza el estilo "deshabilitado"
+      if (key === toKey(hoy)) cls += ' today';
+      if (key === selDate) cls += ' selected';
+      if (citaDates.has(key)) cls += ' has-cita';
+      cells.push(<div key={key} className={cls} title={bloq ? 'No disponible' : ''}
+        onClick={() => { if (!bloq) setSelDate(key); }}>{d}</div>);
+    }
+    return cells;
+  };
+
+  return (
+    <div>
+      {reagendarActivo && (
+        <div style={{ background: '#fff', border: '1px solid var(--gold)', borderRadius: 12, padding: '12px 14px', marginBottom: 14, fontSize: 12.5, color: 'var(--dark)', lineHeight: 1.5 }}>
+          <b>Reagendando tu cita</b> del {reagendarActivo.fecha} a las {reagendarActivo.hora}. Elige un nuevo día y horario; al confirmar, tu cita anterior se cancelará automáticamente.
+        </div>
+      )}
+      <div className="card">
+        <div className="cal-nav">
+          <button onClick={() => setView(v => { let m=v.m-1,y=v.y; if(m<0){m=11;y--;} return {y,m}; })}>&#x2039;</button>
+          <span className="month">{MESES[view.m]} {view.y}</span>
+          <button onClick={() => setView(v => { let m=v.m+1,y=v.y; if(m>11){m=0;y++;} return {y,m}; })}>&#x203a;</button>
+        </div>
+        <div className="cal-grid">
+          {DIAS.map(d => <div key={d} className="cal-lbl">{d}</div>)}
+          {renderCal()}
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--stone)', marginBottom: 12 }}>
+          Martes, jueves y domingo no disponibles.
+        </div>
+
+        <div className="section-label">{fmtDate(selDate)}</div>
+        {bloqueado(selDate, horario, excepciones)
+          ? <div className="empty-state">Día no disponible para citas.</div>
+          : citasDia.length === 0
+            ? <div className="empty-state">Sin citas este día</div>
+            : citasDia.map(c => (
+              <div className="cita-item" key={c.id}>
+                <div className="cita-hora">{c.hora}</div>
+                <div style={{flex:1}}>
+                  <div className="cita-nombre">{c.pacienteNombre}</div>
+                  <div className="cita-motivo">{(c.tipoNombre || c.motivo)}{c.objetivo ? ' · ' + c.objetivo : ''}</div>
+                  {c.estado !== 'cancelada' && c.estadoPago && (
+                    <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        display: 'inline-block', padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                        background: c.estadoPago === 'pagado' ? '#E9F1ED' : '#F7EAE5',
+                        color: c.estadoPago === 'pagado' ? '#3E6B5B' : 'var(--danger)',
+                      }}>
+                        {c.estadoPago === 'pagado' ? 'Pagado' : 'Pendiente de pago'}
+                      </span>
+                      {c.metodoPago && METODO_LABEL[c.metodoPago] && c.estadoPago !== 'pagado' && (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--stone)' }}>· {METODO_LABEL[c.metodoPago]}</span>
+                      )}
+                      {isNutri && c.estadoPago !== 'pagado' && (
+                        <button onClick={() => updateDoc(doc(db, 'citas', c.id), { estadoPago: 'pagado' })} title="Marcar como pagada"
+                          style={{ padding: '2px 9px', background: '#E9F1ED', border: '1px solid #3E6B5B', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#3E6B5B', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif' }}>
+                          Marcar pagado
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {c.estado !== 'cancelada' && citaPasada(c)
+                  ? <span className="badge" style={{ background: '#ECE7E1', color: '#7A6F66' }}>Concluida</span>
+                  : <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>}
+                {c.estado !== 'cancelada' && !citaPasada(c) && (
+                  <button onClick={() => (!isNutri && onSolicitarCancelar) ? onSolicitarCancelar(c) : setLocalModal(c)} title="Cancelar cita"
+                    style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid var(--danger)', borderRadius: 8, fontSize: 11, fontWeight: 600, color: 'var(--danger)', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', flexShrink: 0 }}>
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            ))
+        }
+        <button className="btn-primary" onClick={abrirModal} disabled={bloqueado(selDate, horario, excepciones)}>
+          + {isNutri ? 'Nueva cita' : 'Agendar cita'}
+        </button>
+      </div>
+
+      {showModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && cerrarModal()}>
+          <div className="modal">
+            <div className="modal-title">{isNutri ? 'Nueva cita' : 'Agendar cita'}</div>
+
+            {isNutri && (
+              <div className="fg" style={{ position: 'relative' }}>
+                <label>Paciente</label>
+                <input value={mPaciente} autoComplete="off"
+                  onChange={e => { setMPaciente(e.target.value); setMPacienteEmail(''); setMPacienteTel(''); setShowSug(true); }}
+                  onFocus={() => setShowSug(true)}
+                  onBlur={() => setTimeout(() => setShowSug(false), 150)}
+                  placeholder="Escribe el nombre del paciente…" />
+                {showSug && mPaciente.trim() && (() => {
+                  const qq = mPaciente.trim().toLowerCase();
+                  const matches = pacientesList.filter(p => (p.nombre || '').toLowerCase().includes(qq)).slice(0, 6);
+                  if (matches.length === 0) return null;
+                  return (
+                    <div style={{ position:'absolute', left:0, right:0, top:'100%', zIndex:50, background:'#fff', border:'1px solid var(--border)', borderRadius:10, marginTop:4, boxShadow:'0 10px 30px rgba(33,28,23,0.15)', maxHeight:190, overflowY:'auto' }}>
+                      {matches.map(p => (
+                        <button key={p.id} type="button"
+                          onMouseDown={(e) => { e.preventDefault(); setMPaciente(p.nombre); setMPacienteEmail((p.correo || '').toLowerCase()); setMPacienteTel(p.telefono || ''); setShowSug(false); }}
+                          style={{ display:'block', width:'100%', textAlign:'left', background:'transparent', border:'none', padding:'9px 12px', fontSize:13, cursor:'pointer', color:'var(--dark)', fontFamily:'Montserrat, sans-serif' }}>
+                          {p.nombre} <span style={{ color:'var(--stone)', fontSize:11 }}>· {p.codigo}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+                {mPaciente.trim() && !mPacienteEmail && (
+                  <div style={{ fontSize: 11.5, color: 'var(--danger)', marginTop: 5, lineHeight: 1.4 }}>
+                    Selecciona el paciente de la lista para poder guardar la cita.
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="section-label">Tipo de consulta</div>
+            <div className="motivos-grid">
+              {servicios.map(s => (
+                <button key={s.id}
+                  className={`motivo-btn${mTipo === s.id ? ' selected' : ''}`}
+                  onClick={() => { setMTipo(s.id); setMHora(null); }}>
+                  {s.nombre}<br/><span style={{ fontSize:9, opacity:.8 }}>{s.dur} min{s.online ? ' · online' : ''}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="fg"><label>Objetivo</label>
+              <select value={mObjetivo} onChange={e=>setMObjetivo(e.target.value)}>
+                {OBJETIVOS.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+            {mObjetivo === 'Otro' && (
+              <div className="fg"><label>Especifica el objetivo</label>
+                <input value={mObjetivoOtro} onChange={e=>setMObjetivoOtro(e.target.value)} placeholder="Describe el objetivo" />
+              </div>
+            )}
+
+            <div className="section-label">Horarios disponibles — {fmtDate(selDate)}</div>
+            {!servSel
+              ? <div className="empty-state">Selecciona el tipo de consulta para ver los horarios.</div>
+              : slots.length === 0
+                ? <div className="empty-state">
+                    {diaAbierto(selDate, horario, excepciones, null)
+                      ? ('Este día no hay atención ' + (servSel.online ? 'en línea' : 'presencial') + '. Elige otro día o cambia el tipo de consulta.')
+                      : 'No hay horarios para este día.'}
+                  </div>
+                : slots.every(s => !s.disponible)
+                  ? <div className="empty-state">Sin horarios disponibles (día lleno).</div>
+                  : (
+                    <div className="horario-grid">
+                      {slots.map(s => (
+                        <button key={s.hora}
+                          className={`horario-slot${!s.disponible ? ' ocupado' : mHora === s.hora ? ' selected' : ''}`}
+                          onClick={() => { if (s.disponible) setMHora(s.hora); }}>{s.hora}</button>
+                      ))}
+                    </div>
+                  )
+            }
+
+            <div className="fg"><label>Notas (opcional)</label>
+              <textarea value={mNotas} onChange={e=>setMNotas(e.target.value)} placeholder={isNutri ? 'Observaciones…' : 'Cuéntanos tu objetivo…'} />
+            </div>
+
+            {!reagActivo && servSel && saldoFamilia > 0 && (
+              <div className="fg">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', border: '1px solid var(--gold)', borderRadius: 12, background: 'rgba(205,167,136,0.14)', cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal' }}>
+                  <input type="checkbox" checked={mUsarPaquete} onChange={e => setMUsarPaquete(e.target.checked)} style={{ width: 16, height: 16, minWidth: 16, flex: '0 0 auto', margin: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)', lineHeight: 1.35 }}>
+                    Usar 1 consulta del paquete{familiaSel === 'deportiva' ? ' deportivo' : ''} — {saldoFamilia} disponible{saldoFamilia > 1 ? 's' : ''}
+                    <span style={{ display: 'block', fontSize: 11.5, fontWeight: 500, color: 'var(--stone)' }}>No se cobra: se descuenta del saldo.</span>
+                  </span>
+                </label>
+              </div>
+            )}
+
+            {!isNutri && servSel && !usarPaqueteActivo && (
+              <div className="fg"><label>Forma de pago</label>
+                {servSel.online ? (
+                  <div className="empty-state" style={{ textAlign: 'center' }}>Esta consulta es en línea: el pago se realiza por Stripe al confirmar la cita.</div>
+                ) : (
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                    {[['efectivo', 'Efectivo (en consultorio)'], ['tarjeta', 'Tarjeta (en consultorio)'], ['transferencia', 'Transferencia'], ['stripe', 'Pagar en línea ahora (Stripe)']].map(([val, lbl], i) => (
+                      <label key={val} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                        padding: '13px 14px', cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal',
+                        borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                        background: mMetodoPago === val ? 'rgba(205,167,136,0.14)' : 'transparent',
+                      }}>
+                        <input type="radio" name="metodoPago" checked={mMetodoPago === val} onChange={() => setMMetodoPago(val)} style={{ width: 16, height: 16, minWidth: 16, flex: '0 0 auto', margin: 0 }} />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)', minWidth: 0, textAlign: 'center', whiteSpace: 'normal', lineHeight: 1.3 }}>{lbl}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="btn-row">
+              <button className="btn-cancel" onClick={cerrarModal}>Cancelar</button>
+              <button className="btn-save" onClick={guardar} disabled={saving}>
+                {saving ? 'Guardando...' : (usarPaqueteActivo ? 'Agendar con paquete' : (isNutri ? 'Guardar cita' : (((servSel && servSel.online) || mMetodoPago === 'stripe') ? 'Pagar y agendar' : 'Confirmar cita')))}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {localModal && (
+        <div onClick={() => { setLocalModal(null); setLocalConfirm(false); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(26,22,18,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 360, padding: '22px 20px', fontFamily: 'var(--font)' }}>
+            {!localConfirm ? (
+              <>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)', marginBottom: 6 }}>¿Cancelar o reagendar la cita?</div>
+                <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5, marginBottom: 16 }}>
+                  {localModal.pacienteNombre ? localModal.pacienteNombre + ' · ' : ''}{localModal.fecha} a las {localModal.hora}.
+                </div>
+                <button onClick={() => { setReagendarLocal(localModal); setSelDate(localModal.fecha); setLocalModal(null); setLocalConfirm(false); }}
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', border: 'none', background: 'var(--gold)', color: '#fff' }}>
+                  Reagendar
+                </button>
+                <button onClick={() => setLocalConfirm(true)}
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)' }}>
+                  Cancelar cita
+                </button>
+                <button onClick={() => { setLocalModal(null); setLocalConfirm(false); }}
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 10, fontSize: 12.5, fontFamily: 'var(--font)', cursor: 'pointer', background: 'transparent', border: 'none', color: 'var(--stone)' }}>
+                  Volver
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)', marginBottom: 6 }}>¿Seguro que deseas cancelar?</div>
+                <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5, marginBottom: 16 }}>
+                  Se cancelará la cita de {localModal.pacienteNombre || 'el paciente'} del {localModal.fecha} a las {localModal.hora}. Se libera el horario, se elimina el evento del calendario y se envía el correo de cancelación.
+                </div>
+                <button onClick={async () => { const c = localModal; setLocalModal(null); setLocalConfirm(false); try { await cancelarEnServidor(c, 'nutriologa'); } catch (e) { alert('No se pudo cancelar: ' + e.message); } }}
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', marginBottom: 9, cursor: 'pointer', background: 'var(--danger)', border: 'none', color: '#fff' }}>
+                  Sí, cancelar la cita
+                </button>
+                <button onClick={() => setLocalConfirm(false)}
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, padding: 12, fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer', background: 'transparent', border: '1px solid var(--border)', color: 'var(--stone)' }}>
+                  No, volver
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
