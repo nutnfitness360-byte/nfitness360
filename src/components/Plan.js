@@ -158,6 +158,7 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   });
   const [eq, setEq] = useState(() => (Array.isArray(saved.eq) && saved.eq.length === GRUPOS.length) ? saved.eq.map(String) : GRUPOS.map(() => '0'));
   const [meta, setMeta] = useState(() => ({
+    formula: (saved.meta && saved.meta.formula) || 'mifflin', // fórmula elegida para el gasto
     ...(saved.meta || { pP: 30, pL: 20, pC: 50, factor: 1.55 }),
     // Al reabrir un plan ya guardado se muestra su energía meta; en un cálculo nuevo arranca vacía.
     energia: (saved.meta && num(saved.meta.energia) > 0) ? String(saved.meta.energia) : '',
@@ -190,7 +191,12 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   const mlg = peso > 0 && grasa > 0 ? peso * (1 - grasa / 100) : NaN;
   const cunningham = isFin(mlg) ? 500 + 22 * mlg : NaN;
   const factor = num(meta.factor);
-  const sugerido = isFin(mifflin) ? mifflin * factor : NaN;
+  // La nutrióloga elige la fórmula (clic en la tarjeta). El gasto estimado = fórmula elegida × factor.
+  const tmbSel = tmb > 0 ? tmb : NaN;
+  const BMR_POR_FORMULA = { tmb: tmbSel, mifflin, hb, cunningham };
+  const formulaSel = meta.formula || 'mifflin';
+  const baseFormula = BMR_POR_FORMULA[formulaSel];
+  const sugerido = isFin(baseFormula) ? baseFormula * factor : NaN;
 
   useEffect(() => {
     // La energía meta (B) se hereda solo al reabrir un plan guardado; en un cálculo nuevo arranca vacía.
@@ -245,7 +251,7 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
     const plan = {
       // Conservamos el menú (el reescalado si se escaló, o el vigente) para que editar el plan no lo borre.
       ...(menusAGuardar ? { menus: menusAGuardar } : {}),
-      eq: eq.map(num), meta: { energia: num(meta.energia), pP, pL, pC, factor },
+      eq: eq.map(num), meta: { energia: num(meta.energia), pP, pL, pC, factor, formula: formulaSel },
       totales: { kcal: r0(tot.kcal), prot: r0(tot.prot), lip: r0(tot.lip), hc: r0(tot.hc), distP: r1(distP), distL: r1(distL), distC: r1(distC) },
       fecha: new Date().toISOString().slice(0, 10),
     };
@@ -266,6 +272,7 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
     if (item.meta) {
       setMeta({
         pP: item.meta.pP, pL: item.meta.pL, pC: item.meta.pC, factor: item.meta.factor,
+        formula: item.meta.formula || 'mifflin',
         energia: item.meta.energia != null ? String(item.meta.energia) : '',
       });
     }
@@ -283,6 +290,7 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
       if (base.meta) {
         setMeta({
           pP: base.meta.pP, pL: base.meta.pL, pC: base.meta.pC, factor: base.meta.factor,
+          formula: base.meta.formula || 'mifflin',
           energia: base.meta.energia != null ? String(base.meta.energia) : '',
         });
       }
@@ -478,11 +486,12 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
             <Field label="% grasa corporal"><input style={styles.input} inputMode="decimal" value={pp.grasa} onChange={(e) => setP('grasa', e.target.value)} /></Field>
           </Grid>
 
+          <div style={styles.formulaHint}>Elige la fórmula para el gasto energético — da clic en una:</div>
           <div style={styles.bmrRow}>
-            {tmb > 0 && <BmrCard label="InBody · TMB" value={tmb} sub="medido" />}
-            <BmrCard label="Mifflin-St Jeor" value={mifflin} sub="gasto basal" />
-            <BmrCard label="Harris-Benedict" value={hb} sub="gasto basal" />
-            <BmrCard label="Cunningham" value={cunningham} sub="usa masa magra" />
+            {tmb > 0 && <BmrCard label="InBody · TMB" value={tmb} sub="medido" selected={formulaSel === 'tmb'} onClick={() => setM('formula', 'tmb')} />}
+            <BmrCard label="Mifflin-St Jeor" value={mifflin} sub="gasto basal" selected={formulaSel === 'mifflin'} onClick={() => setM('formula', 'mifflin')} />
+            <BmrCard label="Harris-Benedict" value={hb} sub="gasto basal" selected={formulaSel === 'hb'} onClick={() => setM('formula', 'hb')} />
+            <BmrCard label="Cunningham" value={cunningham} sub="usa masa magra" selected={formulaSel === 'cunningham'} onClick={() => setM('formula', 'cunningham')} />
             <div style={styles.bmrCardAccent}>
               <div style={styles.bmrLabel}>Gasto estimado</div>
               <div style={styles.bmrValue}>{isFin(sugerido) ? r0(sugerido) : '—'}<span style={styles.kcalU}> kcal</span></div>
@@ -665,12 +674,22 @@ function Grid({ children }) { return <div style={styles.grid}>{children}</div>; 
 function Field({ label, children }) {
   return <label style={styles.field}><span style={styles.label}>{label}</span>{children}</label>;
 }
-function BmrCard({ label, value, sub }) {
+function BmrCard({ label, value, sub, selected, onClick }) {
+  const clickable = typeof onClick === 'function';
   return (
-    <div style={styles.bmrCard}>
-      <div style={styles.bmrLabel}>{label}</div>
+    <div
+      onClick={clickable ? onClick : undefined}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+      title={clickable ? 'Usar esta fórmula para el gasto energético' : undefined}
+      style={{ ...styles.bmrCard, ...(clickable ? styles.bmrCardClick : {}), ...(selected ? styles.bmrCardSel : {}) }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+        <div style={styles.bmrLabel}>{label}</div>
+        {selected && <span style={styles.bmrCheck}>✓</span>}
+      </div>
       <div style={styles.bmrValue}>{isFin(value) ? r0(value) : '—'}<span style={styles.kcalU}> kcal</span></div>
-      <div style={styles.bmrSub}>{sub}</div>
+      <div style={styles.bmrSub}>{selected ? 'fórmula elegida' : sub}</div>
     </div>
   );
 }
@@ -727,6 +746,10 @@ const styles = {
   bmrRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 10, marginTop: 16 },
   hintBox: { marginTop: 12, fontSize: 12.5, color: T.inkSoft, background: T.mint, borderRadius: 9, padding: '9px 12px' },
   bmrCard: { border: `1px solid ${T.line}`, borderRadius: 12, padding: '12px 14px', background: '#FCFAF7' },
+  bmrCardClick: { cursor: 'pointer', transition: 'box-shadow .12s, border-color .12s' },
+  bmrCardSel: { borderColor: T.amber, background: T.mint, boxShadow: `0 0 0 2px ${T.amber}` },
+  bmrCheck: { color: T.amber, fontWeight: 800, fontSize: 14, lineHeight: 1, flexShrink: 0 },
+  formulaHint: { fontSize: 12, color: T.inkSoft, marginTop: 14, marginBottom: 2, fontWeight: 600 },
   bmrCardAccent: { border: `1px solid ${T.amber}`, borderRadius: 12, padding: '12px 14px', background: T.mint },
   bmrLabel: { fontSize: 11.5, fontWeight: 600, color: T.inkSoft, textTransform: 'uppercase', letterSpacing: 0.4 },
   bmrValue: { fontSize: 24, fontWeight: 800, color: T.pine, marginTop: 4, letterSpacing: -0.5 },
