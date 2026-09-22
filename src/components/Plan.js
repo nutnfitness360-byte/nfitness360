@@ -297,7 +297,11 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
       if (Array.isArray(base.eq) && base.eq.length === GRUPOS.length) setEq(base.eq.map(String));
       setMantenerEq(true);
     } else {
-      // Plan nuevo desde cero: comportamiento normal (la energía meta genera las equivalencias con la plantilla).
+      // Plan nuevo desde cero: deja la tabla EN BLANCO (equivalentes en 0 y energía meta vacía)
+      // y restablece macros/factor a los valores por defecto. Al capturar la energía meta,
+      // la plantilla vuelve a generar las equivalencias desde cero.
+      setEq(GRUPOS.map(() => '0'));
+      setMeta(m => ({ ...m, energia: '', pP: 30, pL: 20, pC: 50, factor: 1.55 }));
       setMantenerEq(false);
     }
     setStatus('nuevo');
