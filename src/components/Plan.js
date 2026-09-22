@@ -11,6 +11,10 @@ import HistoriaClinica from './HistoriaClinica';
 
 const CODE_PREFIX = process.env.REACT_APP_CODE_PREFIX || 'NF-';
 
+// Fitmeal: el resumen de cálculos usa "Propuesta A" (carbón + amarillo) en vez del
+// magenta plano. Solo aplica cuando la instancia es Fitmeal; Natalia/Aretia intactas.
+const ES_FITMEAL = (process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'fitmeal';
+
 // Paleta por variables de marca (configurable por instancia). Los valores por
 // defecto de cada variable son los de Nfitness 360, así Natalia se ve idéntica;
 // Aretia (u otra instancia) los recolorea desde config/branding.
@@ -807,6 +811,24 @@ const styles = {
   exitBtns: { display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' },
   templateBtn: { background: '#fff', color: T.pine, border: `1px solid ${T.amber}`, padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: mono, alignSelf: 'flex-start' },
 };
+
+// ── Fitmeal · Propuesta A para el resumen de cálculos ──────────────────────────
+// Menos magenta plano: tarjeta en carbón, el número clave (Kcal) en amarillo y el
+// resto en blanco; el amarillo pasa a ser el acento (badges g/kg). Se sobreescriben
+// solo estas llaves del resumen; el resto del Plan queda igual. Gate ES_FITMEAL →
+// Natalia y Aretia no cambian.
+if (ES_FITMEAL) {
+  const CARBON = '#32363A', AMARILLO = '#F5D92C', GRISCLARO = '#A9A4AE', BLANCOSUAVE = '#E9E7EC';
+  styles.summary = { ...styles.summary, background: CARBON };
+  styles.sumKLabel = { ...styles.sumKLabel, color: GRISCLARO };
+  styles.sumK = { ...styles.sumK, color: AMARILLO };
+  styles.sumKU = { ...styles.sumKU, color: GRISCLARO };
+  styles.sumMeta = { ...styles.sumMeta, color: BLANCOSUAVE };
+  styles.macroLabel = { ...styles.macroLabel, color: GRISCLARO };
+  styles.macroVal = { ...styles.macroVal, color: '#fff' };
+  styles.gkgBadge = { ...styles.gkgBadge, background: 'rgba(245,217,44,0.16)', color: AMARILLO };
+  styles.gkgU = { ...styles.gkgU, color: 'rgba(245,217,44,0.70)' };
+}
 
 const css = `
 .nf-primary:hover { background: #C0986F; }

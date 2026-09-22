@@ -405,3 +405,49 @@ body {
 .loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--dark); }
 .loading-n { font-family: 'Cormorant Garamond', serif; font-size: 64px; font-weight: 300; color: var(--nav-accent); animation: pulse 1.5s ease-in-out infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* Nombre/correo en el menú del avatar (clases para que el modo día pueda recolorearlos;
+   los valores base reproducen EXACTAMENTE los inline anteriores → sin cambios en noche). */
+.tb-acct-name { font-size: 12px; font-weight: 600; color: var(--cream); font-family: var(--font); }
+.tb-acct-email { font-size: 10px; color: var(--stone); margin-top: 2px; font-family: var(--font); }
+
+/* ============================================================
+   MODO DÍA — chrome claro. SOLO Fitmeal (ThemeContext pone data-theme="dia").
+   Todo aquí es ADITIVO y depende de [data-theme="dia"]: sin ese atributo nada
+   aplica, así que Natalia, Aretia y Fitmeal-noche quedan intactos.
+   ============================================================ */
+/* IMPORTANTE: Fitmeal fija --nav-accent / --avatar-bg / --nav-active-bg como estilos
+   INLINE en <html> (App.js/BrandingContext), y una variable inline gana a cualquier
+   regla de hoja de estilos. Por eso el modo día NO redefine esas variables: pinta el
+   magenta directo sobre los elementos con valores literales. */
+/* Fondos claros del chrome */
+:root[data-theme="dia"] .topbar { background: #FFFFFF; border-bottom: 1px solid #EDE6EF; }
+:root[data-theme="dia"] .bottomnav { background: #FBF8FB; border-top: 1px solid #EDE6EF; }
+:root[data-theme="dia"] .avatar-menu { background: #FFFFFF; border-color: #EDE6EF; box-shadow: 0 10px 30px rgba(50,54,58,0.14); }
+:root[data-theme="dia"] .avatar-menu-divider { background: #EDE6EF; }
+:root[data-theme="dia"] .nav-sheet { background: #FFFFFF; border-color: #EDE6EF; box-shadow: 0 -10px 34px rgba(50,54,58,0.18); }
+@media (min-width: 768px) {
+  :root[data-theme="dia"] .app .bottomnav { border-top: none; border-right: 1px solid #EDE6EF; }
+}
+/* Textos e íconos del chrome en claro */
+:root[data-theme="dia"] .topbar-role { color: #9A93A0; }
+:root[data-theme="dia"] .nav-item svg,
+:root[data-theme="dia"] .nav-mas svg,
+:root[data-theme="dia"] .nav-sheet-item svg { stroke: #9A93A0; }
+:root[data-theme="dia"] .nav-item span { color: #7C7A85; }
+:root[data-theme="dia"] .avatar-menu-item { color: #32363A; }
+:root[data-theme="dia"] .avatar-menu-item:hover { background: rgba(186,0,124,0.06); }
+:root[data-theme="dia"] .avatar-menu-item.danger { color: #C0392B; }
+:root[data-theme="dia"] .nav-sheet-item { color: #32363A; }
+:root[data-theme="dia"] .nav-sheet-item:hover { background: rgba(186,0,124,0.06); }
+:root[data-theme="dia"] .tb-acct-name { color: #32363A; }
+:root[data-theme="dia"] .tb-acct-email { color: #7C7A85; }
+/* Activos en MAGENTA literal (no var(--nav-accent), que es amarillo inline) */
+:root[data-theme="dia"] .nav-item.active svg,
+:root[data-theme="dia"] .nav-mas.active svg,
+:root[data-theme="dia"] .nav-sheet-item.active svg { stroke: #BA007C; }
+:root[data-theme="dia"] .nav-item.active span,
+:root[data-theme="dia"] .nav-sheet-item.active { color: #BA007C; }
+:root[data-theme="dia"] .bottomnav .nav-item.active { background: rgba(186,0,124,0.10); }
+/* Avatar: aro y texto en magenta sobre claro (sobreescribe las var inline) */
+:root[data-theme="dia"] .avatar { background: rgba(186,0,124,0.10); border-color: #BA007C; color: #BA007C; }

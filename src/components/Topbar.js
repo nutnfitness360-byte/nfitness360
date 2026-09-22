@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { auth } from '../firebase/config';
 import { signOut } from 'firebase/auth';
 import { useBranding } from '../context/BrandingContext';
+import { useTheme } from '../context/ThemeContext';
+import { LOGO_FITMEAL } from '../report/logoFitmeal';
 
 const LOGO = process.env.REACT_APP_LOGO_URL || '/logo.png';
 
@@ -9,7 +11,10 @@ export default function Topbar({ role, user, onPerfil }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const { logo } = useBranding();
-  const logoSrc = (logo === undefined) ? LOGO : logo; // undefined = por defecto · '' = sin logo
+  const { tema, temaDisponible } = useTheme();
+  // En modo día (solo Fitmeal) el topbar es blanco → se usa el logo OSCURO Fitmeal.
+  const logoDia = (temaDisponible && tema === 'dia') ? LOGO_FITMEAL : null;
+  const logoSrc = logoDia || ((logo === undefined) ? LOGO : logo); // undefined = por defecto · '' = sin logo
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -42,8 +47,8 @@ export default function Topbar({ role, user, onPerfil }) {
         {menuOpen && (
           <div className="avatar-menu">
             <div style={{padding:'0.75rem 1rem',borderBottom:'1px solid #333'}}>
-              <div style={{fontSize:'12px',fontWeight:'600',color:'var(--cream)',fontFamily:'var(--font)'}}>{nombre}</div>
-              <div style={{fontSize:'10px',color:'var(--stone)',marginTop:'2px',fontFamily:'var(--font)'}}>{user?.email}</div>
+              <div className="tb-acct-name">{nombre}</div>
+              <div className="tb-acct-email">{user?.email}</div>
             </div>
             <button className="avatar-menu-item" onClick={() => { setMenuOpen(false); onPerfil && onPerfil(); }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>

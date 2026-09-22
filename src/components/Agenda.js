@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, FB_PROJECT_ID } from '../firebase/config';
-import { collection, query, onSnapshot, addDoc, updateDoc, doc, Timestamp, orderBy, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, updateDoc, doc, getDoc, Timestamp, orderBy, where } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { MULTI_NUTRI, filtroDueno, selloDueno } from '../utils/multiTenant';
 import { familiaDeServicio, saldoDisponible } from '../utils/creditos';
@@ -166,6 +166,9 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   // Campos del modal (unificados para nutrióloga y paciente)
   const [mPaciente, setMPaciente] = useState('');
   const [mPacienteEmail, setMPacienteEmail] = useState('');
+  const [mPacienteTel, setMPacienteTel] = useState(''); // tel del paciente elegido (nutrióloga) → aviso interno
+  const [miTelefono, setMiTelefono] = useState('');      // tel del paciente logueado (cargado de su expediente)
+  const [mTelefono, setMTelefono] = useState('');        // tel que el paciente captura/edita al agendar (obligatorio)
   const [mTipo, setMTipo] = useState(null);
   const [mObjetivo, setMObjetivo] = useState(OBJETIVOS[0]);
   const [mObjetivoOtro, setMObjetivoOtro] = useState('');
@@ -196,6 +199,28 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
       setDuenoPac((d && d.nutriDueno) || null);
     }, () => setDuenoPac(null));
   }, [isNutri, user]);
+
+  // Teléfono del paciente logueado (para incluirlo en el aviso a la nutrióloga
+  // cuando el propio paciente agenda su cita). Solo lectura de su expediente.
+  useEffect(() => {
+    if (isNutri || !(user && user.email)) { setMiTelefono(''); return undefined; }
+    const correo = user.email.toLowerCase();
+    const qp = query(collection(db, 'pacientes'), where('correo', '==', correo));
+    return onSnapshot(qp, async snap => {
+      const d = snap.docs[0] && snap.docs[0].data();
+      if (d && d.telefono) { setMiTelefono(d.telefono); return; }
+      // Sin teléfono en el expediente → usar el que dio al registrarse (suscriptores).
+      try { const s = await getDoc(doc(db, 'suscriptores', correo)); setMiTelefono((s.exists() && s.data().telefono) || ''); }
+      catch (_) { setMiTelefono(''); }
+    }, () => setMiTelefono(''));
+  }, [isNutri, user]);
+
+  // Prellena el teléfono del paciente con el de su expediente (si ya lo tiene).
+  // No pisa lo que el paciente haya tecleado.
+  useEffect(() => {
+    if (isNutri) return;
+    setMTelefono(prev => (prev && prev.trim()) ? prev : (miTelefono || ''));
+  }, [miTelefono, isNutri]);
 
   useEffect(() => {
     // Se cargan las citas para calcular la disponibilidad real (slots ocupados).
@@ -257,7 +282,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const usarPaqueteActivo = saldoFamilia > 0 && mUsarPaquete && !reagActivo;
 
   const abrirModal = () => {
-    setMPaciente(''); setMPacienteEmail(''); setMTipo(null);
+    setMPaciente(''); setMPacienteEmail(''); setMPacienteTel(''); setMTipo(null);
     setMObjetivo(OBJETIVOS[0]); setMObjetivoOtro(''); setMHora(null); setMNotas('');
     setMMetodoPago('efectivo'); setMUsarPaquete(true);
     setShowSug(false); setShowModal(true);
@@ -271,11 +296,16 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
       return;
     }
     if (!servSel) { alert('Selecciona el tipo de consulta.'); return; }
+    if (!isNutri && String(mTelefono || '').replace(/\D/g, '').length !== 10) {
+      alert('Escribe tu teléfono de contacto (10 dígitos) para poder agendar. Así tu nutrióloga podrá comunicarse contigo si hace falta.');
+      return;
+    }
     if (bloqueado(selDate, horario, excepciones)) { alert('Ese día no hay atención. Elige otro día.'); return; }
     if (!mHora) { alert('Selecciona un horario.'); return; }
     const objetivoFinal = mObjetivo === 'Otro' ? (mObjetivoOtro.trim() || 'Otro') : mObjetivo;
     const correo = (isNutri ? mPacienteEmail : user.email || '').toLowerCase();
     const pacienteNombre = isNutri ? mPaciente.trim() : (user.displayName || user.email.split('@')[0]);
+    const telefono = (isNutri ? mPacienteTel : mTelefono || '').toString().trim();
     const reagOrigen = reagendarDe || reagendarLocal;
     const nowISO = new Date().toISOString();
     const familia = familiaDeServicio(servSel);
@@ -307,6 +337,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
         monto: usarPaquete ? null : (precio || null),
         pacienteEmail: correo,
         pacienteNombre: pacienteNombre,
+        pacienteTelefono: telefono, // para el aviso a la nutrióloga y contacto rápido
         creadoEn: Timestamp.now(),
       });
       // Descontar 1 consulta del saldo de paquete (si aplica). Si algo falla, la cita ya quedó confirmada.
@@ -361,6 +392,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
               action: 'crearCita',
               paciente: pacienteNombre,
               correo: correo,
+              telefono: telefono,
               fecha: selDate,
               hora: mHora,
               dur: servSel.dur,
@@ -512,7 +544,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
               <div className="fg" style={{ position: 'relative' }}>
                 <label>Paciente</label>
                 <input value={mPaciente} autoComplete="off"
-                  onChange={e => { setMPaciente(e.target.value); setMPacienteEmail(''); setShowSug(true); }}
+                  onChange={e => { setMPaciente(e.target.value); setMPacienteEmail(''); setMPacienteTel(''); setShowSug(true); }}
                   onFocus={() => setShowSug(true)}
                   onBlur={() => setTimeout(() => setShowSug(false), 150)}
                   placeholder="Escribe el nombre del paciente…" />
@@ -524,7 +556,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                     <div style={{ position:'absolute', left:0, right:0, top:'100%', zIndex:50, background:'#fff', border:'1px solid var(--border)', borderRadius:10, marginTop:4, boxShadow:'0 10px 30px rgba(33,28,23,0.15)', maxHeight:190, overflowY:'auto' }}>
                       {matches.map(p => (
                         <button key={p.id} type="button"
-                          onMouseDown={(e) => { e.preventDefault(); setMPaciente(p.nombre); setMPacienteEmail((p.correo || '').toLowerCase()); setShowSug(false); }}
+                          onMouseDown={(e) => { e.preventDefault(); setMPaciente(p.nombre); setMPacienteEmail((p.correo || '').toLowerCase()); setMPacienteTel(p.telefono || ''); setShowSug(false); }}
                           style={{ display:'block', width:'100%', textAlign:'left', background:'transparent', border:'none', padding:'9px 12px', fontSize:13, cursor:'pointer', color:'var(--dark)', fontFamily:'Montserrat, sans-serif' }}>
                           {p.nombre} <span style={{ color:'var(--stone)', fontSize:11 }}>· {p.codigo}</span>
                         </button>
@@ -537,6 +569,23 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                     Selecciona el paciente de la lista para poder guardar la cita.
                   </div>
                 )}
+              </div>
+            )}
+
+            {!isNutri && (
+              <div className="fg">
+                <label>Teléfono de contacto (WhatsApp)</label>
+                <input value={mTelefono} inputMode="tel" autoComplete="tel"
+                  onChange={e => setMTelefono(e.target.value)}
+                  placeholder="10 dígitos" />
+                {mTelefono.trim() && String(mTelefono).replace(/\D/g, '').length !== 10 && (
+                  <div style={{ fontSize: 11.5, color: 'var(--danger)', marginTop: 5, lineHeight: 1.4 }}>
+                    Escribe un teléfono válido de 10 dígitos.
+                  </div>
+                )}
+                <div style={{ fontSize: 11.5, color: 'var(--stone)', marginTop: 5, lineHeight: 1.4 }}>
+                  Lo usará tu nutrióloga para contactarte si hace falta.
+                </div>
               </div>
             )}
 

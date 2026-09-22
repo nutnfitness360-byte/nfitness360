@@ -4,7 +4,7 @@ import {
   signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword,
   updateProfile, signOut, sendPasswordResetEmail, fetchSignInMethodsForEmail,
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { NUTRI_EMAIL } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
 
@@ -66,6 +66,7 @@ export default function LoginPage() {
   const [pass, setPass] = useState('');
   const [pass2, setPass2] = useState('');
   const [nombre, setNombre] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [ofrecerCrear, setOfrecerCrear] = useState(false);
@@ -75,7 +76,7 @@ export default function LoginPage() {
   const esNutriPuerta = puerta === 'nutri';
   const tituloPuerta = esNutriPuerta ? 'Panel de nutrición' : 'Portal del paciente';
 
-  const abrir = (p) => { setPuerta(p); setError(''); setResetMsg(''); setMetodos(null); setEmail(''); setPass(''); setPass2(''); setNombre(''); setOfrecerCrear(false); setVista('acceso'); };
+  const abrir = (p) => { setPuerta(p); setError(''); setResetMsg(''); setMetodos(null); setEmail(''); setPass(''); setPass2(''); setNombre(''); setTelefono(''); setOfrecerCrear(false); setVista('acceso'); };
   const volverInicio = () => { setError(''); setResetMsg(''); setMetodos(null); setVista('inicio'); };
 
   // Detecta con qué método se registró el correo (Google vs contraseña) para guiar
@@ -159,17 +160,22 @@ export default function LoginPage() {
   };
 
   // ---- Crear cuenta (solo si el correo es nuevo) ----
-  const irACrear = () => { setError(''); setOfrecerCrear(false); setPass2(''); setNombre(''); setVista('crear'); };
+  const irACrear = () => { setError(''); setOfrecerCrear(false); setPass2(''); setNombre(''); setTelefono(''); setVista('crear'); };
 
   const crearCuenta = async () => {
     const e = email.trim().toLowerCase();
+    const tel = String(telefono || '').replace(/\D/g, '');
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+    if (tel.length !== 10) { setError('Escribe tu teléfono de contacto (10 dígitos).'); return; }
     if (pass.length < 6) { setError('La contraseña debe tener al menos 6 caracteres.'); return; }
     if (pass !== pass2) { setError('Las contraseñas no coinciden.'); return; }
     setLoading(true); setError('');
     try {
       const cred = await createUserWithEmailAndPassword(auth, e, pass);
       try { await updateProfile(cred.user, { displayName: nombre.trim() }); } catch (_) {}
+      // Guardamos el teléfono en su registro de suscriptor (para que la nutrióloga lo tenga
+      // desde el alta y se prellene al agendar). Es secundario: si falla, no bloquea el acceso.
+      try { await setDoc(doc(db, 'suscriptores', e), { correo: e, nombre: nombre.trim(), telefono: telefono.trim() }, { merge: true }); } catch (_) {}
       // AuthContext entra al panel que corresponda.
     } catch (err) {
       if (err.code === 'auth/email-already-in-use') {
@@ -393,6 +399,9 @@ export default function LoginPage() {
                   {error && <div style={S.err}>{error}</div>}
                   <label style={S.lbl}>Tu nombre</label>
                   <input style={S.inp} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre y apellido" />
+                  <label style={S.lbl}>Teléfono de contacto (WhatsApp)</label>
+                  <input style={S.inp} value={telefono} inputMode="tel" autoComplete="tel"
+                    onChange={e => setTelefono(e.target.value)} placeholder="10 dígitos" />
                   <label style={S.lbl}>Contraseña</label>
                   <input style={S.inp} type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Mínimo 6 caracteres" />
                   <label style={S.lbl}>Confirmar contraseña</label>

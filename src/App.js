@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BrandingProvider } from './context/BrandingContext';
+import { ThemeProvider } from './context/ThemeContext';
 import LoginPage from './pages/LoginPage';
 import NutriDashboard from './pages/NutriDashboard';
 import PacienteDashboard from './pages/PacienteDashboard';
@@ -87,7 +88,9 @@ export default function App() {
   return (
     <AuthProvider>
       <BrandingProvider>
-        <AppContent />
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
       </BrandingProvider>
     </AuthProvider>
   );

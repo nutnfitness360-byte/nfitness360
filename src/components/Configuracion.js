@@ -3,6 +3,7 @@ import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { HORARIO_DEFAULT, MODALIDADES, franjasDe, SERVICIOS_DEFAULT } from './Agenda';
 import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
+import { useTheme } from '../context/ThemeContext';
 import { PAQUETES_DEFAULT, FAMILIAS } from '../utils/creditos';
 import { CFDI_DEFAULT, CLAVES_UNIDAD, OPCIONES_IVA, REGIMENES_FISCALES } from '../data/catalogosCFDI';
 
@@ -55,6 +56,7 @@ function comprimirLogo(file) {
 
 export default function Configuracion() {
   const { logo, colors } = useBranding();
+  const { tema, setTema, temaDisponible } = useTheme();
   const [colorsLocal, setColorsLocal] = useState(colors);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -254,6 +256,44 @@ export default function Configuracion() {
 
   return (
     <>
+      {temaDisponible && (
+        <div className="card" style={{ maxWidth: 760, marginBottom: 18 }}>
+          <div className="card-title">Apariencia</div>
+          <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 16, lineHeight: 1.5 }}>
+            Elige cómo se ven la barra lateral y el encabezado. Tu preferencia se
+            guarda en este dispositivo.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 12 }}>
+            {[
+              { id: 'noche', titulo: 'Modo noche', desc: 'Barras oscuras (predeterminado)', bg: '#32363A', chip: '#F5D92C', txt: '#fff' },
+              { id: 'dia', titulo: 'Modo día', desc: 'Barras claras, acento magenta', bg: '#FFFFFF', chip: '#BA007C', txt: '#32363A', borde: '#EDE6EF' },
+            ].map(opt => {
+              const activo = tema === opt.id;
+              return (
+                <button key={opt.id} type="button" onClick={() => setTema(opt.id)}
+                  style={{
+                    textAlign: 'left', cursor: 'pointer', borderRadius: 12, padding: 14,
+                    background: '#fff', fontFamily: 'var(--font)',
+                    border: activo ? '2px solid var(--gold)' : '1px solid var(--border)',
+                    boxShadow: activo ? '0 4px 14px rgba(0,0,0,0.06)' : 'none',
+                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <span style={{ width: 30, height: 22, borderRadius: 6, background: opt.bg, border: opt.borde ? `1px solid ${opt.borde}` : 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ width: 12, height: 4, borderRadius: 3, background: opt.chip }} />
+                      </span>
+                    </div>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--dark)' }}>{opt.titulo}</span>
+                    {activo && <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Activo</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--stone)', lineHeight: 1.4 }}>{opt.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="card" style={{ maxWidth: 760 }}>
       <div className="card-title">Configuración de marca</div>
       <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 22, lineHeight: 1.5 }}>

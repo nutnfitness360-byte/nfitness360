@@ -517,7 +517,7 @@ export default function PacienteDashboard() {
               if (c && !c.eventId) {
                 const r2 = await fetch(url, {
                   method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                  body: JSON.stringify({ action: 'crearCita', paciente: c.pacienteNombre, correo: c.pacienteEmail, fecha: c.fecha, hora: c.hora, dur: c.dur, tipoNombre: c.tipoNombre, online: c.online, objetivo: c.objetivo, notas: c.notas }), redirect: 'follow',
+                  body: JSON.stringify({ action: 'crearCita', paciente: c.pacienteNombre, correo: c.pacienteEmail, telefono: c.pacienteTelefono || '', fecha: c.fecha, hora: c.hora, dur: c.dur, tipoNombre: c.tipoNombre, online: c.online, objetivo: c.objetivo, notas: c.notas }), redirect: 'follow',
                 });
                 let d2; try { d2 = JSON.parse(await r2.text()); } catch (_) { d2 = null; }
                 if (d2 && d2.eventId) { try { await updateDoc(doc(db, 'citas', citaId), { eventId: d2.eventId }); } catch (e) {} }
