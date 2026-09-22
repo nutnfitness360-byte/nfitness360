@@ -165,6 +165,7 @@ export default function LoginPage() {
   const crearCuenta = async () => {
     const e = email.trim().toLowerCase();
     const tel = String(telefono || '').replace(/\D/g, '');
+    if (!e || e.indexOf('@') < 0) { setError('Escribe un correo válido.'); return; }
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
     if (tel.length !== 10) { setError('Escribe tu teléfono de contacto (10 dígitos).'); return; }
     if (pass.length < 6) { setError('La contraseña debe tener al menos 6 caracteres.'); return; }
@@ -355,6 +356,14 @@ export default function LoginPage() {
                     Continuar con Google
                   </button>
                   {INCRUSTADO && <div style={S.hintMini}>Si el botón de Google marca “Something went wrong”, abre esta página en tu navegador.</div>}
+                  {!esNutriPuerta && (
+                    <>
+                      <div style={S.orLbl}>¿primera vez?</div>
+                      <button style={{ ...S.btn, ...S.btnGold }} onClick={irACrear} disabled={loading}>
+                        Crea tu cuenta
+                      </button>
+                    </>
+                  )}
                 </>
               )}
 
@@ -395,8 +404,10 @@ export default function LoginPage() {
 
               {vista === 'crear' && (
                 <>
-                  <p style={S.p}>Crea tu cuenta para <b>{email.trim().toLowerCase()}</b>.</p>
+                  <p style={S.p}>Crea tu cuenta para reservar y dar seguimiento a tus consultas.</p>
                   {error && <div style={S.err}>{error}</div>}
+                  <label style={S.lbl}>Correo electrónico</label>
+                  <input style={S.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="correo@ejemplo.com" />
                   <label style={S.lbl}>Tu nombre</label>
                   <input style={S.inp} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre y apellido" />
                   <label style={S.lbl}>Teléfono de contacto (WhatsApp)</label>
@@ -410,6 +421,7 @@ export default function LoginPage() {
                   <button style={{ ...S.btn, ...S.btnDark }} onClick={crearCuenta} disabled={loading}>
                     {loading ? 'Creando…' : 'Crear y entrar'}
                   </button>
+                  <button style={S.linkBtn} onClick={() => { setError(''); setVista('acceso'); }} disabled={loading}>← Volver</button>
                 </>
               )}
             </>
