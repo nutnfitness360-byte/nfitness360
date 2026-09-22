@@ -11,6 +11,10 @@ import { CFDI_DEFAULT, CLAVES_UNIDAD, OPCIONES_IVA, REGIMENES_FISCALES } from '.
 // si REACT_APP_BRANDING_LOCKED === 'true', no se muestra el editor de colores.
 const BRANDING_LOCKED = String(process.env.REACT_APP_BRANDING_LOCKED || '').toLowerCase() === 'true';
 
+// Facturación (CFDI) en modo prueba: la tarjeta de config se OCULTA salvo que la
+// instancia la habilite con REACT_APP_FACTURACION=true.
+const FACTURACION_ON = String(process.env.REACT_APP_FACTURACION || '').toLowerCase() === 'true';
+
 const DIAS_SEMANA = [
   [1, 'Lunes'], [2, 'Martes'], [3, 'Miércoles'], [4, 'Jueves'],
   [5, 'Viernes'], [6, 'Sábado'], [0, 'Domingo'],
@@ -597,6 +601,7 @@ export default function Configuracion() {
         {pkgMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{pkgMsg}</span> : null}
       </div>
 
+      {FACTURACION_ON && (
       <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
         <div className="card-title">Facturación (CFDI)</div>
         <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>
@@ -701,6 +706,7 @@ export default function Configuracion() {
         </div>
         {cfdiMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{cfdiMsg}</span> : null}
       </div>
+      )}
 
       <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
         <div className="card-title">Reactivación de pacientes inactivos</div>
