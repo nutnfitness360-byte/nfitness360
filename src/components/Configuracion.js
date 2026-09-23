@@ -365,137 +365,7 @@ export default function Configuracion() {
 
   return (
     <>
-      {MULTI_NUTRI && esAdmin && (
-        <div className="card" style={{ maxWidth: 760, marginBottom: 18 }}>
-          <div className="card-title">Nutriólogas del equipo</div>
-          <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 16, lineHeight: 1.5 }}>
-            Da de alta a cada nutrióloga y comparte su link. Cada una entra con su propio correo y ve solo sus pacientes. El paciente que abra el link de una nutrióloga queda asignado a ella.
-          </div>
-
-          {nutriList.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
-              {nutriList.map(p => (
-                <div key={p.correo} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--dark)' }}>{p.nombre || '(sin nombre)'}</div>
-                      <div style={{ fontSize: 12, color: 'var(--stone)' }}>{p.correo}{p.cedula ? ' · Céd. ' + p.cedula : ''}</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button style={B.ghost} onClick={() => nfEditar(p)}>Editar</button>
-                      <button style={{ ...B.ghost, color: 'var(--danger)' }} onClick={() => quitarNutri(p.correo)} disabled={nfBusy}>Quitar</button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                    <input readOnly value={linkNutri(p.slug)} onFocus={e => e.target.select()}
-                      style={{ flex: 1, minWidth: 220, fontFamily: 'var(--font)', fontSize: 12, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--cream)', color: 'var(--dark)' }} />
-                    <button style={B.primary} onClick={() => copiarLink(p.slug)}>{nfCopiado === p.slug ? '¡Copiado!' : 'Copiar link'}</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-            <div style={{ ...B.label, marginBottom: 10 }}>{nfEdit ? 'Editar nutrióloga' : 'Agregar nutrióloga'}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px,1fr))', gap: 10 }}>
-              <label><span style={B.label}>Nombre</span><input style={B.inp2} value={nfForm.nombre} onChange={e => nfSet('nombre', e.target.value)} placeholder="LN Nombre Apellido" /></label>
-              <label><span style={B.label}>Correo (su acceso)</span><input style={{ ...B.inp2, opacity: nfEdit ? 0.6 : 1 }} value={nfForm.correo} onChange={e => nfSet('correo', e.target.value)} placeholder="correo@ejemplo.com" disabled={!!nfEdit} /></label>
-              <label><span style={B.label}>Cédula</span><input style={B.inp2} value={nfForm.cedula} onChange={e => nfSet('cedula', e.target.value)} placeholder="Cédula profesional" /></label>
-              <label><span style={B.label}>Identificador del link</span><input style={B.inp2} value={nfForm.slug} onChange={e => { setNfSlugTocado(true); nfSet('slug', slugDeNombre(e.target.value)); }} placeholder="ej. yoddam" /></label>
-            </div>
-            <div style={{ display: 'flex', gap: 14, marginTop: 12, flexWrap: 'wrap' }}>
-              <div>
-                <div style={B.label}>Logo (PDF)</div>
-                <div onClick={() => nfLogoRef.current && nfLogoRef.current.click()} style={{ ...B.drop, width: 150, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6 }}>
-                  {nfForm.logo ? <img src={nfForm.logo} alt="logo" style={{ maxHeight: 52, maxWidth: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 11, color: 'var(--stone)' }}>Subir logo</span>}
-                </div>
-                <input ref={nfLogoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => nfArchivo(e.target.files && e.target.files[0], 'logo')} />
-              </div>
-              <div>
-                <div style={B.label}>Firma (PDF)</div>
-                <div onClick={() => nfFirmaRef.current && nfFirmaRef.current.click()} style={{ ...B.drop, width: 150, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6 }}>
-                  {nfForm.firma ? <img src={nfForm.firma} alt="firma" style={{ maxHeight: 52, maxWidth: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 11, color: 'var(--stone)' }}>Subir firma</span>}
-                </div>
-                <input ref={nfFirmaRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => nfArchivo(e.target.files && e.target.files[0], 'firma')} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button style={B.primary} onClick={guardarNutri} disabled={nfBusy}>{nfBusy ? 'Guardando…' : (nfEdit ? 'Guardar cambios' : 'Agregar nutrióloga')}</button>
-              {nfEdit ? <button style={B.ghost} onClick={nfCancelar} disabled={nfBusy}>Cancelar</button> : null}
-              {nfMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>{nfMsg}</span> : null}
-            </div>
-            <div style={{ fontSize: 11.5, color: 'var(--stone)', marginTop: 10, lineHeight: 1.5 }}>
-              El <b>logo</b> y la <b>firma</b> se usarán en los PDF/correos de esa nutrióloga (esa parte se conecta en el motor, en la siguiente fase).
-            </div>
-          </div>
-        </div>
-      )}
-
-      {ES_FITMEAL && esAdmin && (
-        <div className="card" style={{ maxWidth: 760, marginBottom: 18 }}>
-          <div className="card-title">Cobros con MercadoPago</div>
-          <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 16, lineHeight: 1.5 }}>
-            Conecta tu cuenta de MercadoPago para cobrar consultas y paquetes en línea. El dinero llega
-            directo a tu cuenta de MercadoPago. Solo necesitas conectarla una vez.
-          </div>
-
-          {mpEstado === null ? (
-            <div style={{ fontSize: 13, color: 'var(--stone)' }}>Comprobando conexión…</div>
-          ) : mpEstado.conectado ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <span style={{ ...H.pill, background: '#E8F0EA', color: '#3E6B52' }}>Conectado ✓</span>
-              <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>Cuenta MercadoPago #{mpEstado.user_id || '—'}</span>
-              <button style={B.ghost} onClick={conectarMp}>Volver a conectar</button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <span style={{ ...H.pill, background: '#FBF4EF', color: 'var(--danger, #B0593F)' }}>Sin conectar</span>
-              <button style={B.primary} onClick={conectarMp}>Conectar MercadoPago</button>
-            </div>
-          )}
-          {mpMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 12 }}>{mpMsg}</span> : null}
-        </div>
-      )}
-
-      {temaDisponible && (
-        <div className="card" style={{ maxWidth: 760, marginBottom: 18 }}>
-          <div className="card-title">Apariencia</div>
-          <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 16, lineHeight: 1.5 }}>
-            Elige cómo se ven la barra lateral y el encabezado. Tu preferencia se
-            guarda en este dispositivo.
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 12 }}>
-            {[
-              { id: 'noche', titulo: 'Modo noche', desc: 'Barras oscuras (predeterminado)', bg: '#32363A', chip: '#F5D92C', txt: '#fff' },
-              { id: 'dia', titulo: 'Modo día', desc: 'Barras claras, acento magenta', bg: '#FFFFFF', chip: '#BA007C', txt: '#32363A', borde: '#EDE6EF' },
-            ].map(opt => {
-              const activo = tema === opt.id;
-              return (
-                <button key={opt.id} type="button" onClick={() => setTema(opt.id)}
-                  style={{
-                    textAlign: 'left', cursor: 'pointer', borderRadius: 12, padding: 14,
-                    background: '#fff', fontFamily: 'var(--font)',
-                    border: activo ? '2px solid var(--gold)' : '1px solid var(--border)',
-                    boxShadow: activo ? '0 4px 14px rgba(0,0,0,0.06)' : 'none',
-                  }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                    <div style={{ display: 'flex', gap: 5 }}>
-                      <span style={{ width: 30, height: 22, borderRadius: 6, background: opt.bg, border: opt.borde ? `1px solid ${opt.borde}` : 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ width: 12, height: 4, borderRadius: 3, background: opt.chip }} />
-                      </span>
-                    </div>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--dark)' }}>{opt.titulo}</span>
-                    {activo && <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Activo</span>}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--stone)', lineHeight: 1.4 }}>{opt.desc}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
+      <Seccion titulo={temaDisponible ? 'Marca y apariencia' : 'Marca'} n={1 + (temaDisponible ? 1 : 0)} defaultOpen>
       <div className="card" style={{ maxWidth: 760 }}>
       <div className="card-title">Configuración de marca</div>
       <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 22, lineHeight: 1.5 }}>
@@ -545,8 +415,47 @@ export default function Configuracion() {
       )}
       {msg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{msg}</span> : null}
       </div>
+      {temaDisponible && (
+        <div className="card" style={{ maxWidth: 760 }}>
+          <div className="card-title">Apariencia</div>
+          <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 16, lineHeight: 1.5 }}>
+            Elige cómo se ven la barra lateral y el encabezado. Tu preferencia se
+            guarda en este dispositivo.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 12 }}>
+            {[
+              { id: 'noche', titulo: 'Modo noche', desc: 'Barras oscuras (predeterminado)', bg: '#32363A', chip: '#F5D92C', txt: '#fff' },
+              { id: 'dia', titulo: 'Modo día', desc: 'Barras claras, acento magenta', bg: '#FFFFFF', chip: '#BA007C', txt: '#32363A', borde: '#EDE6EF' },
+            ].map(opt => {
+              const activo = tema === opt.id;
+              return (
+                <button key={opt.id} type="button" onClick={() => setTema(opt.id)}
+                  style={{
+                    textAlign: 'left', cursor: 'pointer', borderRadius: 12, padding: 14,
+                    background: '#fff', fontFamily: 'var(--font)',
+                    border: activo ? '2px solid var(--gold)' : '1px solid var(--border)',
+                    boxShadow: activo ? '0 4px 14px rgba(0,0,0,0.06)' : 'none',
+                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <span style={{ width: 30, height: 22, borderRadius: 6, background: opt.bg, border: opt.borde ? `1px solid ${opt.borde}` : 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ width: 12, height: 4, borderRadius: 3, background: opt.chip }} />
+                      </span>
+                    </div>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--dark)' }}>{opt.titulo}</span>
+                    {activo && <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Activo</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--stone)', lineHeight: 1.4 }}>{opt.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      </Seccion>
 
-      <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
+      <Seccion titulo="Agenda y servicios" n={3}>
+      <div className="card" style={{ maxWidth: 760 }}>
         <div className="card-title">Horarios de atención</div>
         <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 18, lineHeight: 1.5 }}>
           Define los días y el horario en que atiendes. La agenda solo ofrecerá citas dentro de estos horarios,
@@ -668,8 +577,7 @@ export default function Configuracion() {
         </div>
         {horMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{horMsg}</span> : null}
       </div>
-
-      <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
+      <div className="card" style={{ maxWidth: 760 }}>
         <div className="card-title">Servicios y precios</div>
         <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>
           Solo visible para ti. Define las consultas que se pueden agendar, su duración y su precio. Se usan en la agenda y en el resumen financiero.
@@ -726,8 +634,7 @@ export default function Configuracion() {
         </div>
         {precioMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{precioMsg}</span> : null}
       </div>
-
-      <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
+      <div className="card" style={{ maxWidth: 760 }}>
         <div className="card-title">Paquetes de consultas</div>
         <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>
           Define los paquetes que un paciente puede tener como saldo de consultas. La <b>familia</b> separa el saldo:
@@ -798,9 +705,39 @@ export default function Configuracion() {
         </div>
         {pkgMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{pkgMsg}</span> : null}
       </div>
+      </Seccion>
 
+      {((ES_FITMEAL && esAdmin) || FACTURACION_ON) && (
+        <Seccion
+          titulo={(ES_FITMEAL && esAdmin && FACTURACION_ON) ? 'Cobros y facturación' : (FACTURACION_ON ? 'Facturación' : 'Cobros')}
+          n={(ES_FITMEAL && esAdmin ? 1 : 0) + (FACTURACION_ON ? 1 : 0)}>
+      {ES_FITMEAL && esAdmin && (
+        <div className="card" style={{ maxWidth: 760 }}>
+          <div className="card-title">Cobros con MercadoPago</div>
+          <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 16, lineHeight: 1.5 }}>
+            Conecta tu cuenta de MercadoPago para cobrar consultas y paquetes en línea. El dinero llega
+            directo a tu cuenta de MercadoPago. Solo necesitas conectarla una vez.
+          </div>
+
+          {mpEstado === null ? (
+            <div style={{ fontSize: 13, color: 'var(--stone)' }}>Comprobando conexión…</div>
+          ) : mpEstado.conectado ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ ...H.pill, background: '#E8F0EA', color: '#3E6B52' }}>Conectado ✓</span>
+              <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>Cuenta MercadoPago #{mpEstado.user_id || '—'}</span>
+              <button style={B.ghost} onClick={conectarMp}>Volver a conectar</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ ...H.pill, background: '#FBF4EF', color: 'var(--danger, #B0593F)' }}>Sin conectar</span>
+              <button style={B.primary} onClick={conectarMp}>Conectar MercadoPago</button>
+            </div>
+          )}
+          {mpMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 12 }}>{mpMsg}</span> : null}
+        </div>
+      )}
       {FACTURACION_ON && (
-      <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
+      <div className="card" style={{ maxWidth: 760 }}>
         <div className="card-title">Facturación (CFDI)</div>
         <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>
           Valores por defecto del concepto para las facturas de consultas. Confírmalos con tu contador (clave del SAT, unidad e IVA). El timbrado se conecta con tu proveedor (FEL).
@@ -905,8 +842,82 @@ export default function Configuracion() {
         {cfdiMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{cfdiMsg}</span> : null}
       </div>
       )}
+        </Seccion>
+      )}
 
-      <div className="card" style={{ maxWidth: 760, marginTop: 18 }}>
+      {MULTI_NUTRI && esAdmin && (
+        <Seccion titulo="Equipo" n={1}>
+      {MULTI_NUTRI && esAdmin && (
+        <div className="card" style={{ maxWidth: 760 }}>
+          <div className="card-title">Nutriólogas del equipo</div>
+          <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 16, lineHeight: 1.5 }}>
+            Da de alta a cada nutrióloga y comparte su link. Cada una entra con su propio correo y ve solo sus pacientes. El paciente que abra el link de una nutrióloga queda asignado a ella.
+          </div>
+
+          {nutriList.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+              {nutriList.map(p => (
+                <div key={p.correo} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--dark)' }}>{p.nombre || '(sin nombre)'}</div>
+                      <div style={{ fontSize: 12, color: 'var(--stone)' }}>{p.correo}{p.cedula ? ' · Céd. ' + p.cedula : ''}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button style={B.ghost} onClick={() => nfEditar(p)}>Editar</button>
+                      <button style={{ ...B.ghost, color: 'var(--danger)' }} onClick={() => quitarNutri(p.correo)} disabled={nfBusy}>Quitar</button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                    <input readOnly value={linkNutri(p.slug)} onFocus={e => e.target.select()}
+                      style={{ flex: 1, minWidth: 220, fontFamily: 'var(--font)', fontSize: 12, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--cream)', color: 'var(--dark)' }} />
+                    <button style={B.primary} onClick={() => copiarLink(p.slug)}>{nfCopiado === p.slug ? '¡Copiado!' : 'Copiar link'}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+            <div style={{ ...B.label, marginBottom: 10 }}>{nfEdit ? 'Editar nutrióloga' : 'Agregar nutrióloga'}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px,1fr))', gap: 10 }}>
+              <label><span style={B.label}>Nombre</span><input style={B.inp2} value={nfForm.nombre} onChange={e => nfSet('nombre', e.target.value)} placeholder="LN Nombre Apellido" /></label>
+              <label><span style={B.label}>Correo (su acceso)</span><input style={{ ...B.inp2, opacity: nfEdit ? 0.6 : 1 }} value={nfForm.correo} onChange={e => nfSet('correo', e.target.value)} placeholder="correo@ejemplo.com" disabled={!!nfEdit} /></label>
+              <label><span style={B.label}>Cédula</span><input style={B.inp2} value={nfForm.cedula} onChange={e => nfSet('cedula', e.target.value)} placeholder="Cédula profesional" /></label>
+              <label><span style={B.label}>Identificador del link</span><input style={B.inp2} value={nfForm.slug} onChange={e => { setNfSlugTocado(true); nfSet('slug', slugDeNombre(e.target.value)); }} placeholder="ej. yoddam" /></label>
+            </div>
+            <div style={{ display: 'flex', gap: 14, marginTop: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={B.label}>Logo (PDF)</div>
+                <div onClick={() => nfLogoRef.current && nfLogoRef.current.click()} style={{ ...B.drop, width: 150, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6 }}>
+                  {nfForm.logo ? <img src={nfForm.logo} alt="logo" style={{ maxHeight: 52, maxWidth: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 11, color: 'var(--stone)' }}>Subir logo</span>}
+                </div>
+                <input ref={nfLogoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => nfArchivo(e.target.files && e.target.files[0], 'logo')} />
+              </div>
+              <div>
+                <div style={B.label}>Firma (PDF)</div>
+                <div onClick={() => nfFirmaRef.current && nfFirmaRef.current.click()} style={{ ...B.drop, width: 150, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6 }}>
+                  {nfForm.firma ? <img src={nfForm.firma} alt="firma" style={{ maxHeight: 52, maxWidth: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 11, color: 'var(--stone)' }}>Subir firma</span>}
+                </div>
+                <input ref={nfFirmaRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => nfArchivo(e.target.files && e.target.files[0], 'firma')} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button style={B.primary} onClick={guardarNutri} disabled={nfBusy}>{nfBusy ? 'Guardando…' : (nfEdit ? 'Guardar cambios' : 'Agregar nutrióloga')}</button>
+              {nfEdit ? <button style={B.ghost} onClick={nfCancelar} disabled={nfBusy}>Cancelar</button> : null}
+              {nfMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>{nfMsg}</span> : null}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--stone)', marginTop: 10, lineHeight: 1.5 }}>
+              El <b>logo</b> y la <b>firma</b> se usarán en los PDF/correos de esa nutrióloga (esa parte se conecta en el motor, en la siguiente fase).
+            </div>
+          </div>
+        </div>
+      )}
+        </Seccion>
+      )}
+
+      <Seccion titulo="Automatizaciones" n={1}>
+      <div className="card" style={{ maxWidth: 760 }}>
         <div className="card-title">Reactivación de pacientes inactivos</div>
         <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>
           Envía automáticamente un correo cálido a los pacientes que llevan cierto tiempo sin un plan nuevo, invitándolos a retomar su seguimiento. Se envía una sola vez por periodo de inactividad, y te llega un resumen de a quién se le mandó.
@@ -929,9 +940,11 @@ export default function Configuracion() {
         </div>
         {reactMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{reactMsg}</span> : null}
       </div>
+      </Seccion>
     </>
   );
 }
+
 
 const P = {
   row: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)', flexWrap: 'wrap' },
@@ -964,3 +977,26 @@ const B = {
   colorRow: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--dark)' },
   colorInput: { width: 44, height: 34, border: '1px solid var(--border)', borderRadius: 8, background: '#fff', cursor: 'pointer', padding: 2 },
 };
+
+const S = {
+  sec: { border: '1px solid var(--border)', borderRadius: 14, background: 'var(--card)', marginBottom: 16, maxWidth: 800, overflow: 'hidden' },
+  sum: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '16px 18px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', textAlign: 'left' },
+  sumTit: { fontWeight: 700, fontSize: 15, color: 'var(--dark)' },
+  sumN: { fontSize: 11, fontWeight: 700, background: 'var(--cream)', color: 'var(--stone)', borderRadius: 999, padding: '2px 9px' },
+  chev: { marginLeft: 'auto', color: 'var(--stone)', fontSize: 13, transition: 'transform .15s' },
+  body: { display: 'flex', flexDirection: 'column', gap: 24, padding: '2px 18px 22px' },
+};
+
+function Seccion({ titulo, n, defaultOpen, children }) {
+  const [abierta, setAbierta] = useState(!!defaultOpen);
+  return (
+    <div style={S.sec}>
+      <button type="button" onClick={() => setAbierta(a => !a)} style={S.sum} aria-expanded={abierta}>
+        <span style={S.sumTit}>{titulo}</span>
+        {typeof n === 'number' ? <span style={S.sumN}>{n}</span> : null}
+        <span style={{ ...S.chev, transform: abierta ? 'rotate(180deg)' : 'none' }}>▾</span>
+      </button>
+      {abierta && <div style={S.body}>{children}</div>}
+    </div>
+  );
+}
