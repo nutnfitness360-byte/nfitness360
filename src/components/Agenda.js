@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, FB_PROJECT_ID } from '../firebase/config';
 import { collection, query, onSnapshot, addDoc, updateDoc, doc, getDoc, Timestamp, orderBy, where } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
-import { MULTI_NUTRI, filtroDueno, selloDueno } from '../utils/multiTenant';
+import { MULTI_NUTRI, filtroDueno, selloDueno, cargarNutriologos, correoDeSlug, slugNutriURL } from '../utils/multiTenant';
 import { familiaDeServicio, saldoDisponible } from '../utils/creditos';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -193,10 +193,19 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   // Resolver el dueño del paciente logueado desde su expediente (solo multi-inquilino).
   useEffect(() => {
     if (!MULTI_NUTRI || isNutri || !(user && user.email)) { setDuenoPac(null); return undefined; }
-    const qp = query(collection(db, 'pacientes'), where('correo', '==', user.email.toLowerCase()));
-    return onSnapshot(qp, snap => {
+    const correo = user.email.toLowerCase();
+    const qp = query(collection(db, 'pacientes'), where('correo', '==', correo));
+    return onSnapshot(qp, async snap => {
       const d = snap.docs[0] && snap.docs[0].data();
-      setDuenoPac((d && d.nutriDueno) || null);
+      if (d && d.nutriDueno) { setDuenoPac(d.nutriDueno); return; }
+      // Sin expediente aún: usa el dueño que quedó en su registro (suscriptores) o, si no, el del link ?n=.
+      try {
+        const s = await getDoc(doc(db, 'suscriptores', correo));
+        if (s.exists() && s.data().nutriDueno) { setDuenoPac(s.data().nutriDueno); return; }
+      } catch (_) { /* sigue al link */ }
+      try {
+        setDuenoPac(correoDeSlug(await cargarNutriologos(db), slugNutriURL()) || null);
+      } catch (_) { setDuenoPac(null); }
     }, () => setDuenoPac(null));
   }, [isNutri, user]);
 

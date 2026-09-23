@@ -48,3 +48,32 @@ export function slugNutriURL() {
     return n || null;
   } catch (_) { return null; }
 }
+
+// Lee la lista de nutriólogos del equipo (multi-inquilino):
+// config/nutriologos.perfiles = [{ correo, nombre, cedula, slug, logo, firma, web }, ...]
+export async function cargarNutriologos(db) {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'nutriologos'));
+    return (snap.exists() && Array.isArray(snap.data().perfiles)) ? snap.data().perfiles : [];
+  } catch (_) { return []; }
+}
+
+// Resuelve el correo (dueño) a partir del slug del link ?n=.
+export function correoDeSlug(perfiles, slug) {
+  if (!slug) return null;
+  const s = String(slug).toLowerCase();
+  const p = (perfiles || []).find(x => x && String(x.slug || '').toLowerCase() === s);
+  return p ? String(p.correo || '').toLowerCase() : null;
+}
+
+// Genera un slug limpio a partir de un nombre (para el link del nutriólogo).
+export function slugDeNombre(nombre) {
+  return String(nombre || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
+}
+
+// Arma el link que el nutriólogo comparte con SUS pacientes.
+export function linkNutri(slug) {
+  try { return window.location.origin + '/?n=' + encodeURIComponent(String(slug || '').toLowerCase()); }
+  catch (_) { return '/?n=' + String(slug || ''); }
+}

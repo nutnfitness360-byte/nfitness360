@@ -4,6 +4,8 @@ import { db } from '../firebase/config';
 import { HORARIO_DEFAULT, MODALIDADES, franjasDe, SERVICIOS_DEFAULT } from './Agenda';
 import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { MULTI_NUTRI, slugDeNombre, linkNutri } from '../utils/multiTenant';
 import { PAQUETES_DEFAULT, FAMILIAS } from '../utils/creditos';
 import { CFDI_DEFAULT, CLAVES_UNIDAD, OPCIONES_IVA, REGIMENES_FISCALES } from '../data/catalogosCFDI';
 
@@ -61,7 +63,72 @@ function comprimirLogo(file) {
 export default function Configuracion() {
   const { logo, colors } = useBranding();
   const { tema, setTema, temaDisponible } = useTheme();
+  const { esAdmin } = useAuth();
   const [colorsLocal, setColorsLocal] = useState(colors);
+
+  // --- Nutriólogas del equipo (multi-inquilino, solo admin) ---
+  const [nutriList, setNutriList] = useState([]);
+  const nfVacio = { correo: '', nombre: '', cedula: '', slug: '', logo: '', firma: '' };
+  const [nfForm, setNfForm] = useState(nfVacio);
+  const [nfEdit, setNfEdit] = useState(null);   // correo en edición, o null
+  const [nfBusy, setNfBusy] = useState(false);
+  const [nfMsg, setNfMsg] = useState('');
+  const [nfCopiado, setNfCopiado] = useState('');
+  const [nfSlugTocado, setNfSlugTocado] = useState(false);
+  const nfLogoRef = useRef(null);
+  const nfFirmaRef = useRef(null);
+
+  useEffect(() => {
+    if (!MULTI_NUTRI) return undefined;
+    return onSnapshot(doc(db, 'config', 'nutriologos'), snap => {
+      const arr = (snap.exists() && Array.isArray(snap.data().perfiles)) ? snap.data().perfiles : [];
+      setNutriList(arr);
+    }, () => {});
+  }, []);
+
+  const nfSet = (campo, val) => setNfForm(f => {
+    const next = { ...f, [campo]: val };
+    if (campo === 'nombre' && !nfSlugTocado) next.slug = slugDeNombre(val);
+    return next;
+  });
+  const nfArchivo = (file, campo) => { if (!file) return; comprimirLogo(file).then(b64 => nfSet(campo, b64)).catch(() => {}); };
+  const nfEditar = (p) => { setNfForm({ correo: p.correo || '', nombre: p.nombre || '', cedula: p.cedula || '', slug: p.slug || '', logo: p.logo || '', firma: p.firma || '' }); setNfEdit((p.correo || '').toLowerCase()); setNfSlugTocado(true); setNfMsg(''); };
+  const nfCancelar = () => { setNfForm(nfVacio); setNfEdit(null); setNfSlugTocado(false); setNfMsg(''); };
+  const copiarLink = (slug) => {
+    try { navigator.clipboard.writeText(linkNutri(slug)); setNfCopiado(slug); setTimeout(() => setNfCopiado(''), 1800); }
+    catch (_) { setNfMsg('No se pudo copiar; copia el link a mano.'); }
+  };
+  const guardarNutri = async () => {
+    const correo = (nfForm.correo || '').trim().toLowerCase();
+    const nombre = (nfForm.nombre || '').trim();
+    const slug = (nfForm.slug || slugDeNombre(nombre)).trim().toLowerCase();
+    if (!correo || correo.indexOf('@') < 0) { setNfMsg('Escribe un correo válido.'); return; }
+    if (!nombre) { setNfMsg('Escribe el nombre de la nutrióloga.'); return; }
+    if (!slug) { setNfMsg('Falta el identificador del link (slug).'); return; }
+    const slugChoca = nutriList.some(p => (p.slug || '').toLowerCase() === slug && (p.correo || '').toLowerCase() !== correo);
+    if (slugChoca) { setNfMsg('Ese identificador de link ya lo usa otra nutrióloga; cámbialo.'); return; }
+    setNfBusy(true); setNfMsg('');
+    try {
+      const perfil = { correo, nombre, cedula: (nfForm.cedula || '').trim(), slug, logo: nfForm.logo || '', firma: nfForm.firma || '' };
+      const otros = nutriList.filter(p => (p.correo || '').toLowerCase() !== correo);
+      await setDoc(doc(db, 'config', 'nutriologos'), { perfiles: [...otros, perfil] }, { merge: true });
+      // Habilita su acceso como nutrióloga (sin admin).
+      await setDoc(doc(db, 'autorizados', correo), { rol: 'nutriologa' }, { merge: true });
+      setNfMsg(nfEdit ? 'Nutrióloga actualizada.' : 'Nutrióloga agregada. Ya puede entrar con su correo.');
+      nfCancelar();
+    } catch (e) { setNfMsg('No se pudo guardar. Revisa tu conexión y permisos.'); }
+    setNfBusy(false);
+  };
+  const quitarNutri = async (correo) => {
+    const c = (correo || '').toLowerCase();
+    setNfBusy(true); setNfMsg('');
+    try {
+      const perfiles = nutriList.filter(p => (p.correo || '').toLowerCase() !== c);
+      await setDoc(doc(db, 'config', 'nutriologos'), { perfiles }, { merge: true });
+      setNfMsg('Nutrióloga quitada del equipo. (Su acceso sigue activo hasta que lo revoques en autorizados.)');
+    } catch (e) { setNfMsg('No se pudo quitar.'); }
+    setNfBusy(false);
+  };
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [drag, setDrag] = useState(false);
@@ -260,6 +327,73 @@ export default function Configuracion() {
 
   return (
     <>
+      {MULTI_NUTRI && esAdmin && (
+        <div className="card" style={{ maxWidth: 760, marginBottom: 18 }}>
+          <div className="card-title">Nutriólogas del equipo</div>
+          <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 16, lineHeight: 1.5 }}>
+            Da de alta a cada nutrióloga y comparte su link. Cada una entra con su propio correo y ve solo sus pacientes. El paciente que abra el link de una nutrióloga queda asignado a ella.
+          </div>
+
+          {nutriList.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+              {nutriList.map(p => (
+                <div key={p.correo} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--dark)' }}>{p.nombre || '(sin nombre)'}</div>
+                      <div style={{ fontSize: 12, color: 'var(--stone)' }}>{p.correo}{p.cedula ? ' · Céd. ' + p.cedula : ''}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button style={B.ghost} onClick={() => nfEditar(p)}>Editar</button>
+                      <button style={{ ...B.ghost, color: 'var(--danger)' }} onClick={() => quitarNutri(p.correo)} disabled={nfBusy}>Quitar</button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                    <input readOnly value={linkNutri(p.slug)} onFocus={e => e.target.select()}
+                      style={{ flex: 1, minWidth: 220, fontFamily: 'var(--font)', fontSize: 12, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--cream)', color: 'var(--dark)' }} />
+                    <button style={B.primary} onClick={() => copiarLink(p.slug)}>{nfCopiado === p.slug ? '¡Copiado!' : 'Copiar link'}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+            <div style={{ ...B.label, marginBottom: 10 }}>{nfEdit ? 'Editar nutrióloga' : 'Agregar nutrióloga'}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px,1fr))', gap: 10 }}>
+              <label><span style={B.label}>Nombre</span><input style={B.inp2} value={nfForm.nombre} onChange={e => nfSet('nombre', e.target.value)} placeholder="LN Nombre Apellido" /></label>
+              <label><span style={B.label}>Correo (su acceso)</span><input style={{ ...B.inp2, opacity: nfEdit ? 0.6 : 1 }} value={nfForm.correo} onChange={e => nfSet('correo', e.target.value)} placeholder="correo@ejemplo.com" disabled={!!nfEdit} /></label>
+              <label><span style={B.label}>Cédula</span><input style={B.inp2} value={nfForm.cedula} onChange={e => nfSet('cedula', e.target.value)} placeholder="Cédula profesional" /></label>
+              <label><span style={B.label}>Identificador del link</span><input style={B.inp2} value={nfForm.slug} onChange={e => { setNfSlugTocado(true); nfSet('slug', slugDeNombre(e.target.value)); }} placeholder="ej. yoddam" /></label>
+            </div>
+            <div style={{ display: 'flex', gap: 14, marginTop: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={B.label}>Logo (PDF)</div>
+                <div onClick={() => nfLogoRef.current && nfLogoRef.current.click()} style={{ ...B.drop, width: 150, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6 }}>
+                  {nfForm.logo ? <img src={nfForm.logo} alt="logo" style={{ maxHeight: 52, maxWidth: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 11, color: 'var(--stone)' }}>Subir logo</span>}
+                </div>
+                <input ref={nfLogoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => nfArchivo(e.target.files && e.target.files[0], 'logo')} />
+              </div>
+              <div>
+                <div style={B.label}>Firma (PDF)</div>
+                <div onClick={() => nfFirmaRef.current && nfFirmaRef.current.click()} style={{ ...B.drop, width: 150, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6 }}>
+                  {nfForm.firma ? <img src={nfForm.firma} alt="firma" style={{ maxHeight: 52, maxWidth: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 11, color: 'var(--stone)' }}>Subir firma</span>}
+                </div>
+                <input ref={nfFirmaRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => nfArchivo(e.target.files && e.target.files[0], 'firma')} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button style={B.primary} onClick={guardarNutri} disabled={nfBusy}>{nfBusy ? 'Guardando…' : (nfEdit ? 'Guardar cambios' : 'Agregar nutrióloga')}</button>
+              {nfEdit ? <button style={B.ghost} onClick={nfCancelar} disabled={nfBusy}>Cancelar</button> : null}
+              {nfMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>{nfMsg}</span> : null}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--stone)', marginTop: 10, lineHeight: 1.5 }}>
+              El <b>logo</b> y la <b>firma</b> se usarán en los PDF/correos de esa nutrióloga (esa parte se conecta en el motor, en la siguiente fase).
+            </div>
+          </div>
+        </div>
+      )}
+
       {temaDisponible && (
         <div className="card" style={{ maxWidth: 760, marginBottom: 18 }}>
           <div className="card-title">Apariencia</div>
@@ -762,6 +896,7 @@ const B = {
   drop: { border: '1.5px dashed var(--border)', borderRadius: 12, padding: 20, textAlign: 'center', cursor: 'pointer', background: 'var(--cream)' },
   primary: { background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 9, padding: '9px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' },
   ghost: { background: '#fff', color: 'var(--dark)', border: '1px solid var(--border)', borderRadius: 9, padding: '9px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' },
+  inp2: { width: '100%', boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 9, padding: '9px 10px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', marginTop: 4, background: '#fff' },
   colorRow: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--dark)' },
   colorInput: { width: 44, height: 34, border: '1px solid var(--border)', borderRadius: 8, background: '#fff', cursor: 'pointer', padding: 2 },
 };
