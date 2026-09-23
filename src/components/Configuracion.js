@@ -102,7 +102,6 @@ export default function Configuracion() {
       }
     } catch (_) { /* no-op */ }
     cargarEstadoMp();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [esAdmin]);
 
   // --- Nutriólogas del equipo (multi-inquilino, solo admin) ---
