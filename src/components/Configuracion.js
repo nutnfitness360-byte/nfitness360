@@ -3,7 +3,7 @@ import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { HORARIO_DEFAULT, MODALIDADES, franjasDe, SERVICIOS_DEFAULT } from './Agenda';
 import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme, ES_FITMEAL } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { MULTI_NUTRI, slugDeNombre, linkNutri } from '../utils/multiTenant';
 import { PAQUETES_DEFAULT, FAMILIAS } from '../utils/creditos';
@@ -16,6 +16,11 @@ const BRANDING_LOCKED = String(process.env.REACT_APP_BRANDING_LOCKED || '').toLo
 // Facturación (CFDI) en modo prueba: la tarjeta de config se OCULTA salvo que la
 // instancia la habilite con REACT_APP_FACTURACION=true.
 const FACTURACION_ON = String(process.env.REACT_APP_FACTURACION || '').toLowerCase() === 'true';
+
+// Broker de pagos (MercadoPago) — conexión OAuth self-service. Por ahora solo Fitmeal
+// usa el broker (Natalia/Aretia cobran por Stripe). Una sola terminal para todo Fitmeal.
+const MP_BROKER_URL = String(process.env.REACT_APP_BROKER_URL || 'https://mp-broker.vercel.app').replace(/\/+$/, '');
+const MP_INST = String(process.env.REACT_APP_MP_INST || 'fitmeal');
 
 const DIAS_SEMANA = [
   [1, 'Lunes'], [2, 'Martes'], [3, 'Miércoles'], [4, 'Jueves'],
@@ -65,6 +70,40 @@ export default function Configuracion() {
   const { tema, setTema, temaDisponible } = useTheme();
   const { esAdmin } = useAuth();
   const [colorsLocal, setColorsLocal] = useState(colors);
+
+  // --- Cobros MercadoPago (Fitmeal, solo admin) ---
+  const [mpEstado, setMpEstado] = useState(null);   // null = cargando; {conectado, user_id, desde}
+  const [mpMsg, setMpMsg] = useState('');
+  const cargarEstadoMp = async () => {
+    try {
+      const r = await fetch(MP_BROKER_URL + '/api/oauth/status?inst=' + encodeURIComponent(MP_INST), { cache: 'no-store' });
+      const d = await r.json();
+      setMpEstado(d && typeof d.conectado === 'boolean' ? d : { conectado: false });
+    } catch (_) { setMpEstado({ conectado: false, error: true }); }
+  };
+  const conectarMp = () => {
+    let ret;
+    try { const u = new URL(window.location.href); u.searchParams.delete('mp'); ret = u.toString(); }
+    catch (_) { ret = window.location.origin; }
+    window.location.href = MP_BROKER_URL + '/api/oauth/start?inst=' + encodeURIComponent(MP_INST) + '&return=' + encodeURIComponent(ret);
+  };
+  useEffect(() => {
+    if (!(ES_FITMEAL && esAdmin)) return;
+    try {
+      const m = window.location.href.match(/[?&]mp=(ok|error)/);
+      if (m) {
+        setMpMsg(m[1] === 'ok'
+          ? '¡MercadoPago conectado! Ya puedes cobrar en línea.'
+          : 'No se pudo conectar MercadoPago. Vuelve a intentarlo.');
+        const limpio = window.location.href
+          .replace(/([?&])mp=(ok|error)(&|$)/, (mm, pre, v, post) => post === '&' ? pre : '')
+          .replace(/[?&]$/, '');
+        window.history.replaceState({}, '', limpio);
+      }
+    } catch (_) { /* no-op */ }
+    cargarEstadoMp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esAdmin]);
 
   // --- Nutriólogas del equipo (multi-inquilino, solo admin) ---
   const [nutriList, setNutriList] = useState([]);
@@ -391,6 +430,32 @@ export default function Configuracion() {
               El <b>logo</b> y la <b>firma</b> se usarán en los PDF/correos de esa nutrióloga (esa parte se conecta en el motor, en la siguiente fase).
             </div>
           </div>
+        </div>
+      )}
+
+      {ES_FITMEAL && esAdmin && (
+        <div className="card" style={{ maxWidth: 760, marginBottom: 18 }}>
+          <div className="card-title">Cobros con MercadoPago</div>
+          <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 16, lineHeight: 1.5 }}>
+            Conecta tu cuenta de MercadoPago para cobrar consultas y paquetes en línea. El dinero llega
+            directo a tu cuenta de MercadoPago. Solo necesitas conectarla una vez.
+          </div>
+
+          {mpEstado === null ? (
+            <div style={{ fontSize: 13, color: 'var(--stone)' }}>Comprobando conexión…</div>
+          ) : mpEstado.conectado ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ ...H.pill, background: '#E8F0EA', color: '#3E6B52' }}>Conectado ✓</span>
+              <span style={{ fontSize: 12.5, color: 'var(--stone)' }}>Cuenta MercadoPago #{mpEstado.user_id || '—'}</span>
+              <button style={B.ghost} onClick={conectarMp}>Volver a conectar</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ ...H.pill, background: '#FBF4EF', color: 'var(--danger, #B0593F)' }}>Sin conectar</span>
+              <button style={B.primary} onClick={conectarMp}>Conectar MercadoPago</button>
+            </div>
+          )}
+          {mpMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 12 }}>{mpMsg}</span> : null}
         </div>
       )}
 
