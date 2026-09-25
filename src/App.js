@@ -80,14 +80,14 @@ function AppContent() {
   }
 
   if (!user) return <LoginPage />;
-  if (role === 'nutriologa') {
-    return (
-      <TerminosGate>
-        <NutriDashboard />
-      </TerminosGate>
-    );
-  }
-  return <PacienteDashboard />;
+  // Tanto nutrióloga como paciente deben aceptar los términos y el aviso de
+  // privacidad la primera vez que entran (los pacientes son titulares de datos
+  // sensibles). El modal se guarda por usuario en Firestore.
+  return (
+    <TerminosGate>
+      {role === 'nutriologa' ? <NutriDashboard /> : <PacienteDashboard />}
+    </TerminosGate>
+  );
 }
 
 export default function App() {
