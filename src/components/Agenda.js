@@ -291,7 +291,19 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const usarPaqueteActivo = saldoFamilia > 0 && mUsarPaquete && !reagActivo;
 
   const abrirModal = () => {
-    setMPaciente(''); setMPacienteEmail(''); setMPacienteTel(''); setMTipo(null);
+    const reagOrig = reagendarDe || reagendarLocal;
+    // En reagenda: preselecciona la MISMA consulta y el paciente de la cita original,
+    // para que los horarios del día se muestren de inmediato (solo cambia la interfaz;
+    // el guardado y los correos siguen igual).
+    let tipoPre = null;
+    if (reagOrig) {
+      if (servicios.some(s => s.id === reagOrig.tipo)) tipoPre = reagOrig.tipo;
+      else { const m = servicios.find(s => (s.nombre || '') === (reagOrig.tipoNombre || '')); if (m) tipoPre = m.id; }
+    }
+    setMPaciente(reagOrig ? (reagOrig.pacienteNombre || '') : '');
+    setMPacienteEmail(reagOrig ? (reagOrig.pacienteEmail || '') : '');
+    setMPacienteTel(reagOrig ? (reagOrig.pacienteTelefono || '') : '');
+    setMTipo(tipoPre);
     setMObjetivo(OBJETIVOS[0]); setMObjetivoOtro(''); setMHora(null); setMNotas('');
     setMMetodoPago('efectivo'); setMUsarPaquete(true);
     setShowSug(false); setShowModal(true);
@@ -540,14 +552,14 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
             ))
         }
         <button className="btn-primary" onClick={abrirModal} disabled={bloqueado(selDate, horario, excepciones)}>
-          + {isNutri ? 'Nueva cita' : 'Agendar cita'}
+          {reagActivo ? 'Reagendar' : ('+ ' + (isNutri ? 'Nueva cita' : 'Agendar cita'))}
         </button>
       </div>
 
       {showModal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && cerrarModal()}>
           <div className="modal">
-            <div className="modal-title">{isNutri ? 'Nueva cita' : 'Agendar cita'}</div>
+            <div className="modal-title">{reagActivo ? 'Reagendar cita' : (isNutri ? 'Nueva cita' : 'Agendar cita')}</div>
 
             {isNutri && (
               <div className="fg" style={{ position: 'relative' }}>
@@ -683,7 +695,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
             <div className="btn-row">
               <button className="btn-cancel" onClick={cerrarModal}>Cancelar</button>
               <button className="btn-save" onClick={guardar} disabled={saving}>
-                {saving ? 'Guardando...' : (usarPaqueteActivo ? 'Agendar con paquete' : (isNutri ? 'Guardar cita' : (((servSel && servSel.online) || mMetodoPago === 'stripe') ? 'Pagar y agendar' : 'Confirmar cita')))}
+                {saving ? 'Guardando...' : (reagActivo ? 'Confirmar reagenda' : (usarPaqueteActivo ? 'Agendar con paquete' : (isNutri ? 'Guardar cita' : (((servSel && servSel.online) || mMetodoPago === 'stripe') ? 'Pagar y agendar' : 'Confirmar cita'))))}
               </button>
             </div>
           </div>

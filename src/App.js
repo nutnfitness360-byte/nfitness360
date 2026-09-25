@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import LoginPage from './pages/LoginPage';
 import NutriDashboard from './pages/NutriDashboard';
 import PacienteDashboard from './pages/PacienteDashboard';
+import { TerminosGate } from './components/TerminosModal';
 import './styles.css';
 
 // Marca por INSTANCIA: variable de entorno REACT_APP_MARCA → respaldo por dominio
@@ -79,7 +80,13 @@ function AppContent() {
   }
 
   if (!user) return <LoginPage />;
-  if (role === 'nutriologa') return <NutriDashboard />;
+  if (role === 'nutriologa') {
+    return (
+      <TerminosGate>
+        <NutriDashboard />
+      </TerminosGate>
+    );
+  }
   return <PacienteDashboard />;
 }
 
