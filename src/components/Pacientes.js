@@ -149,6 +149,10 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [manual, setManual] = useState({ fecha: hoyISO(), ...MANUAL_CAMPOS });
   const [manualBusy, setManualBusy] = useState(false);
   const [manualMsg, setManualMsg] = useState('');
+  const [editMM, setEditMM] = useState({ fecha: '', ...MANUAL_CAMPOS });
+  const [openEditMM, setOpenEditMM] = useState(false);
+  const [editMMBusy, setEditMMBusy] = useState(false);
+  const [editMMMsg, setEditMMMsg] = useState('');
   const [err, setErr] = useState('');
   const { nutriDueno } = useAuth();   // dueño (multi-inquilino); null si la bandera está apagada
 
@@ -882,6 +886,40 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     setManualBusy(false);
   };
 
+  // Editar la ULTIMA medicion manual (pliegues y perimetros).
+  const abrirEditarUltimaMM = () => {
+    const u = last((sel.medicionesManual || []).slice().sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '')));
+    if (!u) return;
+    const v = (x) => (x === 0 || x ? String(x) : '');
+    const campos = {};
+    [...PLIEGUES, ...PERIMETROS].forEach(({ k }) => { campos[k] = v(u[k]); });
+    setEditMM({ fecha: u.fecha || hoyISO(), ...campos });
+    setEditMMMsg(''); setOpenEditMM(true);
+  };
+
+  const guardarEditUltimaMM = async () => {
+    const numOrU = (str) => { const val = parseFloat(str); return isNaN(val) ? undefined : val; };
+    const entry = { fecha: editMM.fecha || hoyISO() };
+    let algo = false;
+    [...PLIEGUES, ...PERIMETROS].forEach(({ k }) => { const val = numOrU(editMM[k]); if (val !== undefined) { entry[k] = val; algo = true; } });
+    if (!algo) { setEditMMMsg('Escribe al menos un valor antes de guardar.'); return; }
+    if (PLIEGUES.some(({ k }) => typeof entry[k] === 'number')) {
+      const suma = PLIEGUES.reduce((a, { k }) => a + (typeof entry[k] === 'number' ? entry[k] : 0), 0);
+      entry.suma6 = Math.round(suma * 10) / 10;
+    }
+    const base = [...(sel.medicionesManual || [])].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+    if (!base.length) { setOpenEditMM(false); return; }
+    base.pop(); // quita la ultima (la mas reciente), que es la que estamos editando
+    setEditMMBusy(true); setEditMMMsg('');
+    try {
+      const arr = [...base, entry].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+      await updateDoc(doc(db, 'pacientes', sel.id), { medicionesManual: arr });
+      setOpenEditMM(false);
+      setEditMMMsg('Ultima medicion actualizada - revisala en las graficas.');
+    } catch (e) { setEditMMMsg('No se pudo guardar: ' + e.message); }
+    setEditMMBusy(false);
+  };
+
   const onInBody = async (data) => {
     const peso = parseFloat(data.peso);
     if (isFinite(peso)) {
@@ -1132,7 +1170,31 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
 
         {sel.medicionesManual && sel.medicionesManual.length > 0 && (
           <div className="card">
-            <div style={S.titleRow}><div className="card-title" style={{ margin: 0 }}>Gráficas de pliegues y perímetros</div></div>
+            <div style={S.titleRow}>
+              <div className="card-title" style={{ margin: 0 }}>Gráficas de pliegues y perímetros</div>
+              {mm && <button style={S.smallBtn} onClick={openEditMM ? () => setOpenEditMM(false) : abrirEditarUltimaMM}>{openEditMM ? 'Cancelar' : 'Editar última'}</button>}
+            </div>
+            {openEditMM && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ maxWidth: 200, marginBottom: 6 }}>
+                  <Field l="Fecha de la medición"><input type="date" style={S.inp} value={editMM.fecha} onChange={e => setEditMM({ ...editMM, fecha: e.target.value })} /></Field>
+                </div>
+                <div style={S.subLbl}>Pliegues (mm)</div>
+                <div style={S.medGrid}>
+                  {PLIEGUES.map(p => (
+                    <Field key={p.k} l={p.l}><input style={S.inp} inputMode="decimal" value={editMM[p.k]} onChange={e => setEditMM({ ...editMM, [p.k]: e.target.value })} /></Field>
+                  ))}
+                </div>
+                <div style={{ ...S.subLbl, marginTop: 6 }}>Perímetros (cm)</div>
+                <div style={S.medGrid}>
+                  {PERIMETROS.map(p => (
+                    <Field key={p.k} l={p.l}><input style={S.inp} inputMode="decimal" value={editMM[p.k]} onChange={e => setEditMM({ ...editMM, [p.k]: e.target.value })} /></Field>
+                  ))}
+                </div>
+                <button style={{ ...S.saveBtn, marginTop: 6 }} onClick={guardarEditUltimaMM} disabled={editMMBusy}>{editMMBusy ? 'Guardando…' : 'Guardar cambios'}</button>
+                {editMMMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{editMMMsg}</div>}
+              </div>
+            )}
             <div style={S.subLbl}>Pliegues (mm)</div>
             <div style={S.chartGrid}>
               {PLIEGUES.map((p, i) => (
