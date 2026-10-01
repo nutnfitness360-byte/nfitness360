@@ -545,6 +545,16 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
   };
   const addTiempo = () => { setTiempos(ts => [...ts, nuevoTiempo({ nombre: 'Nuevo tiempo', hora: '12:00' }, Array(18).fill(0), nOpciones)]); touch(); };
   const delTiempo = (idx) => { setTiempos(ts => ts.filter((_, i) => i !== idx)); touch(); };
+  const moverTiempo = (idx, dir) => {
+    setTiempos(ts => {
+      const j = idx + dir;
+      if (j < 0 || j >= ts.length) return ts;
+      const next = ts.slice();
+      const tmp = next[idx]; next[idx] = next[j]; next[j] = tmp;
+      return next;
+    });
+    touch();
+  };
 
   // ── Configuración (ventana emergente): número de tiempos y de opciones ──
   const cfgSetN = (n) => {
@@ -1177,7 +1187,13 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
               <input style={S.mealName} value={t.nombre} onChange={e => setT(idx, { nombre: e.target.value })} />
               <input style={S.mealHora} value={t.hora} onChange={e => setT(idx, { hora: e.target.value })} />
               <div style={S.mealKcal}>{r0(en.kcal)} kcal · {r0(en.prot)}P {r0(en.lip)}L {r0(en.hc)}HC</div>
-              {tiempos.length > 1 && <button style={S.del} onClick={() => delTiempo(idx)} title="Quitar tiempo">×</button>}
+              {tiempos.length > 1 && (
+                <>
+                  <button style={{ ...S.cfgArrow, ...(idx === 0 ? S.cfgArrowOff : null) }} disabled={idx === 0} title="Subir tiempo" onClick={() => moverTiempo(idx, -1)}>↑</button>
+                  <button style={{ ...S.cfgArrow, ...(idx === tiempos.length - 1 ? S.cfgArrowOff : null) }} disabled={idx === tiempos.length - 1} title="Bajar tiempo" onClick={() => moverTiempo(idx, 1)}>↓</button>
+                  <button style={S.del} onClick={() => delTiempo(idx)} title="Quitar tiempo">×</button>
+                </>
+              )}
             </div>
 
             <div style={S.eqLabel}>Equivalentes de este tiempo</div>
