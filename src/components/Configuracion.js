@@ -243,6 +243,20 @@ export default function Configuracion() {
   };
 
   const editarServicio = (id, patch) => setServicios(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s));
+  const renombrarServicio = (id, nuevoNombre) => {
+    const s = servicios.find(x => x.id === id);
+    const viejo = s ? s.nombre : "";
+    setServicios(prev => prev.map(x => x.id === id ? { ...x, nombre: nuevoNombre } : x));
+    if (viejo !== nuevoNombre) {
+      setPrecios(p => {
+        if (!(viejo in p)) return p;
+        const n = { ...p };
+        n[nuevoNombre] = n[viejo];
+        delete n[viejo];
+        return n;
+      });
+    }
+  };
 
   const guardarServicios = async () => {
     setPrecioBusy(true); setPrecioMsg('');
@@ -586,7 +600,9 @@ export default function Configuracion() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {servicios.map(s => (
             <div key={s.id} style={P.row}>
-              <span style={{ flex: '1 1 160px', fontSize: 13.5, fontWeight: 600 }}>{s.nombre}</span>
+              <input value={s.nombre} placeholder="Nombre"
+                onChange={e => renombrarServicio(s.id, e.target.value)}
+                style={{ flex: '1 1 160px', padding: '7px 9px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontWeight: 600, fontFamily: 'var(--font)' }} />
               <label style={P.field}>
                 <input inputMode="numeric" value={s.dur || ''} placeholder="30"
                   onChange={e => editarServicio(s.id, { dur: parseInt(e.target.value, 10) || 0 })} style={P.num} />
