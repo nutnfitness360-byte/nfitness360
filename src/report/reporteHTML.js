@@ -228,7 +228,7 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
   }
 
   // equivalencias por tiempo
-  const head = `<tr><th class="l">Grupo</th>${tiempos.map(t => `<th>${esc(t.nombre)}</th>`).join('')}<th>Total</th></tr>`;
+  const head = `<tr><th class="l">Grupo</th>${tiempos.map(t => `<th><span class="eqtn">${esc(t.nombre)}</span>${t.hora ? `<span class="eqhora">${esc(t.hora)}</span>` : ''}</th>`).join('')}<th>Total</th></tr>`;
   const rowsArr = usados.map(g => {
     const cells = tiempos.map(t => { const n = num((t.eq || [])[g]); return `<td>${n || '—'}</td>`; }).join('');
     const tot = tiempos.reduce((a, t) => a + num((t.eq || [])[g]), 0);
@@ -310,7 +310,7 @@ ${FONT_CSS}
 .pcbody{background:#fff;border:1px solid ${LINE};border-top:none;padding:13px 16px;flex:1;}
 .pcline{font-size:12px;line-height:1.85;color:${INK};margin-bottom:7px;} .pcline:last-child{margin-bottom:0;} .pcline b{color:${TAUPE};font-weight:800;}
 .ptitle{font-size:28px;font-weight:800;letter-spacing:5px;color:${TAUPE};margin-bottom:8mm;}
-.eqt{width:100%;border-collapse:collapse;font-size:13px;} .eqt th{background:${TAUPE2};color:#fff;padding:11px 8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:center;} .eqt th.l{text-align:left;padding-left:16px;}
+.eqt{width:100%;border-collapse:collapse;font-size:13px;} .eqt th{background:${TAUPE2};color:#fff;padding:11px 8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:center;vertical-align:top;} .eqt th.l{text-align:left;padding-left:16px;} .eqt th .eqtn{display:block;} .eqt th .eqhora{display:inline-block;background:${TAN};color:#fff;font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:none;padding:2px 7px;margin-top:5px;border-radius:3px;}
 .eqt td{padding:9px 8px;text-align:center;border-bottom:1px solid ${LINE};background:#fff;font-size:13px;} .eqt td.l{text-align:left;font-weight:700;padding-left:16px;} .eqt td.tt{font-weight:800;color:${TAUPE};background:${TOTBG};}
 .gwrap{display:grid;gap:10px;} .gcol{display:flex;flex-direction:column;align-items:center;}
 .gcirc{width:58px;height:58px;border-radius:50%;background:#fff;border:2px solid ${TAN};display:flex;align-items:center;justify-content:center;color:${TAUPE};margin-bottom:7px;}
