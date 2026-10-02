@@ -61,23 +61,25 @@ const ANTRO_COLORS = ['var(--gold)', 'var(--stone)', 'var(--sage)', 'var(--dange
 function Linea({ data, field, color, unit }) {
   const valid = (data || []).filter(d => typeof d[field] === 'number');
   if (valid.length === 0) return <div style={{ fontSize: 12, color: 'var(--stone)', padding: '14px 0', textAlign: 'center' }}>Sin mediciones aún</div>;
-  const w = 300, h = 120, pad = 26;
+  const w = 340, h = 150, pad = 34;
   const vals = valid.map(d => d[field]);
   const min = Math.min(...vals), max = Math.max(...vals), span = (max - min) || 1;
   const n = valid.length;
   const X = (i) => n === 1 ? w / 2 : pad + (i * (w - 2 * pad)) / (n - 1);
   const Y = (v) => h - pad - ((v - min) / span) * (h - 2 * pad);
   const pts = valid.map((d, i) => `${X(i)},${Y(d[field])}`).join(' ');
+  const fmtVal = (v) => Math.round(v * 10) / 10;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto', display: 'block', fontFamily: 'Montserrat, sans-serif' }}>
       <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="var(--border)" strokeWidth="1" />
       {valid.length > 1 && <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />}
-      {valid.map((d, i) => <circle key={i} cx={X(i)} cy={Y(d[field])} r="3.5" fill={color} />)}
+      {valid.map((d, i) => <circle key={i} cx={X(i)} cy={Y(d[field])} r="4" fill={color} />)}
       {valid.map((d, i) => (
-        <text key={'x' + i} x={X(i)} y={h - pad + 14} fontSize="8.5" fill="var(--stone)" textAnchor="middle">{fmtMes(d.fecha)}</text>
+        <text key={'v' + i} x={X(i)} y={Y(d[field]) - 9} fontSize="12" fontWeight="700" fill={color} textAnchor="middle">{fmtVal(d[field])}{unit}</text>
       ))}
-      <text x={pad - 4} y={Y(max) + 3} fontSize="9" fill="var(--stone)" textAnchor="end">{max}{unit}</text>
-      {min !== max && <text x={pad - 4} y={Y(min) + 3} fontSize="9" fill="var(--stone)" textAnchor="end">{min}{unit}</text>}
+      {valid.map((d, i) => (
+        <text key={'x' + i} x={X(i)} y={h - pad + 16} fontSize="11" fill="var(--stone)" textAnchor="middle">{fmtMes(d.fecha)}</text>
+      ))}
     </svg>
   );
 }
