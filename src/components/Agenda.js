@@ -153,8 +153,13 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   // Dueño del paciente logueado (multi-inquilino): se resuelve de SU expediente.
   const [duenoPac, setDuenoPac] = useState(null);
   const hoy = new Date();
+  // Anticipación mínima: los pacientes solo pueden agendar a partir de mañana
+  // (se bloquea el día en curso y los anteriores). La nutrióloga no tiene esta restricción.
+  const minBookDate = (() => { const d = new Date(hoy); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 1); return d; })();
+  const minBookKey = isNutri ? '' : toKey(minBookDate);
+  const antesDelMinimo = (key) => !!minBookKey && key < minBookKey;
   const [view, setView] = useState({ y: hoy.getFullYear(), m: hoy.getMonth() });
-  const [selDate, setSelDate] = useState(toKey(proxDisponible(hoy)));
+  const [selDate, setSelDate] = useState(toKey(proxDisponible(isNutri ? hoy : minBookDate)));
   const [citas, setCitas] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -474,7 +479,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
     for (let i=0; i<first; i++) cells.push(<div key={'e'+i} className="cal-day empty" />);
     for (let d=1; d<=days; d++) {
       const key = view.y+'-'+String(view.m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-      const bloq = bloqueado(key, horario, excepciones);
+      const bloq = bloqueado(key, horario, excepciones) || antesDelMinimo(key);
       let cls = 'cal-day';
       if (bloq) cls += ' sunday';                       // reutiliza el estilo "deshabilitado"
       if (key === toKey(hoy)) cls += ' today';
@@ -506,9 +511,14 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
         <div style={{ fontSize: 10, color: 'var(--stone)', marginBottom: 12 }}>
           Martes, jueves y domingo no disponibles.
         </div>
+        {!isNutri && (
+          <div style={{ fontSize: 10, color: 'var(--stone)', marginBottom: 12 }}>
+            Las citas se agendan con al menos un día de anticipación.
+          </div>
+        )}
 
         <div className="section-label">{fmtDate(selDate)}</div>
-        {bloqueado(selDate, horario, excepciones)
+        {(bloqueado(selDate, horario, excepciones) || antesDelMinimo(selDate))
           ? <div className="empty-state">Día no disponible para citas.</div>
           : citasDia.length === 0
             ? <div className="empty-state">Sin citas este día</div>
