@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useBranding } from "../context/BrandingContext";
 import { LOGO_ARETIA } from "../report/logoAretia";
 
+// Instancia Aretia: por dominio (app.aretia.mx o el demo sistemanutricio) o por marca.
+const ES_ARETIA_HC = ((typeof window !== "undefined" && window.location &&
+  (window.location.hostname.indexOf("aretia") !== -1 || window.location.hostname.indexOf("sistemanutricio") !== -1)) ||
+  ((process.env.REACT_APP_MARCA_NOMBRE || "").toLowerCase() === "aretia"));
+
 /* ============================================================
    NFITNESS 360 — Historia Clínico-Nutriológica
    Formulario editable para el panel de la nutrióloga.
@@ -179,7 +184,7 @@ function histParts(data) {
       .map((r) => `<tr><td class="momento">${v(r.momento)}</td><td>${v(r.alimentos)}</td></tr>`).join("")}</tbody></table>`;
 
   // Logo del PDF por instancia: Aretia usa su logo; Natalia conserva el suyo.
-  const esAretiaPDF = (typeof window !== "undefined" && window.location && window.location.hostname.indexOf("sistemanutricio") !== -1);
+  const esAretiaPDF = ES_ARETIA_HC;
   const logoPdf = esAretiaPDF ? LOGO_ARETIA : LOGO_PDF;
   const logo = logoPdf
     ? `<img src="${logoPdf}" alt="" class="logo"/>`
@@ -387,7 +392,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
   // Logo de la INSTANCIA (Aretia u otra). Si la instancia no configuró logo, se
   // usa el histórico de Nfitness (LOGO) como respaldo → Natalia se ve idéntica.
   const { logo } = useBranding();
-  const logoSrc = logo === undefined ? LOGO : logo;
+  const logoSrc = logo === undefined ? (ES_ARETIA_HC ? LOGO_ARETIA : LOGO) : logo;
   const [data, setData] = useState(() => {
     const s = baseSeed();
     if (initial && typeof initial === "object") {

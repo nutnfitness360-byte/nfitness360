@@ -57,6 +57,8 @@ export default function LoginPage() {
   const host = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
   const _marca = (process.env.REACT_APP_MARCA || '').toLowerCase();
   const esSistemaNutricio = _marca ? (_marca !== 'natalia') : (host.indexOf('sistemanutricio') !== -1 || host.indexOf('aretia') !== -1);
+  // Marca ARETIA en específico (excluye Fitmeal/Natalia): solo para mostrar su logo en la portada.
+  const esAretia = (host.indexOf('aretia') !== -1) || (host.indexOf('sistemanutricio') !== -1) || ((process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'aretia');
   const portadaTitulo = process.env.REACT_APP_PORTADA_TITULO || (esSistemaNutricio ? 'Bienvenido a Aretia' : 'Agenda tu cita con Natalia');
   const portadaSubtitulo = process.env.REACT_APP_PORTADA_SUBTITULO || (esSistemaNutricio
     ? 'Del plan al resultado: reserva tus consultas, confírmalas y da seguimiento a tu plan.'
@@ -260,7 +262,17 @@ export default function LoginPage() {
               {/* Logo de portada: limitado por ALTO y ANCHO (sin deformar) venga de env o de config/branding.
                   Natalia/Aretia usan su alto de siempre (maxHeight) y su logo compacto no llega al tope de ancho;
                   un logo ANCHO (p. ej. Fitmeal) se topa en maxWidth y ya no se encima con la columna derecha. */}
-              {logoSrc ? <img src={logoSrc} alt="" style={{ ...S.lLogo, height: 'auto', width: 'auto', maxHeight: esSistemaNutricio ? 88 : S.lLogo.height, maxWidth: 260 }} /> : null}
+              {esAretia
+                ? (
+                  <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', marginBottom: 16 }}>
+                    <svg width="56" height="56" viewBox="0 0 100 100" style={{ display: 'block' }}>
+                      <path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" strokeWidth="9" strokeLinejoin="miter" />
+                      <path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" strokeWidth="9" strokeLinejoin="miter" />
+                    </svg>
+                    <span style={{ fontFamily: 'Montserrat, Manrope, sans-serif', fontWeight: 700, fontSize: 28, letterSpacing: 1, color: '#F4F1EA', marginTop: 6 }}>Aretia</span>
+                  </span>
+                )
+                : (logoSrc ? <img src={logoSrc} alt="" style={{ ...S.lLogo, height: 'auto', width: 'auto', maxHeight: esSistemaNutricio ? 88 : S.lLogo.height, maxWidth: 260 }} /> : null)}
               <div style={S.lHead}>{portadaTitulo}</div>
               <div style={S.lSub}>{portadaSubtitulo}</div>
               <div style={S.lStepsLbl}>CÓMO AGENDAR</div>
