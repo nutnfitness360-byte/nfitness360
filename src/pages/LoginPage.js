@@ -142,7 +142,6 @@ export default function LoginPage() {
     if (!pass) { setError('Escribe tu contraseña.'); return; }
     setLoading(true); setError(''); setOfrecerCrear(false);
     try {
-      if (esNutriPuerta && !(await esNutriAutorizada(e))) { setLoading(false); setVista('denegado'); return; }
       const cred = await signInWithEmailAndPassword(auth, e, pass);
       if (esNutriPuerta && !(await esNutriAutorizada(cred.user.email))) {
         await signOut(auth); setVista('denegado');
