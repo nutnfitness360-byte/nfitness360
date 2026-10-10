@@ -614,13 +614,11 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
       <header style={styles.header}>
         <div style={styles.brandRow}>
           {(ES_ARETIA_HC && logo === undefined) ? (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <svg width="30" height="30" viewBox="0 0 100 100" style={{ display: "block" }}>
-                <path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" strokeWidth="9" strokeLinejoin="miter" />
-                <path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" strokeWidth="9" strokeLinejoin="miter" />
-              </svg>
-              <span style={{ fontFamily: "Montserrat, Manrope, sans-serif", fontWeight: 700, fontSize: 20, letterSpacing: 0.5, color: "#F4F1EA" }}>Aretia</span>
-            </span>
+            <svg height="32" viewBox="0 0 330 100" style={{ display: "block" }}>
+              <path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" strokeWidth="9" strokeLinejoin="miter" />
+              <path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" strokeWidth="9" strokeLinejoin="miter" />
+              <text x="92" y="64" fontFamily="Montserrat, Manrope, Arial, sans-serif" fontWeight="700" fontSize="52" letterSpacing="1" fill="#F4F1EA">Aretia</text>
+            </svg>
           ) : logoSrc ? (
             <img src={logoSrc} alt="" style={styles.logoImg} />
           ) : (

@@ -39,13 +39,11 @@ export default function Topbar({ role, user, onPerfil }) {
     <div className="topbar">
       <div>
         {(ES_ARETIA_TB && logo === undefined && !logoDia) ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-            <svg width="48" height="48" viewBox="0 0 100 100" style={{ display: 'block' }}>
-              <path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" strokeWidth="9" strokeLinejoin="miter" />
-              <path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" strokeWidth="9" strokeLinejoin="miter" />
-            </svg>
-            <span style={{ fontFamily: 'Montserrat, Manrope, sans-serif', fontWeight: 700, fontSize: 32, letterSpacing: 1, color: '#F4F1EA' }}>Aretia</span>
-          </span>
+          <svg height="48" viewBox="0 0 330 100" style={{ display: 'block' }}>
+            <path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" strokeWidth="9" strokeLinejoin="miter" />
+            <path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" strokeWidth="9" strokeLinejoin="miter" />
+            <text x="92" y="64" fontFamily="Montserrat, Manrope, Arial, sans-serif" fontWeight="700" fontSize="52" letterSpacing="1" fill="#F4F1EA">Aretia</text>
+          </svg>
         ) : (logoSrc ? <img src={logoSrc} alt="" className="topbar-logo-img" /> : null)}
         <div className="topbar-role">{role === 'nutriologa' ? 'Panel de nutrición' : 'Mi cuenta'}</div>
       </div>
