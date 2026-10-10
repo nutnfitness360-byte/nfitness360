@@ -7,6 +7,7 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { NUTRI_EMAIL } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
+import { LOGO_ARETIA_CREMA } from '../report/logoAretia';
 
 // Detecta si la app se abrió DENTRO de otra app (WhatsApp, Instagram, Facebook,
 // Messenger, etc.), es decir, un "navegador incrustado". Google bloquea el inicio
@@ -264,13 +265,7 @@ export default function LoginPage() {
                   un logo ANCHO (p. ej. Fitmeal) se topa en maxWidth y ya no se encima con la columna derecha. */}
               {esAretia
                 ? (
-                  <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', marginBottom: 16 }}>
-                    <svg width="56" height="56" viewBox="0 0 100 100" style={{ display: 'block' }}>
-                      <path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" strokeWidth="9" strokeLinejoin="miter" />
-                      <path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" strokeWidth="9" strokeLinejoin="miter" />
-                    </svg>
-                    <span style={{ fontFamily: 'Montserrat, Manrope, sans-serif', fontWeight: 700, fontSize: 28, letterSpacing: 1, color: '#F4F1EA', marginTop: 6 }}>Aretia</span>
-                  </span>
+                  <img src={LOGO_ARETIA_CREMA} alt="Aretia" style={{ height: 'auto', width: 'auto', maxHeight: 74, maxWidth: 280, display: 'block', marginBottom: 16 }} />
                 )
                 : (logoSrc ? <img src={logoSrc} alt="" style={{ ...S.lLogo, height: 'auto', width: 'auto', maxHeight: esSistemaNutricio ? 88 : S.lLogo.height, maxWidth: 260 }} /> : null)}
               <div style={S.lHead}>{portadaTitulo}</div>
