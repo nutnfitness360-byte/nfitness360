@@ -7,6 +7,12 @@ import { LOGO_FITMEAL } from '../report/logoFitmeal';
 
 const LOGO = process.env.REACT_APP_LOGO_URL || '/logo.png';
 
+// Instancia Aretia (por dominio app.aretia.mx / demo sistemanutricio, o marca). Su logo va en
+// crema/ámbar porque el topbar es azul marino. Solo aplica si la config de marca no trae logo.
+const ES_ARETIA_TB = ((typeof window !== 'undefined' && window.location &&
+  (window.location.hostname.indexOf('aretia') !== -1 || window.location.hostname.indexOf('sistemanutricio') !== -1)) ||
+  ((process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'aretia'));
+
 export default function Topbar({ role, user, onPerfil }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -32,7 +38,15 @@ export default function Topbar({ role, user, onPerfil }) {
   return (
     <div className="topbar">
       <div>
-        {logoSrc ? <img src={logoSrc} alt="" className="topbar-logo-img" /> : null}
+        {(ES_ARETIA_TB && logo === undefined && !logoDia) ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+            <svg width="48" height="48" viewBox="0 0 100 100" style={{ display: 'block' }}>
+              <path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" strokeWidth="9" strokeLinejoin="miter" />
+              <path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" strokeWidth="9" strokeLinejoin="miter" />
+            </svg>
+            <span style={{ fontFamily: 'Montserrat, Manrope, sans-serif', fontWeight: 700, fontSize: 32, letterSpacing: 1, color: '#F4F1EA' }}>Aretia</span>
+          </span>
+        ) : (logoSrc ? <img src={logoSrc} alt="" className="topbar-logo-img" /> : null)}
         <div className="topbar-role">{role === 'nutriologa' ? 'Panel de nutrición' : 'Mi cuenta'}</div>
       </div>
 
