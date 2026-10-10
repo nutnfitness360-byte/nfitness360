@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useBranding } from "../context/BrandingContext";
-import { LOGO_ARETIA } from "../report/logoAretia";
+import { LOGO_ARETIA, LOGO_ARETIA_CREMA } from "../report/logoAretia";
 
 // Instancia Aretia: por dominio (app.aretia.mx o el demo sistemanutricio) o por marca.
 const ES_ARETIA_HC = ((typeof window !== "undefined" && window.location &&
@@ -614,11 +614,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
       <header style={styles.header}>
         <div style={styles.brandRow}>
           {(ES_ARETIA_HC && logo === undefined) ? (
-            <svg height="32" viewBox="0 0 330 100" style={{ display: "block" }}>
-              <path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" strokeWidth="9" strokeLinejoin="miter" />
-              <path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" strokeWidth="9" strokeLinejoin="miter" />
-              <text x="92" y="64" fontFamily="Montserrat, Manrope, Arial, sans-serif" fontWeight="700" fontSize="52" letterSpacing="1" fill="#F4F1EA">Aretia</text>
-            </svg>
+            <img src={LOGO_ARETIA_CREMA} alt="Aretia" style={{ height: 32, width: "auto", display: "block" }} />
           ) : logoSrc ? (
             <img src={logoSrc} alt="" style={styles.logoImg} />
           ) : (
