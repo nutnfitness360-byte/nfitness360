@@ -613,7 +613,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
       {/* ---------- ENCABEZADO ---------- */}
       <header style={styles.header}>
         <div style={styles.brandRow}>
-          {(ES_ARETIA_HC && logo === undefined) ? (
+          {(ES_ARETIA_HC) ? (
             <img src={LOGO_ARETIA_CREMA} alt="Aretia" style={{ height: 32, width: "auto", display: "block" }} />
           ) : logoSrc ? (
             <img src={logoSrc} alt="" style={styles.logoImg} />

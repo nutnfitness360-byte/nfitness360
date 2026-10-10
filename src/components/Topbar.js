@@ -39,7 +39,7 @@ export default function Topbar({ role, user, onPerfil }) {
   return (
     <div className="topbar">
       <div>
-        {(ES_ARETIA_TB && logo === undefined && !logoDia) ? (
+        {(ES_ARETIA_TB && !logoDia) ? (
           <img src={LOGO_ARETIA_CREMA} alt="Aretia" style={{ height: 48, width: 'auto', display: 'block' }} />
         ) : (logoSrc ? <img src={logoSrc} alt="" className="topbar-logo-img" /> : null)}
         <div className="topbar-role">{role === 'nutriologa' ? 'Panel de nutrición' : 'Mi cuenta'}</div>
