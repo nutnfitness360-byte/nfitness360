@@ -167,6 +167,10 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const [localModal, setLocalModal] = useState(null);   // cita o null
   const [localConfirm, setLocalConfirm] = useState(false);
   const [reagendarLocal, setReagendarLocal] = useState(null);
+  // Buscador de pacientes en la agenda (solo nutriologa) y detalle de cita.
+  const [buscar, setBuscar] = useState('');
+  const [showBuscar, setShowBuscar] = useState(false);
+  const [detalle, setDetalle] = useState(null);
 
   // Campos del modal (unificados para nutrióloga y paciente)
   const [mPaciente, setMPaciente] = useState('');
@@ -287,6 +291,17 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   // Para MOSTRAR (lista del día y puntos del calendario) solo las propias del paciente
   const citasDia = citasDelDia.filter(esPropia).slice().sort((a,b) => a.hora.localeCompare(b.hora));
   const citaDates = new Set(citas.filter(c => c.estado !== 'cancelada').filter(esPropia).map(c => c.fecha));
+
+  // --- Buscador (nutriologa): citas proximas que coinciden con el nombre ---
+  const hoyKey = toKey(hoy);
+  const soloDigitos = (t) => String(t || '').replace(/\D/g, '');
+  const telWhatsApp = (t) => { let d = soloDigitos(t); if (!d) return ''; if (d.length === 10) return '52' + d; if (d.length === 11 && d[0] === '1') return '52' + d.slice(1); return d; };
+  const resultadosBusqueda = (isNutri && buscar.trim())
+    ? citas
+        .filter(c => c.estado !== 'cancelada' && c.fecha >= hoyKey)
+        .filter(c => (c.pacienteNombre || '').toLowerCase().includes(buscar.trim().toLowerCase()))
+        .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))
+    : [];
 
   const servSel = servicios.find(s => s.id === mTipo) || null;
   const slots = generarSlots(selDate, servSel ? servSel.dur : 0, ocupadasDia, horario, excepciones, servSel ? !!servSel.online : null);
@@ -499,6 +514,16 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
         </div>
       )}
       <div className="card">
+        {isNutri && (
+          <div style={{ position: 'relative', marginBottom: 16 }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--stone)" strokeWidth="2" strokeLinecap="round" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input value={buscar}
+              onChange={e => { setBuscar(e.target.value); setShowBuscar(!!e.target.value.trim()); }}
+              onFocus={() => { if (buscar.trim()) setShowBuscar(true); }}
+              placeholder="Buscar paciente en la agenda…"
+              style={{ width: '100%', boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 11, padding: '12px 14px 12px 40px', fontSize: 13.5, fontFamily: 'var(--font)', color: 'var(--dark)', background: 'var(--cream)', outline: 'none' }} />
+          </div>
+        )}
         <div className="cal-nav">
           <button onClick={() => setView(v => { let m=v.m-1,y=v.y; if(m<0){m=11;y--;} return {y,m}; })}>&#x2039;</button>
           <span className="month">{MESES[view.m]} {view.y}</span>
@@ -549,15 +574,24 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                     </div>
                   )}
                 </div>
-                {c.estado !== 'cancelada' && citaPasada(c)
-                  ? <span className="badge" style={{ background: '#ECE7E1', color: '#7A6F66' }}>Concluida</span>
-                  : <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>}
-                {c.estado !== 'cancelada' && !citaPasada(c) && (
-                  <button onClick={() => (!isNutri && onSolicitarCancelar) ? onSolicitarCancelar(c) : setLocalModal(c)} title="Cancelar cita"
-                    style={{ marginLeft: 8, padding: '5px 10px', background: 'transparent', border: '1px solid var(--danger)', borderRadius: 8, fontSize: 11, fontWeight: 600, color: 'var(--danger)', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', flexShrink: 0 }}>
-                    Cancelar
-                  </button>
-                )}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                  {c.estado !== 'cancelada' && citaPasada(c)
+                    ? <span className="badge" style={{ background: '#ECE7E1', color: '#7A6F66' }}>Concluida</span>
+                    : <span className={`badge b-${c.estado === 'confirmada' ? 'confirm' : c.estado === 'cancelada' ? 'cancel' : 'pending'}`}>{c.estado}</span>}
+                  {isNutri && (
+                    <button onClick={() => setDetalle(c)} title="Ver detalles de la cita"
+                      style={{ padding: '5px 10px', background: 'var(--dark)', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      Ver detalles
+                    </button>
+                  )}
+                  {c.estado !== 'cancelada' && !citaPasada(c) && (
+                    <button onClick={() => (!isNutri && onSolicitarCancelar) ? onSolicitarCancelar(c) : setLocalModal(c)} title="Cancelar cita"
+                      style={{ padding: '5px 10px', background: 'transparent', border: '1px solid var(--danger)', borderRadius: 8, fontSize: 11, fontWeight: 600, color: 'var(--danger)', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', flexShrink: 0 }}>
+                      Cancelar
+                    </button>
+                  )}
+                </div>
               </div>
             ))
         }
@@ -711,6 +745,74 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
           </div>
         </div>
       )}
+
+      {isNutri && showBuscar && (
+        <div onClick={() => setShowBuscar(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(26,22,18,0.5)', zIndex: 1050, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 16px 16px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 380, maxHeight: '80vh', overflowY: 'auto', padding: '18px 16px 16px', fontFamily: 'var(--font)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--dark)' }}>Resultados: “{buscar.trim()}”</div>
+              <button onClick={() => setShowBuscar(false)} style={{ border: 'none', background: 'var(--cream)', width: 28, height: 28, borderRadius: 8, cursor: 'pointer', color: 'var(--dark)', fontSize: 14, fontFamily: 'var(--font)' }}>✕</button>
+            </div>
+            {resultadosBusqueda.length === 0 ? (
+              <div className="empty-state" style={{ padding: '18px 6px' }}>No se encontraron citas próximas para “{buscar.trim()}”.</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 11.5, color: 'var(--stone)', margin: '0 0 12px' }}>{resultadosBusqueda.length} cita{resultadosBusqueda.length > 1 ? 's' : ''} próxima{resultadosBusqueda.length > 1 ? 's' : ''} encontrada{resultadosBusqueda.length > 1 ? 's' : ''}</div>
+                {resultadosBusqueda.map(c => (
+                  <div key={c.id} onClick={() => { const [yy, mm] = c.fecha.split('-'); setView({ y: +yy, m: +mm - 1 }); setSelDate(c.fecha); setShowBuscar(false); }}
+                    style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '11px 13px', marginBottom: 9, cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--dark)' }}>{c.pacienteNombre}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, whiteSpace: 'nowrap', background: c.estadoPago === 'pagado' ? '#E9F1ED' : '#F7EAE5', color: c.estadoPago === 'pagado' ? '#3E6B5B' : 'var(--danger)' }}>{c.estadoPago === 'pagado' ? 'Pagado' : 'Pendiente de pago'}</span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: 'var(--dark)', marginTop: 5, fontWeight: 600 }}>{fmtDate(c.fecha)} · {c.hora}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--stone)', marginTop: 2 }}>{(c.tipoNombre || c.motivo || '')}{c.objetivo ? ' · ' + c.objetivo : ''}</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--gold)', fontWeight: 700, marginTop: 7 }}>Tocar para ir a ese día →</div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {detalle && (() => {
+        const tel = soloDigitos(detalle.pacienteTelefono);
+        const waNum = telWhatsApp(detalle.pacienteTelefono);
+        const correo = (detalle.pacienteEmail || '').trim();
+        return (
+          <div onClick={() => setDetalle(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(26,22,18,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 370, overflow: 'hidden', fontFamily: 'var(--font)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+              <div style={{ background: 'var(--dark)', color: '#fff', padding: '16px 18px' }}>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>{detalle.pacienteNombre || 'Paciente'}</div>
+                <div style={{ fontSize: 12, color: '#d9cfc4', marginTop: 3 }}>{fmtDate(detalle.fecha)} · {detalle.hora}</div>
+              </div>
+              <div style={{ padding: '14px 18px 2px' }}>
+                {[
+                  ['Correo', correo ? <a href={'mailto:' + correo} style={{ color: 'var(--gold)', textDecoration: 'none', fontWeight: 700, wordBreak: 'break-all' }}>{correo}</a> : <span style={{ color: '#a89e95', fontStyle: 'italic', fontWeight: 500 }}>No registrado</span>],
+                  ['Teléfono', tel ? <a href={'tel:+' + waNum} style={{ color: 'var(--gold)', textDecoration: 'none', fontWeight: 700 }}>{detalle.pacienteTelefono}</a> : <span style={{ color: '#a89e95', fontStyle: 'italic', fontWeight: 500 }}>No registrado</span>],
+                  ['Fecha', fmtDate(detalle.fecha)],
+                  ['Hora', detalle.hora],
+                  ['Tipo', detalle.tipoNombre || detalle.motivo || '—'],
+                  ['Objetivo', detalle.objetivo || '—'],
+                  ['Notas', detalle.notas ? detalle.notas : <span style={{ color: '#a89e95', fontStyle: 'italic', fontWeight: 500 }}>Sin notas</span>],
+                ].map(([k, v], i) => (
+                  <div key={k} style={{ display: 'flex', gap: 10, padding: '9px 0', borderBottom: i === 6 ? 'none' : '1px solid var(--border)', fontSize: 13 }}>
+                    <div style={{ width: 78, flexShrink: 0, color: 'var(--stone)', fontWeight: 700, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.03em', paddingTop: 1 }}>{k}</div>
+                    <div style={{ flex: 1, color: 'var(--dark)', fontWeight: 600 }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 9, padding: '14px 18px 2px' }}>
+                {waNum && <a href={'https://wa.me/' + waNum} target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', borderRadius: 11, padding: '11px 8px', fontSize: 12, fontWeight: 700, textDecoration: 'none', background: '#25D366', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.82 11.82 0 018.413 3.488 11.82 11.82 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zM6.597 20.13c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.82 9.82 0 001.506 5.26l-.999 3.648 3.993-1.207z"/></svg>WhatsApp</a>}
+                {tel && <a href={'tel:+' + waNum} style={{ flex: 1, textAlign: 'center', borderRadius: 11, padding: '11px 8px', fontSize: 12, fontWeight: 700, textDecoration: 'none', background: 'var(--cream)', color: 'var(--dark)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2E2A24" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Llamar</a>}
+                {correo && <a href={'mailto:' + correo} style={{ flex: 1, textAlign: 'center', borderRadius: 11, padding: '11px 8px', fontSize: 12, fontWeight: 700, textDecoration: 'none', background: 'var(--cream)', color: 'var(--dark)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2E2A24" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/></svg>Correo</a>}
+              </div>
+              <button onClick={() => setDetalle(null)} style={{ margin: '14px 18px 16px', width: 'calc(100% - 36px)', background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', padding: 6 }}>Cerrar</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {localModal && (
         <div onClick={() => { setLocalModal(null); setLocalConfirm(false); }}
