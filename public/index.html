@@ -9,6 +9,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Nfitness 360" />
     <title>Nfitness 360®</title>
+    <!-- Vista previa al compartir el enlace (Open Graph / Twitter). Se resuelve POR INSTANCIA
+         al compilar: Aretia/Fitmeal definen sus variables en Vercel; si no hay nada definido
+         (Natalia) se usan los valores por defecto de .env.production (Nfitness). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="%REACT_APP_SITE_TITLE%" />
+    <meta property="og:title" content="%REACT_APP_SITE_TITLE%" />
+    <meta property="og:description" content="%REACT_APP_SITE_DESC%" />
+    <meta property="og:image" content="%REACT_APP_OG_IMAGE%" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="%REACT_APP_SITE_TITLE%" />
+    <meta name="twitter:description" content="%REACT_APP_SITE_DESC%" />
+    <meta name="twitter:image" content="%REACT_APP_OG_IMAGE%" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon-32.png" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
