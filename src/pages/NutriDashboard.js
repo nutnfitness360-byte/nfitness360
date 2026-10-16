@@ -55,7 +55,9 @@ export default function NutriDashboard() {
   const hayNovedad = !!NOVEDADES_ULTIMA && noveVisto !== NOVEDADES_ULTIMA;
   const marcarNovedadesVistas = () => { try { localStorage.setItem('novedades_visto', NOVEDADES_ULTIMA); } catch (e) {} setNoveVisto(NOVEDADES_ULTIMA); };
   // Abre la ventana de novedades SOLA una vez cuando hay una actualización no vista.
-  useEffect(() => { if (hayNovedad) setNovePopup(true); // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (hayNovedad) setNovePopup(true);
+    // eslint-disable-next-line
   }, []);
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
