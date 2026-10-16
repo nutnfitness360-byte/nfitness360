@@ -119,6 +119,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [inbodyOpen, setInbodyOpen] = useState(false);
   const [inbody, setInbody] = useState(null);
   const [recoForm, setRecoForm] = useState({ estudios: '', suplementos: '', ejercicio: '', hidratacion: '', generales: '' });
+  const [hidMlKg, setHidMlKg] = useState(35);
+  const [hidPeso, setHidPeso] = useState('');
   const [recoAnalisis, setRecoAnalisis] = useState(null);
   const [recoSup, setRecoSup] = useState([{ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '' }]);
   const [recoEditIdx, setRecoEditIdx] = useState(null);
@@ -195,6 +197,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       ? b.suplementacionTabla.items.map(x => ({ nombre: x.nombre || '', marca: x.marca || '', dosis: x.dosis || '', frecuencia: x.frecuencia || '', horario: x.horario || '' }))
       : [{ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '' }]);
     setRecoEditIdx(null);
+    setHidPeso(''); setHidMlKg(35);
     setVerHistoria(false);
     setVerNotas(false);
   }, [selId, pacientes]);
@@ -1587,38 +1590,6 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
           </div>
 
           {panel === null && <div style={S.rowSep} aria-hidden="true" />}
-          {/* Seguimientos (notas internas de consulta, no visibles para el paciente) */}
-          <div className="card" style={panel === 'bitacora' ? S.panelOpen : S.panel}>
-            <button style={S.panelHead} onClick={() => setPanel(p => p === 'bitacora' ? null : 'bitacora')}>
-              <span style={S.panelTitle}>Seguimientos</span>
-              <span style={panel === 'bitacora' ? S.chevOpen : S.chev}>⌄</span>
-            </button>
-            {panel === 'bitacora' && (
-              <div style={S.panelBody}>
-                <div style={S.note}>Notas de seguimiento de la consulta (texto libre). <b>El paciente no las ve.</b></div>
-                <div style={{ marginBottom: 12 }}>
-                  <textarea style={S.recoArea} rows={3} value={bitacoraTexto} onChange={e => setBitacoraTexto(e.target.value)}
-                    placeholder="Anota lo que comente el paciente, observaciones, acuerdos…" />
-                  <div style={{ marginTop: 8, maxWidth: 200 }}>
-                    <Field l="% apego al plan (opcional)"><input style={S.inp} inputMode="decimal" value={bitacoraApego} onChange={e => setBitacoraApego(e.target.value)} placeholder="Ej. 100" /></Field>
-                  </div>
-                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addBitacora}>+ Agregar nota</button>
-                </div>
-                {(!sel.bitacora || sel.bitacora.length === 0)
-                  ? <div className="empty-state">Aún no hay notas de consulta.</div>
-                  : [...sel.bitacora].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
-                    <div key={idx} style={S.recoItem}>
-                      <div style={{ flex: 1 }}>
-                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
-                        <div style={S.recoText}>{r.texto}</div>
-                      </div>
-                      <button style={S.rm} onClick={() => removeBitacora(idx)} title="Eliminar">×</button>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-
           {/* Recomendaciones */}
           <div className="card" style={panel === 'reco' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'reco' ? null : 'reco')}>
@@ -1656,6 +1627,48 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                 {RECO_SECCIONES.map(sec => (
                   <div key={sec.key} style={S.recoSeccion}>
                     <div style={S.recoSeccionTitulo}>{sec.titulo}</div>
+                    {sec.key === 'hidratacion' && (() => {
+                      const pesoDefault = (m && (m.peso || m.peso === 0)) ? String(m.peso) : '';
+                      const pesoShown = hidPeso !== '' ? hidPeso : pesoDefault;
+                      const pesoNum = parseFloat(pesoShown) || 0;
+                      const hidMl = Math.round(pesoNum * hidMlKg);
+                      const fmtMl = hidMl.toLocaleString('es-MX');
+                      const hidL = (hidMl / 1000).toFixed(1).replace('.', ',');
+                      const insertarHid = () => {
+                        if (!pesoNum) return;
+                        const linea = '• Consumo de agua: ' + fmtMl + ' ml al día (≈ ' + hidL + ' L) — ' + pesoNum + ' kg × ' + hidMlKg + ' ml/kg.';
+                        setRecoForm(prev => { const cur = prev.hidratacion || ''; const base = cur && !cur.endsWith('\n') ? cur + '\n' : cur; return { ...prev, hidratacion: base + linea + '\n' }; });
+                      };
+                      return (
+                        <div style={{ border: '0.5px solid var(--border)', background: 'var(--mint)', borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, color: 'var(--stone)', fontWeight: 700, marginBottom: 10 }}>Calculadora de agua · Peso × ml/kg</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              <label style={{ fontSize: 10, color: 'var(--stone)', fontWeight: 600 }}>Peso (kg)</label>
+                              <input style={{ ...S.inp, width: 90 }} inputMode="decimal" value={pesoShown} onChange={e => setHidPeso(e.target.value)} placeholder="kg" />
+                            </div>
+                            <div style={{ fontSize: 16, color: 'var(--stone)', paddingBottom: 8 }}>×</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              <label style={{ fontSize: 10, color: 'var(--stone)', fontWeight: 600 }}>ml por kg</label>
+                              <select style={{ ...S.inp, width: 110, cursor: 'pointer' }} value={hidMlKg} onChange={e => setHidMlKg(+e.target.value)}>
+                                <option value={30}>30 ml</option>
+                                <option value={35}>35 ml</option>
+                                <option value={40}>40 ml</option>
+                              </select>
+                            </div>
+                            <div style={{ fontSize: 16, color: 'var(--stone)', paddingBottom: 8 }}>=</div>
+                            <div style={{ flex: 1, minWidth: 140, background: '#fff', border: '1px dashed var(--gold)', borderRadius: 9, padding: '7px 10px', textAlign: 'center' }}>
+                              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--dark)', lineHeight: 1.1 }}>{pesoNum ? fmtMl + ' ml' : '—'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 2 }}>{pesoNum ? '≈ ' + hidL + ' L al día' : 'Captura el peso'}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 10.5, color: 'var(--stone)' }}>El peso viene de la última medición; puedes ajustarlo.</span>
+                            <button type="button" style={{ ...S.saveBtn, padding: '8px 14px' }} onClick={insertarHid} disabled={!pesoNum}>Insertar en Hidratación ↓</button>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {sec.key === 'suplementos' && (
                       <div style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--mint)', border: '0.5px solid var(--border)', borderRadius: 10 }}>
                         <div style={{ fontSize: 11, color: 'var(--stone)', fontWeight: 600, marginBottom: 8 }}>Tabla de suplementos de esta recomendación · se imprime en el PDF</div>
@@ -1745,6 +1758,38 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                       </div>
                     );
                   })}
+              </div>
+            )}
+          </div>
+
+          {/* Seguimientos (notas internas de consulta, no visibles para el paciente) */}
+          <div className="card" style={panel === 'bitacora' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'bitacora' ? null : 'bitacora')}>
+              <span style={S.panelTitle}>Seguimientos</span>
+              <span style={panel === 'bitacora' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'bitacora' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Notas de seguimiento de la consulta (texto libre). <b>El paciente no las ve.</b></div>
+                <div style={{ marginBottom: 12 }}>
+                  <textarea style={S.recoArea} rows={3} value={bitacoraTexto} onChange={e => setBitacoraTexto(e.target.value)}
+                    placeholder="Anota lo que comente el paciente, observaciones, acuerdos…" />
+                  <div style={{ marginTop: 8, maxWidth: 200 }}>
+                    <Field l="% apego al plan (opcional)"><input style={S.inp} inputMode="decimal" value={bitacoraApego} onChange={e => setBitacoraApego(e.target.value)} placeholder="Ej. 100" /></Field>
+                  </div>
+                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addBitacora}>+ Agregar nota</button>
+                </div>
+                {(!sel.bitacora || sel.bitacora.length === 0)
+                  ? <div className="empty-state">Aún no hay notas de consulta.</div>
+                  : [...sel.bitacora].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                    <div key={idx} style={S.recoItem}>
+                      <div style={{ flex: 1 }}>
+                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
+                        <div style={S.recoText}>{r.texto}</div>
+                      </div>
+                      <button style={S.rm} onClick={() => removeBitacora(idx)} title="Eliminar">×</button>
+                    </div>
+                  ))}
               </div>
             )}
           </div>
