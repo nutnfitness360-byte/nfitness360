@@ -857,7 +857,7 @@ const RECETARIO = {
 "huevos estrellados sobre tortilla y pechuga de pavo": "2 tortillas de maíz 2 huevos (1 en cada tortilla y 1 rebanada de pavo) 20g de aguacate y huevo cocinar con PAM ½ taza de papaya con 1 cda de amaranto o avena en hojuelas",
 "huevos fritos": "Usar aceite de spray 3 huevos sobre 2 tortillas de nopal marca nopalia, bañar con alguna salsa y acompañar con champiñones ½ taza de piña o papaya o melón O Op p cc ii ó ón n 31",
 "huevos machacados": "2 huevos cocidos + 40g de pechuga de pavo Mezclar con espinaca, jitomate cherry 1 cdta de aceite de oliva, sal y limon Acompañar con 2 paquetes de salmas",
-"huevos rancheros": "4 tortillas + 5 huevos al gusto calienta 3 rebanadas de pechuga de pavo (san Rafael o bernina) Agrega con 40g de aguacate Acompaña con un vaso de chocomilk + sandwich pan oroweat con 1 cda de spread de almendra o de maní + 1 plátano en roda",
+"huevos rancheros": "4 tortillas + 5 huevos al gusto calienta 3 rebanadas de pechuga de pavo (san Rafael o bernina) Agrega con 40g de aguacate",
 "huevos revueltos": "3 huevos + 80g de pechuga de pavo Preparar a la mexicana ó con nopales 40g de aguacate + 1 tortilla de maiz ó 2 tortillas de nopal para acompañar 4TA OPCIÓN: HOT CAKES PROTEICOS 1 huevo +120ml de claras + ½ scoop de proteína + 40g de harina",
 "huevos revueltos con calabacitas a la mexicana": "3 huevos revueltos con calabacitas, jitomate, chile y cebolla (todo picado fino) 20g de aguacate 2 tortillas de maíz",
 "huevos revueltos con calabaza": "2 huevos revueltos con calabaza; 2 tortillas de maíz y salsa.",
