@@ -7,6 +7,8 @@ import Agenda from '../components/Agenda';
 import Topbar from '../components/Topbar';
 import Pacientes from '../components/Pacientes';
 import Configuracion from '../components/Configuracion';
+import Novedades from '../components/Novedades';
+import { NOVEDADES, NOVEDADES_ULTIMA } from '../data/novedades';
 
 function initials(name) { return name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'NU'; }
 const SERVICIOS_NOMBRES_DEFAULT = ['Primera vez', 'Seguimiento', 'Deportivo', 'Seguimiento deportivo', 'Online', 'Deportivo online'];
@@ -45,8 +47,16 @@ export default function NutriDashboard() {
     if (id === 'pacientes' && tab === 'pacientes') {
       const g = exitGuardRef.current; const reset = () => setPacReset(n => n + 1);
       if (g) g(reset); else reset();
-    } else goTab(id);
+    } else { if (id === 'novedades') marcarNovedadesVistas(); goTab(id); }
   };
+  // "Lo nuevo": aviso y seguimiento de novedades. Se recuerda en el navegador cuál fue la última vista.
+  const [novePopup, setNovePopup] = useState(false);
+  const [noveVisto, setNoveVisto] = useState(() => { try { return localStorage.getItem('novedades_visto') || ''; } catch (e) { return ''; } });
+  const hayNovedad = !!NOVEDADES_ULTIMA && noveVisto !== NOVEDADES_ULTIMA;
+  const marcarNovedadesVistas = () => { try { localStorage.setItem('novedades_visto', NOVEDADES_ULTIMA); } catch (e) {} setNoveVisto(NOVEDADES_ULTIMA); };
+  // Abre la ventana de novedades SOLA una vez cuando hay una actualización no vista.
+  useEffect(() => { if (hayNovedad) setNovePopup(true); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [suscriptores, setSuscriptores] = useState([]);
@@ -269,14 +279,18 @@ export default function NutriDashboard() {
     { id: 'inicio', label: 'Inicio', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg> },
     { id: 'agenda', label: 'Agenda', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg> },
     { id: 'pacientes', label: 'Pacientes', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg> },
+    { id: 'novedades', label: 'Lo nuevo', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.5a.6.6 0 011.04 0l2.1 5.05 5.46.44a.6.6 0 01.34 1.05l-4.16 3.56 1.27 5.33a.6.6 0 01-.9.65L12 16.88l-4.73 2.9a.6.6 0 01-.9-.65l1.27-5.33-4.16-3.56a.6.6 0 01.34-1.05l5.46-.44 2.1-5.05z"/></svg> },
   ];
 
   const navEl = (
     <nav className="bottomnav">
       {tabs.map(t => (
-        <button key={t.id} className={`nav-item${tab === t.id ? ' active' : ''}`} onClick={() => navClick(t.id)}>
+        <button key={t.id} className={`nav-item${tab === t.id ? ' active' : ''}`} onClick={() => navClick(t.id)} style={{ position: 'relative' }}>
           {t.icon}
           <span>{t.label}</span>
+          {t.id === 'novedades' && hayNovedad && (
+            <span style={{ position: 'absolute', top: 4, left: '50%', marginLeft: 6, width: 8, height: 8, borderRadius: '50%', background: 'var(--gold)' }} />
+          )}
         </button>
       ))}
       <div className="nav-spacer" />
@@ -479,6 +493,7 @@ export default function NutriDashboard() {
         )}
         {tab === 'agenda' && <Agenda isNutri={true} />}
         {tab === 'pacientes' && <Pacientes onRegisterExitGuard={registerExitGuard} resetToList={pacReset} />}
+        {tab === 'novedades' && <Novedades />}
         {tab === 'config' && <Configuracion />}
         {tab === 'perfil' && (
           <div className="card">
@@ -495,6 +510,28 @@ export default function NutriDashboard() {
         )}
       </div>
 
+      {novePopup && NOVEDADES[0] && (
+        <div onClick={() => { setNovePopup(false); marcarNovedadesVistas(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(15,25,40,0.55)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 440, overflow: 'hidden', boxShadow: '0 24px 70px rgba(0,0,0,0.35)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', fontFamily: 'Montserrat, sans-serif' }}>
+            <div style={{ background: 'var(--dark)', color: '#fff', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 11 }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 2l2.4 6.9L21 9.3l-5.4 4.3L17.6 21 12 16.9 6.4 21l2-7.4L3 9.3l6.6-.4z"/></svg>
+              <div><div style={{ fontSize: 17, fontWeight: 800 }}>¡Novedades del sistema!</div><div style={{ fontSize: 11.5, color: '#9FB8D4', marginTop: 2 }}>{NOVEDADES[0].fecha}</div></div>
+            </div>
+            <div style={{ padding: '14px 20px 4px', overflow: 'auto' }}>
+              {(NOVEDADES[0].puntos || []).map((p, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, padding: '6px 0' }}>
+                  <span style={{ color: '#2E8B57', fontWeight: 800, flexShrink: 0, lineHeight: 1.45 }}>✓</span>
+                  <div><div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--dark)' }}>{p.t}</div><div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.45, marginTop: 1 }}>{p.d}</div></div>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: '14px 20px 18px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <button onClick={() => { setNovePopup(false); marcarNovedadesVistas(); goTab('novedades'); }} style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif' }}>Ver todas</button>
+              <button onClick={() => { setNovePopup(false); marcarNovedadesVistas(); }} style={{ background: 'var(--dark)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif' }}>Entendido</button>
+            </div>
+          </div>
+        </div>
+      )}
       {navEl}
     </div>
   );
