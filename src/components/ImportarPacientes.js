@@ -13,6 +13,23 @@ const sinId = (p) => { const o = { ...p }; delete o.id; return o; };
 // Normaliza un nombre para comparar (sin mayúsculas ni espacios de más).
 const normNombre = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
+// Normaliza un registro que YA viene en el formato de Nfitness (p. ej. historias
+// clínicas convertidas desde Word): no pasa por el mapeador de Sistema MP.
+function normalizarRec(r, hoy) {
+  const o = { ...r };
+  delete o.id;
+  o.correo = String(o.correo || '').toLowerCase();
+  o.mediciones = Array.isArray(o.mediciones) ? o.mediciones : [];
+  o.planes = Array.isArray(o.planes) ? o.planes : [];
+  o.creado = o.creado || Date.now();
+  o.inicio = o.inicio || hoy;
+  o.origen = o.origen || 'word-hc';
+  return o;
+}
+// Un registro trae "campos" (Sistema MP) o ya viene mapeado (tiene historia/nombre).
+const esRegistroMP = (r) => !!(r && r.campos);
+const aRegistro = (r, hoy) => (esRegistroMP(r) ? mapearPaciente(r, hoy) : normalizarRec(r, hoy));
+
 export default function ImportarPacientes({ open, onClose, pacientes, prefix = 'NF-', nutriDueno = null }) {
   const [raws, setRaws] = useState(null);      // array de registros crudos del archivo
   const [nombreArch, setNombreArch] = useState('');
@@ -32,7 +49,7 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
 
   // Detecta el último lote importado (para "Deshacer último lote").
   const ultimoLote = useMemo(() => {
-    const conLote = (pacientes || []).filter(p => p.origen === 'sistema-mp' && p.loteId);
+    const conLote = (pacientes || []).filter(p => (p.origen === 'sistema-mp' || p.origen === 'word-hc') && p.loteId);
     if (!conLote.length) return null;
     let max = 0;
     conLote.forEach(p => { if ((p.importadoEn || 0) > max) max = p.importadoEn; });
@@ -49,7 +66,7 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
     const vistos = {};   // nombre normalizado -> veces que aparece entre los "nuevos" del archivo
     const dupes = [];    // descripciones de posibles duplicados
     raws.forEach(r => {
-      const rec = mapearPaciente(r, hoyISO());
+      const rec = aRegistro(r, hoyISO());
       const correo = (rec.correo || '').toLowerCase();
       if (correo && porCorreo.has(correo)) { actualiza++; return; } // se empareja por correo: no es duplicado
       nuevos++;
@@ -74,7 +91,7 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
       try {
         const data = JSON.parse(reader.result);
         const arr = Array.isArray(data) ? data : [data];
-        if (!arr.length || !arr[0].campos) throw new Error('El archivo no tiene el formato esperado (se espera una lista con "campos").');
+        if (!arr.length || !(arr[0].campos || arr[0].historia || arr[0].nombre)) throw new Error('El archivo no tiene el formato esperado (se espera una lista de pacientes).');
         setRaws(arr); setNombreArch(file.name);
       } catch (e) {
         setRaws(null); setNombreArch('');
@@ -109,8 +126,8 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
     let creados = 0, actualizados = 0;
     try {
       for (let i = 0; i < raws.length; i++) {
-        const rec = mapearPaciente(raws[i], hoyISO());
-        rec.origen = 'sistema-mp';
+        const rec = aRegistro(raws[i], hoyISO());
+        rec.origen = rec.origen || 'sistema-mp';
         rec.loteId = loteId;
         rec.importadoEn = importadoEn;
 
