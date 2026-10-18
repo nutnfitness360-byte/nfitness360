@@ -293,6 +293,21 @@ const tituloOracion = (txt) => {
   }).join('');
 };
 
+// Textarea que crece de alto con el contenido (recetas largas legibles en tablet/iPad).
+function AutoGrow({ value, style, ...rest }) {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [value]);
+  return (
+    <textarea ref={ref} value={value} rows={1}
+      style={{ ...style, overflow: "hidden", resize: "none" }} {...rest} />
+  );
+}
+
 export default function Menus({ patient, onBack, initialMenus = null, onGuardChange }) {
   const plan = patient.plan || {};
   const ultimaNota = (() => {
@@ -1288,7 +1303,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
                         );
                       })()}
                     </div>
-                    <textarea style={S.optPrep} rows={2} placeholder="Preparación y gramajes" value={o.prep} onChange={e => setOpcion(idx, oi, { prep: e.target.value })} />
+                    <AutoGrow style={S.optPrep} placeholder="Preparación y gramajes" value={o.prep} onChange={e => setOpcion(idx, oi, { prep: e.target.value })} />
                     <div style={S.optFotoRow}>
                       {o.fotoKey
                         ? <img src={fotoUrl(o.fotoKey)} alt="" style={S.optFotoThumb} />

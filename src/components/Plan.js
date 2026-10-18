@@ -496,10 +496,15 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
             <BmrCard label="Mifflin-St Jeor" value={mifflin} sub="gasto basal" selected={formulaSel === 'mifflin'} onClick={() => setM('formula', 'mifflin')} />
             <BmrCard label="Harris-Benedict" value={hb} sub="gasto basal" selected={formulaSel === 'hb'} onClick={() => setM('formula', 'hb')} />
             <BmrCard label="Cunningham" value={cunningham} sub="usa masa magra" selected={formulaSel === 'cunningham'} onClick={() => setM('formula', 'cunningham')} />
-            <div style={styles.bmrCardAccent}>
+          </div>
+          <div style={styles.gastoCard}>
+            <div style={styles.gastoMain}>
               <div style={styles.bmrLabel}>Gasto estimado</div>
               <div style={styles.bmrValue}>{isFin(sugerido) ? r0(sugerido) : '—'}<span style={styles.kcalU}> kcal</span></div>
-              <select style={styles.factorSel} value={meta.factor} onChange={(e) => setM('factor', e.target.value)}>
+            </div>
+            <div style={styles.gastoActividad}>
+              <div style={styles.gastoActLabel}>Nivel de actividad</div>
+              <select style={styles.factorSelWide} value={meta.factor} onChange={(e) => setM('factor', e.target.value)}>
                 {FACTORES.map(([v, l]) => <option key={v} value={v}>×{v} · {l}</option>)}
               </select>
             </div>
@@ -768,6 +773,11 @@ const styles = {
   histHint: { fontSize: 11, color: T.inkSoft, marginTop: 8 },
   bmrSub: { fontSize: 11, color: T.inkSoft, marginTop: 2 },
   factorSel: { marginTop: 8, width: '100%', border: `1px solid ${T.line}`, borderRadius: 8, padding: '6px 8px', fontSize: 12.5, background: '#fff', fontFamily: mono, color: T.ink },
+  gastoCard: { border: `1px solid ${T.amber}`, borderRadius: 12, padding: '14px 18px', background: T.mint, marginTop: 10, display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' },
+  gastoMain: { flex: '0 0 auto' },
+  gastoActividad: { flex: '1 1 220px', minWidth: 200 },
+  gastoActLabel: { fontSize: 11.5, fontWeight: 600, color: T.inkSoft, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
+  factorSelWide: { width: '100%', border: `1px solid ${T.line}`, borderRadius: 8, padding: '10px 12px', fontSize: 14, background: '#fff', fontFamily: mono, color: T.ink },
   warn: { marginTop: 12, fontSize: 12.5, color: T.danger, background: '#F7EAE5', borderRadius: 9, padding: '9px 12px' },
   metaRow: { display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 14, alignItems: 'center' },
   sumTag: { fontSize: 12.5, fontWeight: 700, padding: '6px 12px', borderRadius: 8 },

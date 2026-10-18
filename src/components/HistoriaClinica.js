@@ -1008,7 +1008,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
               <div key={i} style={styles.dietRow}>
                 <input style={styles.dietMomentoInput} value={r.momento} placeholder="Tiempo"
                   onChange={(e) => setDietaCampo(i, "momento", e.target.value)} />
-                <textarea style={styles.dietCell} rows={1} value={r.alimentos}
+                <AutoTextarea style={styles.dietCell} value={r.alimentos}
                   placeholder="Alimentos y bebidas…" onChange={(e) => setDietaCampo(i, "alimentos", e.target.value)} />
                 <button style={styles.dietDel} title="Quitar tiempo"
                   onClick={() => removeRow("dietetica", "dieta", i)}>×</button>
@@ -1273,6 +1273,20 @@ function Field({ label, children, full, style }) {
     </label>
   );
 }
+// Textarea que crece de alto automáticamente con el contenido (lectura completa en tablet/iPad).
+function AutoTextarea({ value, style, ...rest }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [value]);
+  return (
+    <textarea ref={ref} value={value} rows={1}
+      style={{ ...style, overflow: "hidden", resize: "none" }} {...rest} />
+  );
+}
 function SaveBadge({ status }) {
   const map = {
     guardado: { t: "Guardado", c: T.sage, dot: T.sage },
@@ -1325,11 +1339,11 @@ const styles = {
   h2: { fontSize: 18, fontWeight: 750, margin: 0, letterSpacing: -0.3, color: T.ink },
   hint: { margin: "3px 0 0", fontSize: 13, color: T.inkSoft, lineHeight: 1.45 },
   subhead: { fontSize: 12, fontWeight: 700, color: T.pine, margin: "24px 0 10px", letterSpacing: 0.4, textTransform: "uppercase" },
-  grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 16px" },
-  field: { display: "flex", flexDirection: "column", gap: 6 },
+  grid: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "14px 16px" },
+  field: { display: "flex", flexDirection: "column", gap: 6, minWidth: 0 },
   fieldFull: { gridColumn: "1 / -1" },
   label: { fontSize: 12.5, fontWeight: 600, color: T.inkSoft, letterSpacing: 0.1 },
-  input: { width: "100%", border: `1px solid ${T.line}`, borderRadius: 9, padding: "10px 12px", fontSize: 14, color: T.ink, background: "var(--card)", boxSizing: "border-box", fontFamily: "inherit" },
+  input: { width: "100%", minWidth: 0, maxWidth: "100%", border: `1px solid ${T.line}`, borderRadius: 9, padding: "10px 12px", fontSize: 14, color: T.ink, background: "var(--card)", boxSizing: "border-box", fontFamily: "inherit" },
   inputAuto: { background: T.mint, color: T.pine, fontWeight: 700, letterSpacing: 0.5 },
   autoWrap: { position: "relative", display: "flex", alignItems: "center" },
   autoTag: { position: "absolute", right: 10, fontSize: 10.5, fontWeight: 700, color: T.pineSoft, background: "var(--card)", border: `1px solid ${T.line}`, borderRadius: 6, padding: "1px 6px", textTransform: "uppercase", letterSpacing: 0.5 },
