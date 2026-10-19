@@ -621,7 +621,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                     <div style={{ position:'absolute', left:0, right:0, top:'100%', zIndex:50, background:'#fff', border:'1px solid var(--border)', borderRadius:10, marginTop:4, boxShadow:'0 10px 30px rgba(33,28,23,0.15)', maxHeight:190, overflowY:'auto' }}>
                       {matches.map(p => (
                         <button key={p.id} type="button"
-                          onMouseDown={(e) => { e.preventDefault(); setMPaciente(p.nombre); setMPacienteEmail((p.correo || '').toLowerCase()); setMPacienteTel(p.telefono || ''); setShowSug(false); }}
+                          onMouseDown={(e) => { e.preventDefault(); setMPaciente(p.nombre); setMPacienteEmail((p.correo || '').toLowerCase()); setMPacienteTel(p.contacto || p.telefono || ''); setShowSug(false); }}
                           style={{ display:'block', width:'100%', textAlign:'left', background:'transparent', border:'none', padding:'9px 12px', fontSize:13, cursor:'pointer', color:'var(--dark)', fontFamily:'Montserrat, sans-serif' }}>
                           {p.nombre} <span style={{ color:'var(--stone)', fontSize:11 }}>· {p.codigo}</span>
                         </button>
@@ -777,8 +777,12 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
       )}
 
       {detalle && (() => {
-        const tel = soloDigitos(detalle.pacienteTelefono);
-        const waNum = telWhatsApp(detalle.pacienteTelefono);
+        // Si la cita no guardó teléfono (citas viejas o pacientes importados), se toma
+        // el teléfono actual del expediente del paciente (buscado por correo).
+        const pacDet = (pacientesList || []).find(p => (p.correo || '').toLowerCase() === (detalle.pacienteEmail || '').toLowerCase());
+        const telRaw = detalle.pacienteTelefono || (pacDet && (pacDet.contacto || pacDet.telefono)) || '';
+        const tel = soloDigitos(telRaw);
+        const waNum = telWhatsApp(telRaw);
         const correo = (detalle.pacienteEmail || '').trim();
         return (
           <div onClick={() => setDetalle(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(26,22,18,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -790,7 +794,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
               <div style={{ padding: '14px 18px 2px' }}>
                 {[
                   ['Correo', correo ? <a href={'mailto:' + correo} style={{ color: 'var(--gold)', textDecoration: 'none', fontWeight: 700, wordBreak: 'break-all' }}>{correo}</a> : <span style={{ color: '#a89e95', fontStyle: 'italic', fontWeight: 500 }}>No registrado</span>],
-                  ['Teléfono', tel ? <a href={'tel:+' + waNum} style={{ color: 'var(--gold)', textDecoration: 'none', fontWeight: 700 }}>{detalle.pacienteTelefono}</a> : <span style={{ color: '#a89e95', fontStyle: 'italic', fontWeight: 500 }}>No registrado</span>],
+                  ['Teléfono', tel ? <a href={'tel:+' + waNum} style={{ color: 'var(--gold)', textDecoration: 'none', fontWeight: 700 }}>{telRaw}</a> : <span style={{ color: '#a89e95', fontStyle: 'italic', fontWeight: 500 }}>No registrado</span>],
                   ['Fecha', fmtDate(detalle.fecha)],
                   ['Hora', detalle.hora],
                   ['Tipo', detalle.tipoNombre || detalle.motivo || '—'],
