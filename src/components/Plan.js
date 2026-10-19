@@ -174,10 +174,52 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
   const [menusOverride, setMenusOverride] = useState(null); // menú con gramajes reescritos tras escalar (se guarda en vez del vigente)
   const [escalando, setEscalando] = useState(false);
   const [escalarMsg, setEscalarMsg] = useState('');
+  // Macros por g/kg: segunda forma de llegar a la energía meta (además de por %).
+  const [modoMacros, setModoMacros] = useState('pct'); // 'pct' | 'gkg'
+  const [gkg, setGkg] = useState({ p: '', l: '', c: '' });
 
   const setP = (k, v) => { setPp(p => ({ ...p, [k]: v })); setStatus('nuevo'); };
   const setM = (k, v) => { setMeta(m => ({ ...m, [k]: v })); setStatus('nuevo'); };
   const setEqi = (i, v) => { setEq(e => e.map((x, k) => k === i ? v : x)); setStatus('nuevo'); };
+
+  // Reparte kcal → % en enteros que suman 100 (método del mayor residuo).
+  const pctDesdeKcal = (kp, kl, kc) => {
+    const tot = kp + kl + kc;
+    if (!(tot > 0)) return [0, 0, 0];
+    const raw = [kp / tot * 100, kl / tot * 100, kc / tot * 100];
+    const base = raw.map(x => Math.floor(x));
+    let resto = 100 - base.reduce((a, b) => a + b, 0);
+    const orden = raw.map((x, i) => ({ i, f: x - Math.floor(x) })).sort((a, b) => b.f - a.f);
+    for (let k = 0; k < orden.length && resto > 0; k++) { base[orden[k].i]++; resto--; }
+    return base;
+  };
+  // Aplica los g/kg: gramos (× peso) → kcal → energía meta + distribución %, y lo escribe
+  // en la meta. De ahí, el cálculo de equivalentes sigue igual que siempre.
+  const aplicarGkg = (vals) => {
+    const w = num(pp.peso);
+    if (!(w > 0)) return;
+    const kp = num(vals.p) * w * 4, kl = num(vals.l) * w * 9, kc = num(vals.c) * w * 4;
+    const kcal = kp + kl + kc;
+    if (!(kcal > 0)) return;
+    const [pcp, pcl, pcc] = pctDesdeKcal(kp, kl, kc);
+    setMeta(m => ({ ...m, energia: String(Math.round(kcal)), pP: pcp, pL: pcl, pC: pcc }));
+    setStatus('nuevo');
+  };
+  const setGkgCampo = (k, v) => { const next = { ...gkg, [k]: v }; setGkg(next); aplicarGkg(next); };
+  // Cambia entre "por %" y "por g/kg". Al entrar a g/kg, prellena los g/kg desde la meta actual.
+  const cambiarModoMacros = (modo) => {
+    if (modo === 'gkg') {
+      const w = num(pp.peso), e0 = num(meta.energia);
+      if (w > 0 && e0 > 0) {
+        setGkg({
+          p: String(r1((num(meta.pP) / 100 * e0) / 4 / w)),
+          l: String(r1((num(meta.pL) / 100 * e0) / 9 / w)),
+          c: String(r1((num(meta.pC) / 100 * e0) / 4 / w)),
+        });
+      }
+    }
+    setModoMacros(modo);
+  };
 
   const peso = num(pp.peso), talla = num(pp.talla), edad = num(pp.edad);
   const esHombre = pp.sexo === 'Masculino';
@@ -220,6 +262,12 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
     if (e > 0 && sumaPctM === 100) { setEq(plantillaEq(e, num(meta.pP), num(meta.pL), num(meta.pC)).map(String)); setStatus('nuevo'); }
     // eslint-disable-next-line
   }, [meta.energia, meta.pP, meta.pL, meta.pC]);
+
+  // En modo g/kg, si cambia el peso (sección A), recalcula la energía meta con los g/kg vigentes.
+  useEffect(() => {
+    if (modoMacros === 'gkg') aplicarGkg(gkg);
+    // eslint-disable-next-line
+  }, [pp.peso]);
 
   const energia = num(meta.energia);
   const pP = num(meta.pP), pL = num(meta.pL), pC = num(meta.pC);
@@ -515,12 +563,44 @@ export default function Plan({ patient, pdata, onBack, onGuardChange }) {
 
         {/* SECCIÓN B */}
         <Section n="B" title="Meta energética y distribución de macros">
-          <Grid>
-            <Field label="Energía meta (kcal)"><input style={{ ...styles.input, ...styles.inputStrong }} inputMode="numeric" value={meta.energia} onChange={(e) => setM('energia', e.target.value)} /></Field>
-            <Field label="% Proteína"><input style={styles.input} inputMode="numeric" value={meta.pP} onChange={(e) => setM('pP', e.target.value)} /></Field>
-            <Field label="% Lípidos"><input style={styles.input} inputMode="numeric" value={meta.pL} onChange={(e) => setM('pL', e.target.value)} /></Field>
-            <Field label="% H. de C."><input style={styles.input} inputMode="numeric" value={meta.pC} onChange={(e) => setM('pC', e.target.value)} /></Field>
-          </Grid>
+          <div style={styles.modoRow}>
+            <span style={styles.modoLbl}>Definir macros por:</span>
+            <div style={styles.modoToggle}>
+              <button type="button" style={{ ...styles.modoBtn, ...(modoMacros === 'pct' ? styles.modoBtnOn : {}) }} onClick={() => cambiarModoMacros('pct')}>% de energía</button>
+              <button type="button" style={{ ...styles.modoBtn, ...(modoMacros === 'gkg' ? styles.modoBtnOn : {}) }} onClick={() => cambiarModoMacros('gkg')}>g por kg</button>
+            </div>
+          </div>
+          {modoMacros === 'pct' ? (
+            <Grid>
+              <Field label="Energía meta (kcal)"><input style={{ ...styles.input, ...styles.inputStrong }} inputMode="numeric" value={meta.energia} onChange={(e) => setM('energia', e.target.value)} /></Field>
+              <Field label="% Proteína"><input style={styles.input} inputMode="numeric" value={meta.pP} onChange={(e) => setM('pP', e.target.value)} /></Field>
+              <Field label="% Lípidos"><input style={styles.input} inputMode="numeric" value={meta.pL} onChange={(e) => setM('pL', e.target.value)} /></Field>
+              <Field label="% H. de C."><input style={styles.input} inputMode="numeric" value={meta.pC} onChange={(e) => setM('pC', e.target.value)} /></Field>
+            </Grid>
+          ) : (
+            <div>
+              <div style={styles.gkgPeso}>Peso del paciente: <b>{peso > 0 ? peso : '—'} kg</b> <span style={{ color: T.inkSoft }}>(de la sección A · editable arriba)</span></div>
+              {!(peso > 0) && <p style={styles.warn}>Captura el peso en la sección A para calcular la energía por g/kg.</p>}
+              <div style={styles.gkgTable}>
+                <div style={styles.gkgHead}><span>Macronutriente</span><span style={{ textAlign: 'center' }}>g / kg</span><span style={{ textAlign: 'right' }}>Gramos</span><span style={{ textAlign: 'right' }}>kcal</span></div>
+                {[['Proteína', 'p', 4], ['Lípidos', 'l', 9], ['H. de C.', 'c', 4]].map(([lbl, k, kc]) => {
+                  const grs = num(gkg[k]) * peso;
+                  return (
+                    <div key={k} style={styles.gkgRow}>
+                      <span style={{ fontWeight: 700 }}>{lbl}</span>
+                      <span style={{ textAlign: 'center' }}><input style={styles.gkgInput} inputMode="decimal" value={gkg[k]} onChange={(e) => setGkgCampo(k, e.target.value)} /></span>
+                      <span style={styles.gkgCell}>{grs > 0 ? r0(grs) + ' g' : '—'}</span>
+                      <span style={styles.gkgCell}>{grs > 0 ? r0(grs * kc) : '—'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={styles.gkgRes}>
+                <div><div style={styles.gkgResK}>Energía meta (calculada)</div><div style={styles.gkgResV}>{energia > 0 ? r0(energia) : '—'}<span style={{ fontSize: 13, color: '#C9D7CF', fontWeight: 600 }}> kcal</span></div></div>
+                <div style={styles.gkgResD}>Distribución: <b style={{ color: '#fff' }}>{pP}% P · {pL}% L · {pC}% C</b></div>
+              </div>
+            </div>
+          )}
           <div style={styles.metaRow}>
             <span style={{ ...styles.sumTag, ...(sumaPct === 100 ? styles.sumOk : styles.sumBad) }}>
               Suma de macros: {sumaPct}%{sumaPct === 100 ? ' ✓' : ' (debe ser 100%)'}
@@ -778,6 +858,21 @@ const styles = {
   gastoActividad: { flex: '1 1 220px', minWidth: 200 },
   gastoActLabel: { fontSize: 11.5, fontWeight: 600, color: T.inkSoft, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
   factorSelWide: { width: '100%', border: `1px solid ${T.line}`, borderRadius: 8, padding: '10px 12px', fontSize: 14, background: '#fff', fontFamily: mono, color: T.ink },
+  modoRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
+  modoLbl: { fontSize: 12.5, fontWeight: 600, color: T.inkSoft },
+  modoToggle: { display: 'inline-flex', border: `1px solid ${T.line}`, borderRadius: 10, overflow: 'hidden' },
+  modoBtn: { border: 'none', background: '#fff', padding: '7px 15px', fontSize: 12.5, fontWeight: 700, color: T.inkSoft, cursor: 'pointer', fontFamily: mono },
+  modoBtnOn: { background: T.pine, color: '#fff' },
+  gkgPeso: { fontSize: 12.5, color: T.ink, background: T.mint, borderRadius: 8, padding: '8px 12px', marginBottom: 12 },
+  gkgTable: { border: `1px solid ${T.line}`, borderRadius: 10, overflow: 'hidden' },
+  gkgHead: { display: 'grid', gridTemplateColumns: '1.5fr 0.9fr 0.9fr 0.8fr', gap: 6, background: 'var(--cream)', padding: '7px 12px', fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, color: T.inkSoft },
+  gkgRow: { display: 'grid', gridTemplateColumns: '1.5fr 0.9fr 0.9fr 0.8fr', gap: 6, alignItems: 'center', padding: '9px 12px', borderTop: `1px solid ${T.lineSoft}`, fontSize: 13, color: T.ink },
+  gkgInput: { width: '100%', maxWidth: 72, textAlign: 'center', border: `1px solid ${T.amber}`, borderRadius: 7, padding: '6px 4px', fontSize: 13.5, fontWeight: 700, color: T.pine, background: '#FCFDFC', fontFamily: mono, boxSizing: 'border-box' },
+  gkgCell: { textAlign: 'right', color: T.inkSoft, fontVariantNumeric: 'tabular-nums' },
+  gkgRes: { marginTop: 12, background: T.pine, borderRadius: 10, padding: '12px 14px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  gkgResK: { fontSize: 10.5, color: '#C9D7CF', textTransform: 'uppercase', letterSpacing: 0.5 },
+  gkgResV: { fontSize: 22, fontWeight: 800, color: T.amber, marginTop: 2 },
+  gkgResD: { fontSize: 12, color: '#D9E4F0', textAlign: 'right' },
   warn: { marginTop: 12, fontSize: 12.5, color: T.danger, background: '#F7EAE5', borderRadius: 9, padding: '9px 12px' },
   metaRow: { display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 14, alignItems: 'center' },
   sumTag: { fontSize: 12.5, fontWeight: 700, padding: '6px 12px', borderRadius: 8 },

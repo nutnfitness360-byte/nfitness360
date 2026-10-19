@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aretia — Manual de marca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,600;0,700;0,800;1,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--emer:#1E3A5F;--amber:#E0913F;--cream:#F4F1EA;--stone:#64726B;--ink:#14120F;--paper:#FBFAF7;--line:#E7E2D8}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:#E9E6DF;color:#202824;line-height:1.55;padding:30px 14px 60px;-webkit-font-smoothing:antialiased}
+  .page{max-width:900px;margin:0 auto;background:var(--paper);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 12px 44px rgba(0,0,0,.08)}
+  /* Portada */
+  .cover{background:var(--emer);color:var(--cream);padding:46px 44px 40px}
+  .cover .lock{display:flex;align-items:center;gap:18px;margin-bottom:26px}
+  .cover .wm{font-family:'Montserrat',sans-serif;font-weight:800;font-size:44px;color:var(--cream);line-height:1;letter-spacing:-.5px}
+  .cover h1{font-family:'Montserrat',sans-serif;font-weight:700;font-size:14px;letter-spacing:3px;text-transform:uppercase;color:var(--amber)}
+  .cover .promise{font-family:'Montserrat',sans-serif;font-style:italic;font-weight:600;font-size:22px;color:#EDE7DA;margin-top:6px}
+  .body{padding:36px 44px 44px}
+  h2{font-family:'Montserrat',sans-serif;font-weight:700;font-size:21px;color:var(--emer);margin:34px 0 4px}
+  h2:first-child{margin-top:0}
+  .lead{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--amber);font-weight:700;margin-bottom:14px}
+  p{font-size:13.5px;margin-bottom:10px}
+  b{color:#111}
+  .hr{height:1px;background:var(--line);margin:30px 0}
+  .card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:#fff}
+  .kv{font-size:13px;margin-bottom:8px}
+  .kv b{display:inline-block;min-width:104px;color:var(--emer)}
+  /* Logo */
+  .logos{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .lo{border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;gap:14px;padding:26px;min-height:104px}
+  .lo.d{background:var(--emer);border-color:var(--emer)}
+  .lo.l{background:var(--cream)}
+  .lo.w{background:#fff}
+  .lw{font-family:'Montserrat',sans-serif;font-weight:800;font-size:30px;letter-spacing:-.5px}
+  .cap{font-size:10.5px;color:var(--stone);text-align:center;margin-top:6px}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+  .do,.dont{border-radius:12px;padding:14px 16px;font-size:12.5px}
+  .do{background:#F2F9F4;border:1px solid #cfe6d8}
+  .dont{background:#FBEFEA;border:1px solid #eed6cc}
+  .do h3,.dont h3{font-size:12px;margin-bottom:8px;letter-spacing:.5px;font-family:'Montserrat',sans-serif}
+  .do h3{color:#2F7D5B}.dont h3{color:#B0593F}
+  .do ul,.dont ul{margin:0;list-style:none}
+  .do li,.dont li{margin-bottom:5px;padding-left:16px;position:relative}
+  .do li:before{content:'✓';position:absolute;left:0;color:#2F7D5B;font-weight:700}
+  .dont li:before{content:'✕';position:absolute;left:0;color:#B0593F;font-weight:700}
+  /* Color */
+  .pal{display:flex;gap:8px;flex-wrap:wrap}
+  .sw{flex:1;min-width:120px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+  .sw .chip{height:56px}
+  .sw .lbl{padding:8px 10px;font-size:11px;background:#fff}
+  .sw .lbl b{display:block;font-size:11.5px}
+  .sw .lbl span{color:var(--stone);font-size:10.5px}
+  .cnote{font-size:12px;color:var(--stone);margin-top:12px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  /* Tipografía */
+  .type-ex{border:1px solid var(--line);border-radius:12px;padding:20px 22px;background:#fff}
+  .fr{font-family:'Montserrat',sans-serif}
+  .mn{font-family:'Inter',sans-serif}
+  /* Voz */
+  .voice{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px}
+  .vp{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:#fff}
+  .vp b{color:var(--emer);font-size:13.5px}
+  .vp p{font-size:12px;color:#4a4f49;margin:4px 0 0}
+  .say{font-size:12.5px}
+  .say .g{color:#2F7D5B;font-weight:600}
+  .say .r{color:#B0593F;font-weight:600}
+  .msg{background:var(--cream);border-radius:12px;padding:16px 18px;font-size:13px}
+  .msg .tag{font-family:'Montserrat',sans-serif;font-style:italic;font-weight:600;font-size:16px;color:var(--emer)}
+  .foot{padding:18px 44px 30px;font-size:11px;color:var(--stone)}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="cover">
+    <div class="lock">
+      <svg width="76" height="76" viewBox="0 0 100 100"><path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" stroke-width="9" stroke-linejoin="miter"/><path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" stroke-width="9" stroke-linejoin="miter"/></svg>
+      <span class="wm">Aretia</span>
+    </div>
+    <h1>Manual de marca</h1>
+    <div class="promise">Del plan al resultado.</div>
+  </div>
+
+  <div class="body">
+
+    <h2>1. Esencia</h2>
+    <div class="lead">Quiénes somos</div>
+    <div class="card">
+      <div class="kv"><b>Nombre</b> Aretia (a·RE·tia)</div>
+      <div class="kv"><b>Significado</b> De <i>areté</i> (griego: excelencia, virtud) + ‑ia. "La excelencia hecha sistema".</div>
+      <div class="kv"><b>Promesa</b> Del plan al resultado.</div>
+      <div class="kv"><b>Qué es</b> La plataforma premium para que nutriólogos y clínicas creen planes, agenden, cobren y den seguimiento a sus pacientes — con su propia marca.</div>
+      <div class="kv"><b>Para quién</b> Nutriólogos y clínicas que quieren una herramienta seria y una imagen a la altura de su trabajo.</div>
+      <div class="kv" style="margin-bottom:0"><b>Personalidad</b> Premium · Moderna · Profesional · Cálida.</div>
+    </div>
+
+    <div class="hr"></div>
+
+    <h2>2. Logo</h2>
+    <div class="lead">El símbolo: la "A" como cumbre; la punta ámbar = la excelencia alcanzada.</div>
+    <div class="logos">
+      <div><div class="lo l">
+        <svg width="60" height="60" viewBox="0 0 100 100"><path d="M29 74 L50 30 L71 74" fill="none" stroke="#1E3A5F" stroke-width="9" stroke-linejoin="miter"/><path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" stroke-width="9" stroke-linejoin="miter"/></svg>
+        <span class="lw" style="color:#1E3A5F">Aretia</span>
+      </div><div class="cap">Principal · fondo claro</div></div>
+      <div><div class="lo d">
+        <svg width="60" height="60" viewBox="0 0 100 100"><path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" stroke-width="9" stroke-linejoin="miter"/><path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" stroke-width="9" stroke-linejoin="miter"/></svg>
+        <span class="lw" style="color:#F4F1EA">Aretia</span>
+      </div><div class="cap">Reverso · fondo oscuro</div></div>
+      <div><div class="lo w">
+        <svg width="52" height="52" viewBox="0 0 100 100"><path d="M29 74 L50 30 L71 74" fill="none" stroke="#1E3A5F" stroke-width="9" stroke-linejoin="miter"/><path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" stroke-width="9" stroke-linejoin="miter"/></svg>
+      </div><div class="cap">Símbolo solo</div></div>
+      <div><div class="lo l">
+        <svg width="56" height="56" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#1E3A5F"/><path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" stroke-width="9" stroke-linejoin="miter"/><path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" stroke-width="9" stroke-linejoin="miter"/></svg>
+      </div><div class="cap">Ícono de app / favicon</div></div>
+    </div>
+    <div class="dos">
+      <div class="do"><h3>SÍ</h3><ul>
+        <li>Deja un margen ≥ la altura de la "A".</li>
+        <li>Usa el reverso sobre fondos oscuros.</li>
+        <li>Conserva los colores de marca.</li>
+      </ul></div>
+      <div class="dont"><h3>NO</h3><ul>
+        <li>No lo estires ni deformes.</li>
+        <li>No le cambies el color ni le pongas sombras.</li>
+        <li>No lo pongas sobre fondos sin contraste.</li>
+      </ul></div>
+    </div>
+
+    <div class="hr"></div>
+
+    <h2>3. Color</h2>
+    <div class="lead">El azul marino manda; el ámbar es el acento (botones, detalles). Cremas para fondos.</div>
+    <div class="pal">
+      <div class="sw"><div class="chip" style="background:#1E3A5F"></div><div class="lbl"><b>Azul Marino</b><span>#1E3A5F · principal, fondos, texto fuerte</span></div></div>
+      <div class="sw"><div class="chip" style="background:#E0913F"></div><div class="lbl"><b>Ámbar</b><span>#E0913F · acento, botones (CTA)</span></div></div>
+      <div class="sw"><div class="chip" style="background:#F4F1EA"></div><div class="lbl"><b>Crema</b><span>#F4F1EA · fondos suaves</span></div></div>
+      <div class="sw"><div class="chip" style="background:#64726B"></div><div class="lbl"><b>Piedra</b><span>#64726B · texto secundario</span></div></div>
+      <div class="sw"><div class="chip" style="background:#14120F"></div><div class="lbl"><b>Tinta</b><span>#14120F · texto sobre claro</span></div></div>
+    </div>
+    <div class="cnote"><b>Regla del acento:</b> el único acento/CTA de la marca es el ámbar <b>#E0913F</b> (el mismo de la punta del logo). No usamos verde como color de marca. El verde solo puede aparecer de forma puntual como señal semántica (un dato positivo: "bajó de peso", "plan activo"), nunca como color de botones ni de identidad.</div>
+
+    <div class="hr"></div>
+
+    <h2>4. Tipografía</h2>
+    <div class="lead">Montserrat para titulares; Inter para interfaz y texto.</div>
+    <div class="type-ex">
+      <div class="fr" style="font-size:32px;font-weight:800;color:#1E3A5F;letter-spacing:-.5px">Montserrat — titulares</div>
+      <div class="fr" style="font-size:15px;font-weight:600;color:#64726B;margin-bottom:14px">Sans geométrica con carácter: da la sensación premium y moderna de la marca. Pesos 600/700/800 para títulos.</div>
+      <div class="mn" style="font-size:22px;font-weight:700;color:#1E3A5F">Inter — interfaz y texto</div>
+      <div class="mn" style="font-size:13px;color:#64726B">Sans limpia y muy legible para botones, formularios y párrafos. Clara a cualquier tamaño. Pesos 400/500/600.</div>
+    </div>
+
+    <div class="hr"></div>
+
+    <h2>5. Tono de voz</h2>
+    <div class="lead">Cómo habla Aretia</div>
+    <div class="voice">
+      <div class="vp"><b>Claro</b><p>Directo, sin tecnicismos. Que se entienda a la primera.</p></div>
+      <div class="vp"><b>Profesional</b><p>Seguro y creíble. Le hablamos a un experto.</p></div>
+      <div class="vp"><b>Cálido</b><p>Humano y cercano, nunca frío ni corporativo.</p></div>
+      <div class="vp"><b>Aspiracional</b><p>Enfocado en resultados y excelencia.</p></div>
+    </div>
+    <div class="card say">
+      <p><span class="g">Sí:</span> "Del plan al resultado." · "Tu práctica, con la imagen que merece." · "Ordena tu consulta y enfócate en tus pacientes."</p>
+      <p style="margin-bottom:0"><span class="r">No:</span> "¡El software #1, el mejor de todos!" · lenguaje técnico y frío · clichés genéricos de bienestar.</p>
+    </div>
+
+    <div class="hr"></div>
+
+    <h2>6. Mensajes clave</h2>
+    <div class="msg">
+      <p><b>Tagline:</b> <span class="tag">Del plan al resultado.</span></p>
+      <p><b>Alternativas:</b> "La excelencia, en tu consulta." · "Tu método, sus resultados."</p>
+      <p style="margin-bottom:0"><b>Una línea (pitch):</b> Aretia es el sistema con el que nutriólogos y clínicas crean planes, agendan, cobran y dan seguimiento a sus pacientes — con su propia marca y una imagen premium.</p>
+    </div>
+
+  </div>
+
+  <div class="foot">Aretia · Manual de marca v2 · octubre 2026. Tipografía final: Montserrat + Inter. Acento único: ámbar #E0913F. Este documento es la guía de identidad; consérvalo para tu equipo y cualquier diseñador que colabore.</div>
+</div>
+</body>
+</html>
