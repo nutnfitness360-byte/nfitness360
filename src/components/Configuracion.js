@@ -71,7 +71,7 @@ export default function Configuracion() {
   const { esAdmin, user } = useAuth();
   // Facturación visible también para la cuenta de pruebas (para demos/presentación),
   // sin encenderla para los clientes reales de ninguna instancia.
-  const correoFacturaPrueba = String((user && user.email) || '').toLowerCase() === 'pruebasistnut@gmail.com';
+  const correoFacturaPrueba = ['pruebasistnut@gmail.com', 'contacto@aretia.mx'].includes(String((user && user.email) || '').toLowerCase());
   const factOn = FACTURACION_ON || correoFacturaPrueba;
   const [colorsLocal, setColorsLocal] = useState(colors);
 

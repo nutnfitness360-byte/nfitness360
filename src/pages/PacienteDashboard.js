@@ -424,7 +424,7 @@ function FacturacionView({ email, citas, creditos }) {
 export default function PacienteDashboard() {
   const { user } = useAuth();
   // Facturación visible también para la cuenta de pruebas (demos/presentación).
-  const correoFacturaPrueba = String((user && user.email) || '').toLowerCase() === 'pruebasistnut@gmail.com';
+  const correoFacturaPrueba = ['pruebasistnut@gmail.com', 'contacto@aretia.mx'].includes(String((user && user.email) || '').toLowerCase());
   const factOn = FACTURACION_ON || correoFacturaPrueba;
   const { colors } = useBranding();
   const [tab, setTab] = useState('inicio');
