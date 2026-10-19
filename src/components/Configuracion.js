@@ -68,7 +68,11 @@ function comprimirLogo(file) {
 export default function Configuracion() {
   const { logo, colors } = useBranding();
   const { tema, setTema, temaDisponible } = useTheme();
-  const { esAdmin } = useAuth();
+  const { esAdmin, user } = useAuth();
+  // Facturación visible también para la cuenta de pruebas (para demos/presentación),
+  // sin encenderla para los clientes reales de ninguna instancia.
+  const correoFacturaPrueba = String((user && user.email) || '').toLowerCase() === 'pruebasistnut@gmail.com';
+  const factOn = FACTURACION_ON || correoFacturaPrueba;
   const [colorsLocal, setColorsLocal] = useState(colors);
 
   // --- Cobros MercadoPago (Fitmeal, solo admin) ---
@@ -723,10 +727,10 @@ export default function Configuracion() {
       </div>
       </Seccion>
 
-      {((ES_FITMEAL && esAdmin) || FACTURACION_ON) && (
+      {((ES_FITMEAL && esAdmin) || factOn) && (
         <Seccion
-          titulo={(ES_FITMEAL && esAdmin && FACTURACION_ON) ? 'Cobros y facturación' : (FACTURACION_ON ? 'Facturación' : 'Cobros')}
-          n={(ES_FITMEAL && esAdmin ? 1 : 0) + (FACTURACION_ON ? 1 : 0)}>
+          titulo={(ES_FITMEAL && esAdmin && factOn) ? 'Cobros y facturación' : (factOn ? 'Facturación' : 'Cobros')}
+          n={(ES_FITMEAL && esAdmin ? 1 : 0) + (factOn ? 1 : 0)}>
       {ES_FITMEAL && esAdmin && (
         <div className="card" style={{ maxWidth: 760 }}>
           <div className="card-title">Cobros con MercadoPago</div>
@@ -752,7 +756,7 @@ export default function Configuracion() {
           {mpMsg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 12 }}>{mpMsg}</span> : null}
         </div>
       )}
-      {FACTURACION_ON && (
+      {factOn && (
       <div className="card" style={{ maxWidth: 760 }}>
         <div className="card-title">Facturación (CFDI)</div>
         <p style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -4, marginBottom: 14 }}>

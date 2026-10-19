@@ -423,6 +423,9 @@ function FacturacionView({ email, citas, creditos }) {
 }
 export default function PacienteDashboard() {
   const { user } = useAuth();
+  // Facturación visible también para la cuenta de pruebas (demos/presentación).
+  const correoFacturaPrueba = String((user && user.email) || '').toLowerCase() === 'pruebasistnut@gmail.com';
+  const factOn = FACTURACION_ON || correoFacturaPrueba;
   const { colors } = useBranding();
   const [tab, setTab] = useState('inicio');
   const [citas, setCitas] = useState([]);
@@ -721,7 +724,7 @@ export default function PacienteDashboard() {
     { id: 'miDia', label: 'Contador de equivalencias', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> },
     { id: 'recomendaciones', label: 'Recomendaciones', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/></svg> },
     { id: 'facturacion', label: 'Facturación', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 3.75h9a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5h-9a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5z"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5v9"/><path strokeLinecap="round" strokeLinejoin="round" d="M14.1 9.4c0-.9-.94-1.5-2.1-1.5s-2.1.63-2.1 1.65c0 2.1 4.2 1.15 4.2 3.15 0 1.02-.94 1.65-2.1 1.65s-2.1-.6-2.1-1.5"/></svg> },
-  ].filter(t => t.id !== 'facturacion' || FACTURACION_ON); // oculta Facturación mientras esté en pruebas
+  ].filter(t => t.id !== 'facturacion' || factOn); // oculta Facturación mientras esté en pruebas
 
   // Opción A: en móvil la barra muestra los principales + "Más"; los secundarios
   // (y Mi perfil) viven dentro de "Más". En escritorio (barra lateral) se ven todos.
@@ -1281,7 +1284,7 @@ export default function PacienteDashboard() {
           </div>
         )}
 
-        {tab === 'facturacion' && FACTURACION_ON && (
+        {tab === 'facturacion' && factOn && (
           <FacturacionView email={user.email} citas={citas} creditos={creditos} />
         )}
       </div>
