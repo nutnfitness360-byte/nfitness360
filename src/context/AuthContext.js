@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase/config';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { MULTI_NUTRI, slugNutriURL, cargarNutriologos, correoDeSlug } from '../utils/multiTenant';
 
@@ -10,6 +10,18 @@ export const useAuth = () => useContext(AuthContext);
 // Correo principal (bootstrap): siempre se considera nutrióloga, aunque la
 // lista "autorizados" estuviera vacía. Evita que te quedes fuera del sistema.
 export const NUTRI_EMAIL = (process.env.REACT_APP_NUTRI_EMAIL || 'nutnfitness360@gmail.com').toLowerCase();
+
+// Cierre temporal de una instancia (p. ej. Fitmeal): con REACT_APP_ACCESO_CERRADO='true'
+// en Vercel, SOLO los correos de la lista de acceso entran; a los demás se les cierra la
+// sesión y ven un aviso de "contacta a soporte". Reversible quitando la variable. No afecta
+// a otras instancias (solo la que tenga la variable).
+export const ACCESO_CERRADO = String(process.env.REACT_APP_ACCESO_CERRADO || '').toLowerCase() === 'true';
+const ACCESO_PERMITIDOS = (() => {
+  const base = ['contacto@aretia.mx', 'proteinanfitness360@gmail.com', 'pruebasistnut@gmail.com'];
+  const extra = String(process.env.REACT_APP_ACCESO_ADMIN || '').toLowerCase().split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  return base.concat(extra);
+})();
+export const accesoPermitido = (email) => ACCESO_PERMITIDOS.indexOf(String(email || '').toLowerCase()) !== -1;
 
 // Decide el rol y si es ADMIN del equipo:
 //  - "nutriologa" si es el correo principal (semilla) o está en /autorizados con rol nutriologa
@@ -76,11 +88,20 @@ export function AuthProvider({ children }) {
   const [role, setRole] = useState(null);
   const [esAdmin, setEsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [bloqueado, setBloqueado] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setLoading(true);
       if (u) {
+        // Instancia cerrada (p. ej. Fitmeal): solo pasan los correos de la lista de acceso.
+        if (ACCESO_CERRADO && !accesoPermitido(u.email)) {
+          setBloqueado(true);
+          setUser(null); setRole(null); setEsAdmin(false);
+          try { await signOut(auth); } catch (e) { /* ignorar */ }
+          setLoading(false);
+          return;
+        }
         const acc = await resolverAcceso(u);
         setUser(u);
         setRole(acc.rol);
@@ -106,7 +127,7 @@ export function AuthProvider({ children }) {
   const adminEquipo = MULTI_NUTRI && role === 'nutriologa' && esAdmin;
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, multiNutri: MULTI_NUTRI, nutriDueno, esAdmin: adminEquipo }}>
+    <AuthContext.Provider value={{ user, role, loading, multiNutri: MULTI_NUTRI, nutriDueno, esAdmin: adminEquipo, bloqueado }}>
       {!loading && children}
     </AuthContext.Provider>
   );

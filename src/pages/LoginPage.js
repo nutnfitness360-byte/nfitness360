@@ -5,7 +5,7 @@ import {
   updateProfile, signOut, sendPasswordResetEmail, fetchSignInMethodsForEmail,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { NUTRI_EMAIL } from '../context/AuthContext';
+import { NUTRI_EMAIL, useAuth } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
 
 // Detecta si la app se abrió DENTRO de otra app (WhatsApp, Instagram, Facebook,
@@ -46,6 +46,7 @@ const POSIBLE_SIN_CUENTA = ['auth/user-not-found', 'auth/invalid-credential', 'a
 export default function LoginPage() {
   const [vista, setVista] = useState('inicio');     // inicio | acceso | email | crear | denegado
   const { logo } = useBranding();
+  const { bloqueado } = useAuth();
   const logoSrc = (logo === undefined) ? (process.env.REACT_APP_LOGO_URL || '/logo.png') : logo;
   // Título de portada FIJO por instancia (no editable). Se decide por el dominio del
   // sitio: la instancia de venta (sistemanutricio...) muestra su propio texto; cualquier
@@ -249,6 +250,31 @@ export default function LoginPage() {
   const Chevron = ({ color }) => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" style={{ marginLeft: 'auto', flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
   );
+
+  if (bloqueado) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: '#262a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18, fontFamily: 'Montserrat, Arial, sans-serif', zIndex: 9999 }}>
+        <div style={{ width: '100%', maxWidth: 400, background: '#32363a', border: '1px solid #44484d', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 70px rgba(0,0,0,0.55)', textAlign: 'center' }}>
+          <div style={{ height: 5, background: 'linear-gradient(90deg,#ba007c,#f5d92c)' }} />
+          <div style={{ padding: '30px 26px 26px' }}>
+            <div style={{ fontWeight: 800, fontSize: 26, color: '#E9E7EC', letterSpacing: 0.5 }}>Fit<span style={{ color: '#f5d92c' }}>meal</span></div>
+            <div style={{ fontSize: 11, color: '#A9A4AE', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 22 }}>Nutrition is simple</div>
+            <div style={{ width: 58, height: 58, borderRadius: '50%', background: 'rgba(186,0,124,0.16)', border: '1px solid rgba(186,0,124,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ba007c" strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 8 }}>Acceso no disponible</div>
+            <div style={{ fontSize: 13.5, color: '#E9E7EC', lineHeight: 1.55, marginBottom: 18 }}>El acceso a esta cuenta está temporalmente deshabilitado. Por favor <b>contacta a soporte</b> para poder acceder.</div>
+            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #44484d', borderRadius: 12, padding: '13px 14px', marginBottom: 20 }}>
+              <div style={{ fontSize: 10.5, color: '#A9A4AE', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Soporte</div>
+              <a href="mailto:contacto@aretia.mx" style={{ color: '#f5d92c', fontSize: 14, fontWeight: 700, textDecoration: 'none', display: 'block', marginBottom: 6 }}>contacto@aretia.mx</a>
+              <a href="https://wa.me/525523008366" target="_blank" rel="noopener noreferrer" style={{ color: '#f5d92c', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>WhatsApp: 55 2300 8366</a>
+            </div>
+            <button onClick={() => window.location.reload()} style={{ width: '100%', background: '#ba007c', color: '#fff', border: 'none', borderRadius: 11, padding: 13, fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Entendido</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (vista === 'inicio') {
     return (
