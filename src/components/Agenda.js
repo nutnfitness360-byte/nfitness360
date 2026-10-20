@@ -431,6 +431,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
             method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
               action: 'crearCita',
+              marca: (process.env.REACT_APP_MARCA_NOMBRE || '') + '|' + ((typeof window !== 'undefined' && window.location && window.location.hostname) || ''),
               paciente: pacienteNombre,
               correo: correo,
               telefono: telefono,
@@ -471,6 +472,7 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
           method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({
             action: 'cancelarCita',
+            marca: (process.env.REACT_APP_MARCA_NOMBRE || '') + '|' + ((typeof window !== 'undefined' && window.location && window.location.hostname) || ''),
             eventId: c.eventId || '',
             correo: (c.pacienteEmail || '').toLowerCase(),
             paciente: c.pacienteNombre || '',
