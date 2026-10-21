@@ -30,6 +30,96 @@ function normalizarRec(r, hoy) {
 const esRegistroMP = (r) => !!(r && r.campos);
 const aRegistro = (r, hoy) => (esRegistroMP(r) ? mapearPaciente(r, hoy) : normalizarRec(r, hoy));
 
+// ===== Importación por CSV (p. ej. export de Avena Health u otro sistema) =====
+// Parser de CSV robusto (respeta comillas y comas dentro de campos).
+function parseCSV(t) {
+  t = String(t).replace(/^﻿/, '');
+  const rows = []; let row = [], field = '', inQ = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (inQ) {
+      if (c === '"') { if (t[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c === '\r') { /* ignora CR */ }
+      else field += c;
+    }
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.length && r.some(x => String(x).trim() !== ''));
+}
+// Fecha "DD/MM/YYYY ..." (formato Avena/México) -> ISO "YYYY-MM-DD".
+function fechaMXaISO(s) {
+  const m = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(s || ''));
+  if (!m) return '';
+  return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+}
+// Busca una columna por varios nombres posibles (sin importar mayúsculas/acentos de más).
+function colFinder(header) {
+  const norm = s => String(s || '').trim().toLowerCase();
+  const idx = {};
+  header.forEach((h, i) => { idx[norm(h)] = i; });
+  return (row, ...names) => {
+    for (const n of names) {
+      const k = norm(n);
+      if (idx[k] !== undefined) {
+        const v = row[idx[k]];
+        if (v !== undefined && String(v).trim() !== '') return String(v).trim();
+      }
+    }
+    return '';
+  };
+}
+// Convierte las filas del CSV en registros de paciente (misma forma que un paciente mapeado).
+function csvARegistros(rows, hoy) {
+  if (!rows.length) return [];
+  const header = rows[0];
+  const get = colFinder(header);
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const nombre = get(r, 'Nombre', 'Nombre completo', 'Paciente');
+    if (!nombre) continue;
+    const correo = get(r, 'Email', 'Correo', 'Correo electrónico', 'E-mail').toLowerCase();
+    const edadRaw = get(r, 'Edad');
+    const sx = get(r, 'Género', 'Genero', 'Sexo').toLowerCase();
+    const sexo = sx.startsWith('m') ? 'Masculino' : (sx.startsWith('f') ? 'Femenino' : '');
+    const lada = get(r, 'LADA');
+    const tel = get(r, 'Teléfono', 'Telefono', 'Celular', 'WhatsApp', 'Whatsapp');
+    const contacto = tel ? ((lada ? lada + ' ' : '') + tel) : '';
+    // El sistema guarda la estatura en CM; Avena la trae en metros (1.70). Se convierte si viene en metros.
+    const alturaRaw = get(r, 'Última Altura', 'Ultima Altura', 'Altura', 'Estatura', 'Talla') || get(r, '1° Altura', '1a Altura');
+    let estatura = '';
+    if (alturaRaw) {
+      const a = parseFloat(String(alturaRaw).replace(',', '.'));
+      if (!isNaN(a) && a > 0) estatura = a < 3 ? String(Math.round(a * 100)) : String(Math.round(a));
+    }
+    const f1 = fechaMXaISO(get(r, '1° Consulta', 'Primera Consulta', 'Creación', 'Creado'));
+    const fu = fechaMXaISO(get(r, 'Última Consulta', 'Ultima Consulta'));
+    const p1 = get(r, '1° Peso', 'Primer Peso');
+    const pu = get(r, 'Último Peso', 'Ultimo Peso', 'Peso');
+    const med = [];
+    if (p1 && !isNaN(+p1)) med.push({ fecha: f1 || hoy, peso: +p1, grasa: 0, musculo: 0 });
+    if (pu && !isNaN(+pu) && fu && fu !== f1) med.push({ fecha: fu, peso: +pu, grasa: 0, musculo: 0 });
+    out.push({
+      nombre,
+      correo,
+      edad: (edadRaw && !isNaN(+edadRaw)) ? parseInt(edadRaw, 10) : '',
+      sexo,
+      estatura,
+      contacto,
+      objetivo: get(r, 'Etiquetas', 'Tags') || '',
+      inicio: f1 || hoy,
+      mediciones: med,
+      origen: 'csv',
+    });
+  }
+  return out;
+}
+
 export default function ImportarPacientes({ open, onClose, pacientes, prefix = 'NF-', nutriDueno = null }) {
   const [raws, setRaws] = useState(null);      // array de registros crudos del archivo
   const [nombreArch, setNombreArch] = useState('');
@@ -49,7 +139,7 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
 
   // Detecta el último lote importado (para "Deshacer último lote").
   const ultimoLote = useMemo(() => {
-    const conLote = (pacientes || []).filter(p => (p.origen === 'sistema-mp' || p.origen === 'word-hc') && p.loteId);
+    const conLote = (pacientes || []).filter(p => (p.origen === 'sistema-mp' || p.origen === 'word-hc' || p.origen === 'csv') && p.loteId);
     if (!conLote.length) return null;
     let max = 0;
     conLote.forEach(p => { if ((p.importadoEn || 0) > max) max = p.importadoEn; });
@@ -89,9 +179,18 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = JSON.parse(reader.result);
-        const arr = Array.isArray(data) ? data : [data];
-        if (!arr.length || !(arr[0].campos || arr[0].historia || arr[0].nombre)) throw new Error('El archivo no tiene el formato esperado (se espera una lista de pacientes).');
+        const txt = String(reader.result || '');
+        const looksJSON = /^[﻿\s]*[[{]/.test(txt);
+        const esCSV = /\.csv$/i.test(file.name || '') || (!looksJSON && txt.indexOf(',') !== -1);
+        let arr;
+        if (esCSV) {
+          arr = csvARegistros(parseCSV(txt), hoyISO());
+          if (!arr.length) throw new Error('El CSV no tiene pacientes reconocibles (se espera al menos una columna "Nombre").');
+        } else {
+          const data = JSON.parse(txt);
+          arr = Array.isArray(data) ? data : [data];
+          if (!arr.length || !(arr[0].campos || arr[0].historia || arr[0].nombre)) throw new Error('El archivo no tiene el formato esperado (se espera una lista de pacientes).');
+        }
         setRaws(arr); setNombreArch(file.name);
       } catch (e) {
         setRaws(null); setNombreArch('');
@@ -195,7 +294,7 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
     <div style={S.overlay} onClick={busy ? undefined : onClose}>
       <div style={S.card} onClick={(e) => e.stopPropagation()}>
         <div style={S.head}>
-          <div style={S.title}>Importar pacientes de Sistema MP</div>
+          <div style={S.title}>Importar pacientes</div>
           <button style={S.x} onClick={onClose} disabled={busy}>✕</button>
         </div>
 
@@ -208,11 +307,11 @@ export default function ImportarPacientes({ open, onClose, pacientes, prefix = '
               onDragLeave={() => setDragOver(false)}
               onDrop={(e) => { e.preventDefault(); setDragOver(false); cargarArchivo(e.dataTransfer.files[0]); }}
             >
-              <input ref={inputRef} type="file" accept="application/json,.json" style={{ display: 'none' }}
+              <input ref={inputRef} type="file" accept=".csv,.json,text/csv,application/json,text/plain" style={{ display: 'none' }}
                 onChange={(e) => cargarArchivo(e.target.files[0])} />
               {nombreArch
                 ? <div><b>{nombreArch}</b><div style={S.muted}>Haz clic para elegir otro archivo</div></div>
-                : <div>Arrastra aquí el archivo <b>.json</b><div style={S.muted}>o haz clic para elegirlo</div></div>}
+                : <div>Arrastra aquí el archivo <b>.csv</b> o <b>.json</b><div style={S.muted}>o haz clic para elegirlo</div></div>}
             </div>
 
             {conteo && (
