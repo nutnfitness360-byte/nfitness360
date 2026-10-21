@@ -18,6 +18,10 @@ const _MARCA_D = (process.env.REACT_APP_MARCA || '').toLowerCase();
 const _HOST_D = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
 const ES_ARETIA_D = _MARCA_D ? (_MARCA_D !== 'natalia') : (_HOST_D.indexOf('sistemanutricio') !== -1 || _HOST_D.indexOf('aretia') !== -1);
 const MARCA_NOMBRE = process.env.REACT_APP_MARCA_NOMBRE || (ES_ARETIA_D ? 'Aretia' : 'Nfitness 360');
+// Nombre del saludo del panel (fijo por instancia): el panel saluda SIEMPRE con este nombre
+// sin depender del displayName de la cuenta. Nombre completo para "Mi perfil".
+const SALUDO = process.env.REACT_APP_NUTRI_SALUDO || '';
+const NOMBRE_NUTRI = process.env.REACT_APP_NUTRI_NOMBRE || '';
 const money = (n) => '$' + Math.round(n || 0).toLocaleString('es-MX');
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -314,7 +318,7 @@ export default function NutriDashboard() {
       <div className="content">
         {tab === 'inicio' && (
           <>
-            <h1 style={D.saludo}>¡Hola, {primerNombre(user?.displayName) || (ES_ARETIA_D ? 'nutrióloga' : 'Natalia')}!</h1>
+            <h1 style={D.saludo}>¡Hola, {SALUDO || primerNombre(user?.displayName) || (ES_ARETIA_D ? 'nutrióloga' : 'Natalia')}!</h1>
 
             <div className="stats">
               <div className="stat"><div className="stat-num">{totalPac}</div><div className="stat-lbl">Pacientes</div></div>
@@ -501,9 +505,9 @@ export default function NutriDashboard() {
           <div className="card">
             <div className="card-title">Mi perfil</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-              <div className="pac-avatar">{initials(user?.displayName || (ES_ARETIA_D ? MARCA_NOMBRE : 'Natalia Flores'))}</div>
+              <div className="pac-avatar">{initials(SALUDO || user?.displayName || (ES_ARETIA_D ? MARCA_NOMBRE : 'Natalia Flores'))}</div>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)' }}>{user?.displayName || (ES_ARETIA_D ? 'Nutrióloga' : 'Lic. N. Natalia Flores')}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)' }}>{NOMBRE_NUTRI || user?.displayName || (ES_ARETIA_D ? 'Nutrióloga' : 'Lic. N. Natalia Flores')}</div>
                 <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 2 }}>{user?.email}</div>
               </div>
             </div>

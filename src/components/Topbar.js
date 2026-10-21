@@ -43,9 +43,9 @@ export default function Topbar({ role, user, onPerfil }) {
 
   return (
     <div className="topbar">
-      <div>
+      <div style={ES_NUTRIALEGO_TB ? { display: 'flex', flexDirection: 'column', alignItems: 'center' } : undefined}>
         {(ES_NUTRIALEGO_TB && !logoDia) ? (
-          <img src={LOGO_NUTRIALEGO_BLANCO} alt="Nutri Ale Go" style={{ height: 75, width: 'auto', display: 'block' }} />
+          <img src={LOGO_NUTRIALEGO_BLANCO} alt="Nutri Ale Go" style={{ height: 101, width: 'auto', display: 'block' }} />
         ) : (ES_ARETIA_TB && !logoDia) ? (
           <img src={LOGO_ARETIA_CREMA} alt="Aretia" style={{ height: 48, width: 'auto', display: 'block' }} />
         ) : (logoSrc ? <img src={logoSrc} alt="" className="topbar-logo-img" /> : null)}
