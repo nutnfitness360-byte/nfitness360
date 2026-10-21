@@ -33,6 +33,9 @@
       (function () {
         try {
           var h = location.hostname;
+          /* Nutri Ale Go vive en nutrialego.aretia.mx (contiene "aretia") pero NO es Aretia:
+             su favicon/título los pone App.js por variables. No aplicar la piel de Aretia. */
+          if (h.indexOf('nutrialego') !== -1) return;
           if (h.indexOf('sistemanutricio') === -1 && h.indexOf('aretia') === -1) return;
           function setLink(rel, href, type, sizes) {
             var sel = 'link[rel="' + rel + '"]' + (sizes ? '[sizes="' + sizes + '"]' : '');
