@@ -5,12 +5,17 @@ import { useBranding } from '../context/BrandingContext';
 import { useTheme } from '../context/ThemeContext';
 import { LOGO_FITMEAL } from '../report/logoFitmeal';
 import { LOGO_ARETIA_CREMA } from '../report/logoAretia';
+import { LOGO_NUTRIALEGO_BLANCO } from '../report/logoNutriAleGo';
 
 const LOGO = process.env.REACT_APP_LOGO_URL || '/logo.png';
 
 // Instancia Aretia (por dominio app.aretia.mx / demo sistemanutricio, o marca). Su logo va en
 // crema/ámbar porque el topbar es azul marino. Solo aplica si la config de marca no trae logo.
-const ES_ARETIA_TB = ((typeof window !== 'undefined' && window.location &&
+// Nutri Ale Go: dominio nutrialego.aretia.mx (contiene "aretia") pero con su propio logo claro.
+const ES_NUTRIALEGO_TB = ((typeof window !== 'undefined' && window.location &&
+  window.location.hostname.indexOf('nutrialego') !== -1) ||
+  ((process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'nutri ale go'));
+const ES_ARETIA_TB = !ES_NUTRIALEGO_TB && ((typeof window !== 'undefined' && window.location &&
   (window.location.hostname.indexOf('aretia') !== -1 || window.location.hostname.indexOf('sistemanutricio') !== -1)) ||
   ((process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'aretia'));
 
@@ -39,7 +44,9 @@ export default function Topbar({ role, user, onPerfil }) {
   return (
     <div className="topbar">
       <div>
-        {(ES_ARETIA_TB && !logoDia) ? (
+        {(ES_NUTRIALEGO_TB && !logoDia) ? (
+          <img src={LOGO_NUTRIALEGO_BLANCO} alt="Nutri Ale Go" style={{ height: 44, width: 'auto', display: 'block' }} />
+        ) : (ES_ARETIA_TB && !logoDia) ? (
           <img src={LOGO_ARETIA_CREMA} alt="Aretia" style={{ height: 48, width: 'auto', display: 'block' }} />
         ) : (logoSrc ? <img src={logoSrc} alt="" className="topbar-logo-img" /> : null)}
         <div className="topbar-role">{role === 'nutriologa' ? 'Panel de nutrición' : 'Mi cuenta'}</div>

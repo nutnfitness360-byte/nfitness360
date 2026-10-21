@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useBranding } from "../context/BrandingContext";
 import { LOGO_ARETIA, LOGO_ARETIA_CREMA } from "../report/logoAretia";
+import { LOGO_NUTRIALEGO, LOGO_NUTRIALEGO_BLANCO } from "../report/logoNutriAleGo";
 
 // Instancia Aretia: por dominio (app.aretia.mx o el demo sistemanutricio) o por marca.
-const ES_ARETIA_HC = ((typeof window !== "undefined" && window.location &&
+const ES_NUTRIALEGO_HC = ((typeof window !== "undefined" && window.location &&
+  window.location.hostname.indexOf("nutrialego") !== -1) ||
+  ((process.env.REACT_APP_MARCA_NOMBRE || "").toLowerCase() === "nutri ale go"));
+const ES_ARETIA_HC = !ES_NUTRIALEGO_HC && ((typeof window !== "undefined" && window.location &&
   (window.location.hostname.indexOf("aretia") !== -1 || window.location.hostname.indexOf("sistemanutricio") !== -1)) ||
   ((process.env.REACT_APP_MARCA_NOMBRE || "").toLowerCase() === "aretia"));
 
@@ -185,7 +189,7 @@ function histParts(data) {
 
   // Logo del PDF por instancia: Aretia usa su logo; Natalia conserva el suyo.
   const esAretiaPDF = ES_ARETIA_HC;
-  const logoPdf = esAretiaPDF ? LOGO_ARETIA : LOGO_PDF;
+  const logoPdf = ES_NUTRIALEGO_HC ? LOGO_NUTRIALEGO : (esAretiaPDF ? LOGO_ARETIA : LOGO_PDF);
   const logo = logoPdf
     ? `<img src="${logoPdf}" alt="" class="logo"/>`
     : `<span class="logoph">N</span>`;
@@ -613,7 +617,9 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
       {/* ---------- ENCABEZADO ---------- */}
       <header style={styles.header}>
         <div style={styles.brandRow}>
-          {(ES_ARETIA_HC) ? (
+          {(ES_NUTRIALEGO_HC) ? (
+            <img src={LOGO_NUTRIALEGO_BLANCO} alt="Nutri Ale Go" style={{ height: 30, width: "auto", display: "block" }} />
+          ) : (ES_ARETIA_HC) ? (
             <img src={LOGO_ARETIA_CREMA} alt="Aretia" style={{ height: 32, width: "auto", display: "block" }} />
           ) : logoSrc ? (
             <img src={logoSrc} alt="" style={styles.logoImg} />

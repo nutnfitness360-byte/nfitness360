@@ -7,6 +7,7 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { NUTRI_EMAIL, useAuth } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
+import { LOGO_NUTRIALEGO_BLANCO } from '../report/logoNutriAleGo';
 
 // Detecta si la app se abrió DENTRO de otra app (WhatsApp, Instagram, Facebook,
 // Messenger, etc.), es decir, un "navegador incrustado". Google bloquea el inicio
@@ -59,7 +60,9 @@ export default function LoginPage() {
   const _marca = (process.env.REACT_APP_MARCA || '').toLowerCase();
   const esSistemaNutricio = _marca ? (_marca !== 'natalia') : (host.indexOf('sistemanutricio') !== -1 || host.indexOf('aretia') !== -1);
   // Marca ARETIA en específico (excluye Fitmeal/Natalia): solo para mostrar su logo en la portada.
-  const esAretia = (host.indexOf('aretia') !== -1) || (host.indexOf('sistemanutricio') !== -1) || ((process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'aretia');
+  // Nutri Ale Go vive en nutrialego.aretia.mx (contiene "aretia") pero NO es Aretia: tiene su propio logo.
+  const esNutriAleGo = (host.indexOf('nutrialego') !== -1) || ((process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'nutri ale go');
+  const esAretia = !esNutriAleGo && ((host.indexOf('aretia') !== -1) || (host.indexOf('sistemanutricio') !== -1) || ((process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'aretia'));
   const portadaTitulo = process.env.REACT_APP_PORTADA_TITULO || (esSistemaNutricio ? 'Bienvenido a Aretia' : 'Agenda tu cita con Natalia');
   const portadaSubtitulo = process.env.REACT_APP_PORTADA_SUBTITULO || (esSistemaNutricio
     ? 'Del plan al resultado: reserva tus consultas, confírmalas y da seguimiento a tu plan.'
@@ -287,7 +290,9 @@ export default function LoginPage() {
               {/* Logo de portada: limitado por ALTO y ANCHO (sin deformar) venga de env o de config/branding.
                   Natalia/Aretia usan su alto de siempre (maxHeight) y su logo compacto no llega al tope de ancho;
                   un logo ANCHO (p. ej. Fitmeal) se topa en maxWidth y ya no se encima con la columna derecha. */}
-              {esAretia
+              {esNutriAleGo
+                ? <img src={LOGO_NUTRIALEGO_BLANCO} alt="Nutri Ale Go" style={{ display: 'block', marginBottom: 16, height: 'auto', width: 'auto', maxHeight: 104, maxWidth: 300 }} />
+                : esAretia
                 ? (
                   <svg width="72" height="72" viewBox="0 0 100 100" style={{ display: 'block', marginBottom: 16 }}>
                     <path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" strokeWidth="9" strokeLinejoin="miter" />

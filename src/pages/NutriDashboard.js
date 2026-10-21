@@ -501,7 +501,7 @@ export default function NutriDashboard() {
           <div className="card">
             <div className="card-title">Mi perfil</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-              <div className="pac-avatar">{initials(user?.displayName || (ES_ARETIA_D ? 'Aretia' : 'Natalia Flores'))}</div>
+              <div className="pac-avatar">{initials(user?.displayName || (ES_ARETIA_D ? MARCA_NOMBRE : 'Natalia Flores'))}</div>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--dark)' }}>{user?.displayName || (ES_ARETIA_D ? 'Nutrióloga' : 'Lic. N. Natalia Flores')}</div>
                 <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 2 }}>{user?.email}</div>
