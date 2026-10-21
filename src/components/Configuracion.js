@@ -355,7 +355,7 @@ export default function Configuracion() {
     setHorBusy(false);
   };
 
-  const logoSrc = (logo === undefined) ? '/logo.png' : logo;
+  const logoSrc = (logo === undefined) ? (process.env.REACT_APP_LOGO_URL || '/logo.png') : logo;
 
   const guardar = async (patch) => {
     setBusy(true); setMsg('');

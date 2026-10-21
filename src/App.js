@@ -42,9 +42,13 @@ function aplicarMarcaPorDominio() {
       if (process.env.REACT_APP_MARCA_NOMBRE) document.title = process.env.REACT_APP_MARCA_NOMBRE;
       var favB = process.env.REACT_APP_FAVICON;
       if (favB) {
-        var lb = document.querySelector("link[rel~='icon']");
-        if (!lb) { lb = document.createElement('link'); lb.rel = 'icon'; document.head.appendChild(lb); }
-        lb.setAttribute('href', favB);
+        // Quitar TODOS los iconos de index.html (favicon.ico + favicon-32.png de Nfitness)
+        // para que no gane el de 32px por defecto; dejar solo el de esta instancia.
+        var olds = document.querySelectorAll("link[rel~='icon']");
+        for (var i = 0; i < olds.length; i++) { if (olds[i].parentNode) olds[i].parentNode.removeChild(olds[i]); }
+        var lb = document.createElement('link'); lb.rel = 'icon'; lb.setAttribute('href', favB); document.head.appendChild(lb);
+        var at = document.querySelector("link[rel='apple-touch-icon']");
+        if (at) at.setAttribute('href', favB);
       }
       return;
     }
