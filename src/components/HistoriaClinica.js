@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useBranding } from "../context/BrandingContext";
 import { LOGO_ARETIA, LOGO_ARETIA_CREMA } from "../report/logoAretia";
 import { LOGO_NUTRIALEGO, LOGO_NUTRIALEGO_BLANCO } from "../report/logoNutriAleGo";
+import { LOGO_INSTANCIA } from "../report/logoInstancia.gen";
+// Instancia GENÉRICA (nueva, sin código): logo por variable / base64 incrustado por el prebuild.
+const ES_GENERICA = (process.env.REACT_APP_MARCA || "").toLowerCase() === "generica";
+const LOGO_CLARO = process.env.REACT_APP_LOGO_CLARO || "";
 
 // Instancia Aretia: por dominio (app.aretia.mx o el demo sistemanutricio) o por marca.
 const ES_NUTRIALEGO_HC = ((typeof window !== "undefined" && window.location &&
@@ -189,7 +193,7 @@ function histParts(data) {
 
   // Logo del PDF por instancia: Aretia usa su logo; Natalia conserva el suyo.
   const esAretiaPDF = ES_ARETIA_HC;
-  const logoPdf = ES_NUTRIALEGO_HC ? LOGO_NUTRIALEGO : (esAretiaPDF ? LOGO_ARETIA : LOGO_PDF);
+  const logoPdf = (ES_GENERICA && LOGO_INSTANCIA) ? LOGO_INSTANCIA : ES_NUTRIALEGO_HC ? LOGO_NUTRIALEGO : (esAretiaPDF ? LOGO_ARETIA : LOGO_PDF);
   const logo = logoPdf
     ? `<img src="${logoPdf}" alt="" class="logo"/>`
     : `<span class="logoph">N</span>`;
@@ -617,7 +621,9 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
       {/* ---------- ENCABEZADO ---------- */}
       <header style={styles.header}>
         <div style={styles.brandRow}>
-          {(ES_NUTRIALEGO_HC) ? (
+          {(LOGO_CLARO) ? (
+            <img src={LOGO_CLARO} alt="" style={{ height: 34, width: "auto", display: "block" }} />
+          ) : (ES_NUTRIALEGO_HC) ? (
             <img src={LOGO_NUTRIALEGO_BLANCO} alt="Nutri Ale Go" style={{ height: 30, width: "auto", display: "block" }} />
           ) : (ES_ARETIA_HC) ? (
             <img src={LOGO_ARETIA_CREMA} alt="Aretia" style={{ height: 32, width: "auto", display: "block" }} />

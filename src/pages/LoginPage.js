@@ -63,7 +63,9 @@ export default function LoginPage() {
   // Nutri Ale Go vive en nutrialego.aretia.mx (contiene "aretia") pero NO es Aretia: tiene su propio logo.
   const esNutriAleGo = (host.indexOf('nutrialego') !== -1) || ((process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'nutri ale go');
   const esAretia = !esNutriAleGo && ((host.indexOf('aretia') !== -1) || (host.indexOf('sistemanutricio') !== -1) || ((process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'aretia'));
-  const portadaTitulo = process.env.REACT_APP_PORTADA_TITULO || (esSistemaNutricio ? 'Bienvenido a Aretia' : 'Agenda tu cita con Natalia');
+  // Instancia GENÉRICA (nueva, sin código): logo claro por variable.
+  const LOGO_CLARO = process.env.REACT_APP_LOGO_CLARO || '';
+  const portadaTitulo = process.env.REACT_APP_PORTADA_TITULO || (esSistemaNutricio ? ('Bienvenido a ' + (process.env.REACT_APP_MARCA_NOMBRE || 'Aretia')) : 'Agenda tu cita con Natalia');
   const portadaSubtitulo = process.env.REACT_APP_PORTADA_SUBTITULO || (esSistemaNutricio
     ? 'Del plan al resultado: reserva tus consultas, confírmalas y da seguimiento a tu plan.'
     : 'Este es tu portal para reservar tus consultas, confirmarlas y dar seguimiento a tu plan.');
@@ -290,7 +292,9 @@ export default function LoginPage() {
               {/* Logo de portada: limitado por ALTO y ANCHO (sin deformar) venga de env o de config/branding.
                   Natalia/Aretia usan su alto de siempre (maxHeight) y su logo compacto no llega al tope de ancho;
                   un logo ANCHO (p. ej. Fitmeal) se topa en maxWidth y ya no se encima con la columna derecha. */}
-              {esNutriAleGo
+              {LOGO_CLARO
+                ? <img src={LOGO_CLARO} alt="" style={{ display: 'block', marginBottom: 16, height: 'auto', width: 'auto', maxHeight: 104, maxWidth: 300 }} />
+                : esNutriAleGo
                 ? <img src={LOGO_NUTRIALEGO_BLANCO} alt="Nutri Ale Go" style={{ display: 'block', marginBottom: 16, height: 'auto', width: 'auto', maxHeight: 104, maxWidth: 300 }} />
                 : esAretia
                 ? (

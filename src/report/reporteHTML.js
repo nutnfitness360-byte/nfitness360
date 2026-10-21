@@ -1,6 +1,7 @@
 import { LOGO_ARETIA } from "./logoAretia";
 import { LOGO_FITMEAL, LOGO_FITMEAL_BLANCO } from "./logoFitmeal";
 import { LOGO_NUTRIALEGO, LOGO_NUTRIALEGO_BLANCO } from "./logoNutriAleGo";
+import { LOGO_INSTANCIA, LOGO_INSTANCIA_CLARO } from "./logoInstancia.gen";
 /* ============================================================
    NFITNESS 360 — Generador del reporte horizontal (HTML)
    Se envía al Apps Script, que lo convierte a PDF y lo sube a
@@ -15,7 +16,12 @@ const LOGO_NF = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAEhCAYAAADs2
 // Natalia: sin variable y en su dominio → ES_ARETIA=false → TODO queda idéntico a hoy.
 const _MARCA = (process.env.REACT_APP_MARCA || '').toLowerCase();
 const _HOST = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
-const ES_ARETIA = _MARCA ? (_MARCA !== 'natalia') : (_HOST.indexOf('sistemanutricio') !== -1 || _HOST.indexOf('aretia') !== -1);
+// Instancia GENÉRICA (nueva, SIN código): paleta desde REACT_APP_BRAND_COLORS y logo incrustado.
+// Ninguna instancia actual usa REACT_APP_MARCA='generica', así que esto NO afecta a Natalia/Aretia/Fitmeal/Nutri Ale Go.
+const ES_GENERICA = _MARCA === 'generica';
+function _gcols() { try { const r = process.env.REACT_APP_BRAND_COLORS; if (!r) return null; const c = JSON.parse(r); const g = k => String(c[k] || '').replace(/%23/g, '#'); return { dark: g('--dark') || '#263C2D', gold: g('--gold') || '#B08D57', cream: g('--cream') || '#F7F5EF', ink: g('--ink') || '#23301F', line: g('--line') || '#E3DDCE', stone: g('--stone') || '#6F7A66', mint: g('--mint') || g('--cream') || '#ECEFE7' }; } catch (e) { return null; } }
+const GEN = _gcols();
+const ES_ARETIA = !ES_GENERICA && (_MARCA ? (_MARCA !== 'natalia') : (_HOST.indexOf('sistemanutricio') !== -1 || _HOST.indexOf('aretia') !== -1));
 // Instancia Fitmeal: usa su logo OSCURO en los PDF (papel blanco). Se detecta por el nombre de marca.
 const ES_FITMEAL = (process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'fitmeal';
 // Instancia Nutri Ale Go: verde bosque + dorado + fondo marfil. Logo propio.
@@ -25,18 +31,18 @@ const MARCA_NOMBRE = process.env.REACT_APP_MARCA_NOMBRE || 'Aretia';
 const MARCA_TAG = process.env.REACT_APP_MARCA_TAG || 'Del plan al resultado';
 // Paleta por instancia. Natalia conserva EXACTAMENTE sus valores cálidos (rama ": ...").
 // Aretia (rama "ES_ARETIA ? ...") usa Azul Marino + Ámbar + fondo claro frío.
-const TAUPE  = ES_FITMEAL ? '#86085D' : ES_NUTRIALEGO ? '#263C2D' : (ES_ARETIA ? '#1E3A5F' : '#8E837B');   // títulos y acento de texto fuerte
-const TAUPE2 = ES_FITMEAL ? '#86085D' : ES_NUTRIALEGO ? '#263C2D' : (ES_ARETIA ? '#1E3A5F' : '#978C87');   // bandas de encabezado
-const TAN    = ES_FITMEAL ? '#BA007C' : ES_NUTRIALEGO ? '#B08D57' : (ES_ARETIA ? '#E0913F' : '#CDA788');   // acentos (hora, marcos de foto, viñetas)
-const CREAM  = ES_FITMEAL ? '#FBF7FA' : ES_NUTRIALEGO ? '#F7F5EF' : (ES_ARETIA ? '#F7FAFD' : '#EEE4DA');   // fondo de página
-const INK    = ES_FITMEAL ? '#32363A' : ES_NUTRIALEGO ? '#23301F' : (ES_ARETIA ? '#14202E' : '#4A443E');   // texto principal
-const LINE   = ES_FITMEAL ? '#EAD9E4' : ES_NUTRIALEGO ? '#E3DDCE' : (ES_ARETIA ? '#D4E1EF' : '#E0D6CB');   // líneas/bordes
-const SOFT   = ES_FITMEAL ? '#7C7A85' : ES_NUTRIALEGO ? '#6F7A66' : (ES_ARETIA ? '#64726B' : '#6E645C');   // texto secundario
-const TOTBG  = ES_FITMEAL ? '#FBEFF6' : ES_NUTRIALEGO ? '#ECEFE7' : (ES_ARETIA ? '#EAF1F8' : '#FBF7F2');   // fondo de la fila "Total" de la tabla
+const TAUPE  = (ES_GENERICA && GEN) ? GEN.dark : ES_FITMEAL ? '#86085D' : ES_NUTRIALEGO ? '#263C2D' : (ES_ARETIA ? '#1E3A5F' : '#8E837B');   // títulos y acento de texto fuerte
+const TAUPE2 = (ES_GENERICA && GEN) ? GEN.dark : ES_FITMEAL ? '#86085D' : ES_NUTRIALEGO ? '#263C2D' : (ES_ARETIA ? '#1E3A5F' : '#978C87');   // bandas de encabezado
+const TAN    = (ES_GENERICA && GEN) ? GEN.gold : ES_FITMEAL ? '#BA007C' : ES_NUTRIALEGO ? '#B08D57' : (ES_ARETIA ? '#E0913F' : '#CDA788');   // acentos (hora, marcos de foto, viñetas)
+const CREAM  = (ES_GENERICA && GEN) ? GEN.cream : ES_FITMEAL ? '#FBF7FA' : ES_NUTRIALEGO ? '#F7F5EF' : (ES_ARETIA ? '#F7FAFD' : '#EEE4DA');   // fondo de página
+const INK    = (ES_GENERICA && GEN) ? GEN.ink : ES_FITMEAL ? '#32363A' : ES_NUTRIALEGO ? '#23301F' : (ES_ARETIA ? '#14202E' : '#4A443E');   // texto principal
+const LINE   = (ES_GENERICA && GEN) ? GEN.line : ES_FITMEAL ? '#EAD9E4' : ES_NUTRIALEGO ? '#E3DDCE' : (ES_ARETIA ? '#D4E1EF' : '#E0D6CB');   // líneas/bordes
+const SOFT   = (ES_GENERICA && GEN) ? GEN.stone : ES_FITMEAL ? '#7C7A85' : ES_NUTRIALEGO ? '#6F7A66' : (ES_ARETIA ? '#64726B' : '#6E645C');   // texto secundario
+const TOTBG  = (ES_GENERICA && GEN) ? GEN.mint : ES_FITMEAL ? '#FBEFF6' : ES_NUTRIALEGO ? '#ECEFE7' : (ES_ARETIA ? '#EAF1F8' : '#FBF7F2');   // fondo de la fila "Total" de la tabla
 
 // Marca por instancia (por dominio): la instancia de venta (sistemanutricio…) es
 // Aretia; cualquier otra (Natalia) conserva su membrete y logo. (ES_ARETIA se define arriba.)
-export const LOGO = ES_FITMEAL ? LOGO_FITMEAL : ES_NUTRIALEGO ? LOGO_NUTRIALEGO : (ES_ARETIA ? LOGO_ARETIA : LOGO_NF);
+export const LOGO = (ES_GENERICA && LOGO_INSTANCIA) ? LOGO_INSTANCIA : ES_FITMEAL ? LOGO_FITMEAL : ES_NUTRIALEGO ? LOGO_NUTRIALEGO : (ES_ARETIA ? LOGO_ARETIA : LOGO_NF);
 
 // Datos de membrete, mostrados en cada página del reporte.
 export const NUTRI_NOMBRE = process.env.REACT_APP_NUTRI_NOMBRE || (ES_ARETIA ? 'Aretia' : 'MSc. Natalia E. Flores Bonilla');
@@ -203,7 +209,9 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
 
   // Encabezado de cada página de menú. Aretia: membrete azul marino con el logo
   // y la promesa de marca. Natalia: el encabezado clásico (idéntico al de siempre).
-  const headerHTML = ES_FITMEAL
+  const headerHTML = (ES_GENERICA && LOGO_INSTANCIA_CLARO)
+    ? `<div class="lead"><div class="leadbrand"><img class="leadlogo-img" src="${LOGO_INSTANCIA_CLARO}" alt="${esc(MARCA_NOMBRE)}"/></div><div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">Objetivo: ${esc(objetivo || '—')} · ${kcal} kcal ${distrib}</div></div></div>`
+    : ES_FITMEAL
     ? `<div class="lead"><div class="leadbrand"><img class="leadlogo-img" src="${LOGO_FITMEAL_BLANCO}" alt="Fitmeal"/></div><div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">Objetivo: ${esc(objetivo || '—')} · ${kcal} kcal ${distrib}</div></div></div>`
     : ES_NUTRIALEGO
     ? `<div class="lead"><div class="leadbrand"><img class="leadlogo-img" src="${LOGO_NUTRIALEGO_BLANCO}" alt="Nutri Ale Go"/></div><div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">Objetivo: ${esc(objetivo || '—')} · ${kcal} kcal ${distrib}</div></div></div>`
@@ -326,9 +334,9 @@ ${FONT_CSS}
 .lcat{background:#fff;border:1px solid ${LINE};border-radius:4px;padding:11px 13px;}
 .lcat h4{margin:0 0 8px;font-size:11px;letter-spacing:1px;color:${TAN};text-transform:uppercase;font-weight:800;}
 .litem{display:flex;justify-content:space-between;gap:8px;font-size:11px;line-height:1.85;color:${INK};}
-.litem .qty{color:${SOFT};white-space:nowrap;}${(ES_ARETIA || ES_FITMEAL || ES_NUTRIALEGO) ? `
+.litem .qty{color:${SOFT};white-space:nowrap;}${(ES_ARETIA || ES_FITMEAL || ES_NUTRIALEGO || ES_GENERICA) ? `
 /* ===== Piel Aretia (solo esta instancia) ===== */
-.lead{display:flex;justify-content:space-between;align-items:center;gap:16px;background:${ES_FITMEAL ? '#32363A' : ES_NUTRIALEGO ? '#263C2D' : '#1E3A5F'};color:#fff;padding:6mm 12mm;margin:-13mm -15mm 6mm;}
+.lead{display:flex;justify-content:space-between;align-items:center;gap:16px;background:${(ES_GENERICA && GEN) ? GEN.dark : ES_FITMEAL ? '#32363A' : ES_NUTRIALEGO ? '#263C2D' : '#1E3A5F'};color:#fff;padding:6mm 12mm;margin:-13mm -15mm 6mm;}
 .lead .leadbrand{display:flex;align-items:center;gap:12px;}
 .lead .leadlogo{height:42px;width:42px;display:block;flex-shrink:0;}
 .lead .leadlogo-img{height:40px;width:auto;max-width:260px;object-fit:contain;display:block;flex-shrink:0;}
@@ -336,8 +344,8 @@ ${FONT_CSS}
 .lead .leadtag{font-size:8.5px;letter-spacing:3px;text-transform:uppercase;color:#9FB8D4;margin-top:4px;}
 .lead .leadmeta{text-align:right;}
 .lead .leaddoc{font-size:18px;font-weight:800;letter-spacing:3px;text-transform:uppercase;}
-.lead .leadsub{font-size:11px;letter-spacing:1px;color:${ES_FITMEAL ? '#E4DFE8' : ES_NUTRIALEGO ? '#D7E0CF' : '#DDE7F1'};margin-top:4px;}
-.lead .leadkcal{font-size:8.5px;letter-spacing:1px;color:${ES_FITMEAL ? '#C9C2CE' : ES_NUTRIALEGO ? '#AEBCA4' : '#9FB8D4'};margin-top:3px;text-transform:uppercase;}
+.lead .leadsub{font-size:11px;letter-spacing:1px;color:${ES_GENERICA ? '#E8E8E2' : ES_FITMEAL ? '#E4DFE8' : ES_NUTRIALEGO ? '#D7E0CF' : '#DDE7F1'};margin-top:4px;}
+.lead .leadkcal{font-size:8.5px;letter-spacing:1px;color:${ES_GENERICA ? '#C9C9C0' : ES_FITMEAL ? '#C9C2CE' : ES_NUTRIALEGO ? '#AEBCA4' : '#9FB8D4'};margin-top:3px;text-transform:uppercase;}
 .ocol{border:1px solid ${LINE};border-radius:9px;overflow:hidden;}
 .obox{border:none;}
 .ophoto,.ophoto1,.ophoto2{border:2px solid ${TAN};}

@@ -33,10 +33,11 @@
       (function () {
         try {
           var h = location.hostname;
-          /* Nutri Ale Go vive en nutrialego.aretia.mx (contiene "aretia") pero NO es Aretia:
-             su favicon/título los pone App.js por variables. No aplicar la piel de Aretia. */
-          if (h.indexOf('nutrialego') !== -1) return;
-          if (h.indexOf('sistemanutricio') === -1 && h.indexOf('aretia') === -1) return;
+          /* Solo los dominios REALES de Aretia / demo reciben su piel (favicon/manifest/título).
+             Cualquier subdominio nuevo bajo aretia.mx (nutrialego., majoluna., etc.) NO es Aretia:
+             su identidad la define App.js por variables de entorno. */
+          var esAretiaReal = (h === 'aretia.mx' || h === 'www.aretia.mx' || h === 'app.aretia.mx');
+          if (h.indexOf('sistemanutricio') === -1 && !esAretiaReal) return;
           function setLink(rel, href, type, sizes) {
             var sel = 'link[rel="' + rel + '"]' + (sizes ? '[sizes="' + sizes + '"]' : '');
             var l = document.querySelector(sel);

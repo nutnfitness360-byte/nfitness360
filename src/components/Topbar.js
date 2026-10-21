@@ -8,6 +8,9 @@ import { LOGO_ARETIA_CREMA } from '../report/logoAretia';
 import { LOGO_NUTRIALEGO_BLANCO } from '../report/logoNutriAleGo';
 
 const LOGO = process.env.REACT_APP_LOGO_URL || '/logo.png';
+// Instancia GENÉRICA (nueva, sin código): su logo claro (sobre fondo oscuro) sale de variable.
+const LOGO_CLARO = process.env.REACT_APP_LOGO_CLARO || '';
+const LOGO_ALT = parseInt(process.env.REACT_APP_LOGO_ALTURA, 10) || 64;
 
 // Instancia Aretia (por dominio app.aretia.mx / demo sistemanutricio, o marca). Su logo va en
 // crema/ámbar porque el topbar es azul marino. Solo aplica si la config de marca no trae logo.
@@ -43,8 +46,10 @@ export default function Topbar({ role, user, onPerfil }) {
 
   return (
     <div className="topbar">
-      <div style={ES_NUTRIALEGO_TB ? { display: 'flex', flexDirection: 'column', alignItems: 'center' } : undefined}>
-        {(ES_NUTRIALEGO_TB && !logoDia) ? (
+      <div style={(LOGO_CLARO || ES_NUTRIALEGO_TB) ? { display: 'flex', flexDirection: 'column', alignItems: 'center' } : undefined}>
+        {(LOGO_CLARO && !logoDia) ? (
+          <img src={LOGO_CLARO} alt="" style={{ height: LOGO_ALT, width: 'auto', display: 'block' }} />
+        ) : (ES_NUTRIALEGO_TB && !logoDia) ? (
           <img src={LOGO_NUTRIALEGO_BLANCO} alt="Nutri Ale Go" style={{ height: 101, width: 'auto', display: 'block' }} />
         ) : (ES_ARETIA_TB && !logoDia) ? (
           <img src={LOGO_ARETIA_CREMA} alt="Aretia" style={{ height: 48, width: 'auto', display: 'block' }} />
