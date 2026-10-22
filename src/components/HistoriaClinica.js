@@ -195,11 +195,16 @@ function histParts(data) {
   const card = (num, title, inner) =>
     `<div class="card"><table class="ch"><tr><td class="chnum"><span class="badge">${num}</span></td><td class="cht">${esc(title)}</td></tr></table>${inner}</div>`;
 
-  const bioFilas = (b.filas || [])
-    .filter((f) => f.parametro || f.resultado || f.referencia)
-    .map((f) => `<tr><td>${v(f.parametro)}</td><td>${v(f.resultado)}</td><td>${v(f.referencia)}</td></tr>`).join("");
+  const bioFilasData = (b.filas || []).filter((f) => f.parametro || f.resultado || f.referencia);
+  const bioHasEstado = bioFilasData.some((f) => f.estado);
+  const EST_PDF = { alto: ["#8B2F2F", "↑ Alto"], bajo: ["#2F5A8B", "↓ Bajo"], normal: ["#3E6B5B", "En rango"], sin_rango: ["#7A7A7A", "s/ rango"] };
+  const bioFilas = bioFilasData.map((f) => {
+    const e = EST_PDF[String(f.estado || "").toLowerCase()];
+    const badge = e ? `<span style="color:${e[0]};font-weight:700;">${e[1]}</span>` : "—";
+    return `<tr><td>${v(f.parametro)}</td><td>${v(f.resultado)}</td><td>${v(f.referencia)}</td>${bioHasEstado ? `<td>${badge}</td>` : ""}</tr>`;
+  }).join("");
   const bioTable = bioFilas
-    ? `<table class="data"><thead><tr><th>Parámetro</th><th>Resultado</th><th>Referencia</th></tr></thead><tbody>${bioFilas}</tbody></table>`
+    ? `<table class="data"><thead><tr><th>Parámetro</th><th>Resultado</th><th>Referencia</th>${bioHasEstado ? "<th>Estado</th>" : ""}</tr></thead><tbody>${bioFilas}</tbody></table>`
     : `<p class="empty">Sin estudios registrados.</p>`;
   const anaFilas = (b.analisis || []).map((x) => `<tr><td>${v(x.nombre)}</td><td>${v(x.fecha)}</td></tr>`).join("");
   const anaTable = anaFilas
@@ -520,6 +525,44 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
     }));
   }, []);
 
+  // Vuelca los valores que la IA extrajo del estudio en la tabla bioquímica,
+  // clasificados (alto/bajo/normal/sin_rango) para pintar las alertas. Conserva
+  // los parámetros que la nutrióloga ya hubiera escrito a mano (con resultado)
+  // y que NO vengan en el estudio. Autocompleta la fecha si estaba vacía.
+  const aplicarValoresIA = (res) => {
+    const valores = Array.isArray(res && res.valores) ? res.valores : [];
+    if (!valores.length) return 0;
+    const estOk = (e) => (['alto', 'bajo', 'normal', 'sin_rango'].includes(String(e || '').toLowerCase()) ? String(e).toLowerCase() : '');
+    const nuevas = valores.map((x) => ({
+      parametro: String((x && x.parametro) || '').trim(),
+      resultado: [String((x && x.resultado) || '').trim(), String((x && x.unidad) || '').trim()].filter(Boolean).join(' ').trim(),
+      referencia: String((x && x.referencia) || '').trim(),
+      estado: estOk(x && x.estado),
+    })).filter((f) => f.parametro || f.resultado);
+    if (!nuevas.length) return 0;
+    setData((prev) => {
+      const prevFilas = prev.bioquimica.filas || [];
+      const nombresIA = new Set(nuevas.map((f) => f.parametro.toLowerCase()));
+      const manuales = prevFilas.filter((f) => String(f.resultado || '').trim() && !nombresIA.has(String(f.parametro || '').trim().toLowerCase()));
+      const fecha = String(prev.bioquimica.fecha || '').trim() || String((res && res.fecha) || '').trim();
+      return { ...prev, bioquimica: { ...prev.bioquimica, filas: [...nuevas, ...manuales], fecha } };
+    });
+    return (res && Array.isArray(res.fueraDeRango)) ? res.fueraDeRango.length : nuevas.filter((f) => f.estado === 'alto' || f.estado === 'bajo').length;
+  };
+
+  // Chip de estado para la tabla bioquímica (editor). Sin estado → no muestra nada.
+  const estadoBadge = (estado) => {
+    const map = {
+      alto: { t: '↑ Alto', bg: '#F4DBDB', fg: '#8B2F2F' },
+      bajo: { t: '↓ Bajo', bg: '#DBE4F4', fg: '#2F5A8B' },
+      normal: { t: 'En rango', bg: T.mint, fg: T.pine },
+      sin_rango: { t: 's/ rango', bg: T.lineSoft, fg: T.inkSoft },
+    };
+    const e = map[String(estado || '').toLowerCase()];
+    if (!e) return null;
+    return <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: e.bg, color: e.fg, whiteSpace: 'nowrap' }}>{e.t}</span>;
+  };
+
   const subirAnalisis = async (file) => {
     if (!file) return;
     const nombre = (data.datos.nombre || "").trim();
@@ -539,11 +582,29 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
         body: JSON.stringify({ action: 'saveAnalisis', patient: nombre, correo: (data.datos.correo || ''), filename, pdfBase64: b64 }), redirect: 'follow',
       });
       let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: 'Respuesta no válida del servidor.' }; }
-      if (d.ok && d.link) {
-        const nuevo = { nombre: filename, fecha: new Date().toLocaleDateString('es-MX'), link: d.link };
-        setData((prev) => ({ ...prev, bioquimica: { ...prev.bioquimica, analisis: [...(prev.bioquimica.analisis || []), nuevo] } }));
-        setAnaStatus('Análisis subido a Drive ✓');
-      } else { setAnaStatus('Error: ' + (d.error || 'no se recibió enlace.')); }
+      if (!(d.ok && d.link)) { setAnaStatus('Error: ' + (d.error || 'no se recibió enlace.')); return; }
+      const nuevo = { nombre: filename, fecha: new Date().toLocaleDateString('es-MX'), link: d.link, fileId: d.fileId || '' };
+      setData((prev) => ({ ...prev, bioquimica: { ...prev.bioquimica, analisis: [...(prev.bioquimica.analisis || []), nuevo] } }));
+      // Auto-análisis con IA: llena la tabla y marca los valores fuera de rango.
+      // Si falla, el archivo igual quedó subido y la captura manual sigue disponible.
+      setAnaStatus('Análisis subido a Drive ✓ · Leyendo valores con IA…');
+      try {
+        const res2 = await fetch(url, {
+          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'analizarEstudio', fileId: d.fileId || '', link: d.link }), redirect: 'follow',
+        });
+        let a2; try { a2 = JSON.parse(await res2.text()); } catch (_) { a2 = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+        if (a2.ok && Array.isArray(a2.valores) && a2.valores.length) {
+          const nf = aplicarValoresIA(a2);
+          setAnaStatus(`Estudio analizado ✓ · ${a2.valores.length} parámetro(s)${nf ? ` · ${nf} fuera de rango` : ' · todos en rango'}. Revisa y ajusta lo que necesites.`);
+        } else if (a2.ok) {
+          setAnaStatus('Análisis subido ✓ · No se pudieron leer valores automáticamente; captúralos a mano.');
+        } else {
+          setAnaStatus('Análisis subido ✓ · No se pudo analizar (' + (a2.error || 'sin detalle') + '); captura los valores a mano.');
+        }
+      } catch (e2) {
+        setAnaStatus('Análisis subido ✓ · No se pudo analizar automáticamente; captura los valores a mano.');
+      }
     } catch (e) { setAnaStatus('No se pudo subir: ' + e.message); }
   };
 
@@ -1020,7 +1081,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
           </Grid>
           <div style={styles.tableWrap}>
             <div style={{ ...styles.bioRow, ...styles.bioHead }}>
-              <div>Parámetro</div><div>Resultado</div><div>Referencia</div><div></div>
+              <div>Parámetro</div><div>Resultado</div><div>Referencia</div><div>Estado</div><div></div>
             </div>
             {data.bioquimica.filas.map((f, i) => (
               <div key={i} style={styles.bioRow}>
@@ -1030,6 +1091,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
                   onChange={(e) => setRow("bioquimica", "filas", i, "resultado", e.target.value)} />
                 <input style={styles.cellInput} value={f.referencia} placeholder="Rango normal"
                   onChange={(e) => setRow("bioquimica", "filas", i, "referencia", e.target.value)} />
+                <div style={styles.bioEstado}>{estadoBadge(f.estado)}</div>
                 <button style={styles.rowDel} title="Quitar"
                   onClick={() => removeRow("bioquimica", "filas", i)}>×</button>
               </div>
@@ -1495,7 +1557,8 @@ const styles = {
   likeNo: { borderLeft: `3px solid ${T.danger}` },
   note: { marginTop: 16, fontSize: 12.5, color: T.pineSoft, background: T.mint, borderRadius: 10, padding: "10px 13px", lineHeight: 1.5 },
   tableWrap: { border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" },
-  bioRow: { display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 40px", borderBottom: `1px solid ${T.lineSoft}` },
+  bioRow: { display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 78px 40px", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "center" },
+  bioEstado: { display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", borderRight: `1px solid ${T.lineSoft}` },
   supRow: { display: "grid", gridTemplateColumns: "1.4fr 1fr 0.9fr 1fr 1.1fr 40px", borderBottom: `1px solid ${T.lineSoft}` },
   bioHead: { background: T.mint, fontSize: 11, fontWeight: 700, color: T.pine, textTransform: "uppercase", letterSpacing: 0.4 },
   cellInput: { border: "none", borderRight: `1px solid ${T.lineSoft}`, padding: "10px 12px", fontSize: 13.5, background: "transparent", fontFamily: "inherit", color: T.ink, width: "100%", boxSizing: "border-box" },
