@@ -6,6 +6,12 @@ import { LOGO_INSTANCIA } from "../report/logoInstancia.gen";
 // Instancia GENÉRICA (nueva, sin código): logo por variable / base64 incrustado por el prebuild.
 const ES_GENERICA = (process.env.REACT_APP_MARCA || "").toLowerCase() === "generica";
 const LOGO_CLARO = process.env.REACT_APP_LOGO_CLARO || "";
+// Secciones opcionales de la historia clínica, encendidas POR INSTANCIA (solo donde se define la variable).
+// Majo Luna (enfoque hormonal) las usa; ninguna otra instancia las ve.
+const HC_GINECO = String(process.env.REACT_APP_HC_GINECO || "").toLowerCase() === "true";
+const HC_PSICO = String(process.env.REACT_APP_HC_PSICO || "").toLowerCase() === "true";
+const GINECO_DX = ["SOP", "Endometriosis", "Hipotiroidismo", "Resistencia a insulina", "Menopausia precoz", "Hiperplasia suprarrenal", "Hígado graso"];
+const GINECO_SX = ["Caída de cabello", "Acné", "Hirsutismo", "Fatiga", "Retención de líquidos", "Cambios de ánimo", "Insomnio"];
 
 // Instancia Aretia: por dominio (app.aretia.mx o el demo sistemanutricio) o por marca.
 const ES_NUTRIALEGO_HC = ((typeof window !== "undefined" && window.location &&
@@ -65,6 +71,8 @@ function pdfRootVars() {
 const SECTIONS = [
   { id: "datos", n: "1", label: "Datos generales" },
   { id: "antecedentes", n: "2", label: "Antecedentes y estilo de vida" },
+  ...(HC_GINECO ? [{ id: "gineco", n: "G", label: "Ginecología y salud hormonal" }] : []),
+  ...(HC_PSICO ? [{ id: "psico", n: "P", label: "Psicología y conducta alimentaria" }] : []),
   { id: "padecimientos", n: "3", label: "Padecimientos" },
   { id: "sintomas", n: "4", label: "Signos y síntomas" },
   { id: "bioquimica", n: "5", label: "Evaluación bioquímica" },
@@ -152,6 +160,20 @@ function baseSeed() {
     },
     nutricionDeportiva: { texto: "" },
     notasGenerales: { texto: "" },
+    gineco: {
+      menarca: "", fum: "", ciclo: "", duracion: "", spm: "",
+      anticMetodo: "", anticDetalle: "", anticPrevios: "",
+      embarazos: "", partos: "", cesareas: "", abortos: "", lactancia: "", complicaciones: "",
+      menopausia: "", menopausiaSintomas: "",
+      diagnosticos: [], diagnosticosOtros: "", sintomas: [],
+      libido: "", dispareunia: "", sequedad: "",
+    },
+    psico: {
+      ansiedad: "", ansiedadDetona: "", ansiedadCome: "",
+      comeEstres: "", estresDetona: "", estresCome: "",
+      atracones: "", comerNocturno: "", conductaNotas: "",
+      compromiso: "", motivada: "", queMotiva: "", disciplina: "",
+    },
   };
 }
 
@@ -165,7 +187,8 @@ function histParts(data) {
   const d = data.datos, b = data.bioquimica, s = data.suplementacion,
     si = data.sintomas, a = data.antecedentes, di = data.dietetica, ej = data.ejercicio,
     pad = data.padecimientos || { lista: [] }, ng = data.notasGenerales || { texto: "" },
-    nd = data.nutricionDeportiva || { texto: "" };
+    nd = data.nutricionDeportiva || { texto: "" },
+    gy = data.gineco || {}, ps = data.psico || {};
 
   const rows = (arr) =>
     `<table class="rows">${arr.map((p) => `<tr><td class="lbl">${esc(p[0])}</td><td class="val">${v(p[1])}</td></tr>`).join("")}</table>`;
@@ -230,6 +253,24 @@ function histParts(data) {
     ].concat(a.anticonceptivos === "Con anticonceptivos" ? [
       ["Nombre o tipo de anticonceptivo", a.anticonceptivoDetalle],
     ] : []) : []))) +
+    ((HC_GINECO && (d.sexo || "") === "Femenino") ? card("G", "Ginecología y salud hormonal", rows([
+      ["Menarca (edad)", gy.menarca], ["FUM · última menstruación", gy.fum ? fmtFechaMX(gy.fum) : ""],
+      ["Ciclo", gy.ciclo], ["Duración del ciclo (días)", gy.duracion], ["SPM / síntomas premenstruales", gy.spm],
+      ["Anticoncepción — método", gy.anticMetodo], ["Detalle / tiempo de uso", gy.anticDetalle], ["Métodos previos", gy.anticPrevios],
+      ["Embarazos", gy.embarazos], ["Partos", gy.partos], ["Cesáreas", gy.cesareas], ["Abortos", gy.abortos],
+      ["Lactancia actual", gy.lactancia], ["Complicaciones / incremento de peso", gy.complicaciones],
+      ["Menopausia / climaterio", gy.menopausia], ["Síntomas de menopausia", gy.menopausiaSintomas],
+      ["Diagnósticos hormonales", [(gy.diagnosticos || []).join(", "), gy.diagnosticosOtros].filter(Boolean).join(", ")],
+      ["Síntomas hormonales", (gy.sintomas || []).join(", ")],
+      ["Líbido", gy.libido], ["Dispareunia", gy.dispareunia], ["Sequedad vaginal", gy.sequedad],
+    ])) : "") +
+    (HC_PSICO ? card("P", "Psicología y conducta alimentaria", rows([
+      ["¿Presenta ansiedad?", ps.ansiedad], ["¿Qué la desata?", ps.ansiedadDetona], ["¿Qué come con ansiedad?", ps.ansiedadCome],
+      ["¿Come por estrés?", ps.comeEstres], ["¿Qué lo desata?", ps.estresDetona], ["¿Qué come (estrés)?", ps.estresCome],
+      ["Atracones", ps.atracones], ["Comer nocturno", ps.comerNocturno], ["Notas de conducta alimentaria", ps.conductaNotas],
+      ["Compromiso para el cambio (1–10)", ps.compromiso], ["¿Se siente motivad@?", ps.motivada],
+      ["¿Qué le motiva?", ps.queMotiva], ["¿Cómo mantendrá disciplina y constancia?", ps.disciplina],
+    ])) : "") +
     card("3", "Padecimientos", padInner) +
     card("4", "Signos y síntomas", rows([
       ["Digestivos", si.digestivos], ["Dermatológicos", si.dermatologicos],
@@ -829,6 +870,82 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
           </Grid>
         </Section>
 
+        {HC_GINECO && esFemenino && (
+          <Section reg={reg("gineco")} sid="gineco" title="Ginecología y salud hormonal" n="G"
+            hint="Historia hormonal y ginecológica (enfoque de esta instancia).">
+            <h3 style={styles.subhead}>Ciclo menstrual</h3>
+            <Grid>
+              <Field label="Menarca (edad)"><input style={styles.input} value={data.gineco.menarca} onChange={(e) => setField("gineco", "menarca", e.target.value)} /></Field>
+              <Field label="FUM · última menstruación"><input type="date" style={styles.input} value={data.gineco.fum} onChange={(e) => setField("gineco", "fum", e.target.value)} /></Field>
+              <Field label="Ciclo"><select style={styles.input} value={data.gineco.ciclo} onChange={(e) => setField("gineco", "ciclo", e.target.value)}><option value="">Selecciona…</option><option>Regular</option><option>Irregular</option><option>Ausente</option><option>Menopausia</option></select></Field>
+              <Field label="Duración del ciclo (días)"><input style={styles.input} value={data.gineco.duracion} onChange={(e) => setField("gineco", "duracion", e.target.value)} /></Field>
+              <Field label="SPM / síntomas premenstruales" full><AutoTextarea style={styles.textarea} value={data.gineco.spm} onChange={(e) => setField("gineco", "spm", e.target.value)} /></Field>
+            </Grid>
+            <h3 style={styles.subhead}>Anticoncepción</h3>
+            <Grid>
+              <Field label="Método actual"><input style={styles.input} value={data.gineco.anticMetodo} onChange={(e) => setField("gineco", "anticMetodo", e.target.value)} /></Field>
+              <Field label="Detalle / tiempo de uso"><input style={styles.input} value={data.gineco.anticDetalle} onChange={(e) => setField("gineco", "anticDetalle", e.target.value)} /></Field>
+              <Field label="Métodos previos" full><input style={styles.input} value={data.gineco.anticPrevios} onChange={(e) => setField("gineco", "anticPrevios", e.target.value)} /></Field>
+            </Grid>
+            <h3 style={styles.subhead}>Historia obstétrica</h3>
+            <Grid>
+              <Field label="Embarazos"><input style={styles.input} value={data.gineco.embarazos} onChange={(e) => setField("gineco", "embarazos", e.target.value)} /></Field>
+              <Field label="Partos"><input style={styles.input} value={data.gineco.partos} onChange={(e) => setField("gineco", "partos", e.target.value)} /></Field>
+              <Field label="Cesáreas"><input style={styles.input} value={data.gineco.cesareas} onChange={(e) => setField("gineco", "cesareas", e.target.value)} /></Field>
+              <Field label="Abortos"><input style={styles.input} value={data.gineco.abortos} onChange={(e) => setField("gineco", "abortos", e.target.value)} /></Field>
+              <Field label="Lactancia actual"><select style={styles.input} value={data.gineco.lactancia} onChange={(e) => setField("gineco", "lactancia", e.target.value)}><option value="">Selecciona…</option><option>Sí</option><option>No</option></select></Field>
+              <Field label="Complicaciones / incremento de peso en embarazos" full><AutoTextarea style={styles.textarea} value={data.gineco.complicaciones} onChange={(e) => setField("gineco", "complicaciones", e.target.value)} /></Field>
+            </Grid>
+            <h3 style={styles.subhead}>Menopausia / climaterio</h3>
+            <Grid>
+              <Field label="Estado"><select style={styles.input} value={data.gineco.menopausia} onChange={(e) => setField("gineco", "menopausia", e.target.value)}><option value="">Selecciona…</option><option>Premenopausia</option><option>Perimenopausia</option><option>Posmenopausia</option></select></Field>
+              <Field label="Síntomas (bochornos, insomnio, etc.)" full><AutoTextarea style={styles.textarea} value={data.gineco.menopausiaSintomas} onChange={(e) => setField("gineco", "menopausiaSintomas", e.target.value)} /></Field>
+            </Grid>
+            <h3 style={styles.subhead}>Diagnósticos hormonales</h3>
+            <ChipRow opts={GINECO_DX} sel={data.gineco.diagnosticos} onToggle={(val) => { const cur = data.gineco.diagnosticos || []; setField("gineco", "diagnosticos", cur.includes(val) ? cur.filter((x) => x !== val) : [...cur, val]); }} />
+            <Field label="Otros diagnósticos" full style={{ marginTop: 10 }}><input style={styles.input} value={data.gineco.diagnosticosOtros} onChange={(e) => setField("gineco", "diagnosticosOtros", e.target.value)} /></Field>
+            <h3 style={styles.subhead}>Síntomas hormonales</h3>
+            <ChipRow opts={GINECO_SX} sel={data.gineco.sintomas} onToggle={(val) => { const cur = data.gineco.sintomas || []; setField("gineco", "sintomas", cur.includes(val) ? cur.filter((x) => x !== val) : [...cur, val]); }} />
+            <h3 style={styles.subhead}>Sexualidad</h3>
+            <Grid>
+              <Field label="Líbido"><select style={styles.input} value={data.gineco.libido} onChange={(e) => setField("gineco", "libido", e.target.value)}><option value="">Selecciona…</option><option>Normal</option><option>Disminuida</option><option>Aumentada</option></select></Field>
+              <Field label="Dispareunia"><select style={styles.input} value={data.gineco.dispareunia} onChange={(e) => setField("gineco", "dispareunia", e.target.value)}><option value="">Selecciona…</option><option>Sí</option><option>No</option></select></Field>
+              <Field label="Sequedad vaginal"><select style={styles.input} value={data.gineco.sequedad} onChange={(e) => setField("gineco", "sequedad", e.target.value)}><option value="">Selecciona…</option><option>Sí</option><option>No</option></select></Field>
+            </Grid>
+          </Section>
+        )}
+
+        {HC_PSICO && (
+          <Section reg={reg("psico")} sid="psico" title="Psicología y conducta alimentaria" n="P"
+            hint="Conducta alimentaria, emociones y motivación.">
+            <h3 style={styles.subhead}>Ansiedad</h3>
+            <Grid>
+              <Field label="¿Presenta ansiedad?"><select style={styles.input} value={data.psico.ansiedad} onChange={(e) => setField("psico", "ansiedad", e.target.value)}><option value="">Selecciona…</option><option>Sí</option><option>No</option></select></Field>
+              <Field label="¿Qué la desata?"><input style={styles.input} value={data.psico.ansiedadDetona} onChange={(e) => setField("psico", "ansiedadDetona", e.target.value)} /></Field>
+              <Field label="¿Qué come cuando siente ansiedad?" full><input style={styles.input} value={data.psico.ansiedadCome} onChange={(e) => setField("psico", "ansiedadCome", e.target.value)} /></Field>
+            </Grid>
+            <h3 style={styles.subhead}>Estrés</h3>
+            <Grid>
+              <Field label="¿Come cuando está estresad@?"><select style={styles.input} value={data.psico.comeEstres} onChange={(e) => setField("psico", "comeEstres", e.target.value)}><option value="">Selecciona…</option><option>Sí</option><option>No</option></select></Field>
+              <Field label="¿Qué lo desata?"><input style={styles.input} value={data.psico.estresDetona} onChange={(e) => setField("psico", "estresDetona", e.target.value)} /></Field>
+              <Field label="¿Qué come?" full><input style={styles.input} value={data.psico.estresCome} onChange={(e) => setField("psico", "estresCome", e.target.value)} /></Field>
+            </Grid>
+            <h3 style={styles.subhead}>Relación con la comida</h3>
+            <Grid>
+              <Field label="Atracones"><select style={styles.input} value={data.psico.atracones} onChange={(e) => setField("psico", "atracones", e.target.value)}><option value="">Selecciona…</option><option>No</option><option>Ocasional</option><option>Frecuente</option></select></Field>
+              <Field label="Comer nocturno (Sx. comedera nocturna)"><select style={styles.input} value={data.psico.comerNocturno} onChange={(e) => setField("psico", "comerNocturno", e.target.value)}><option value="">Selecciona…</option><option>Sí</option><option>No</option></select></Field>
+              <Field label="Notas de conducta alimentaria" full><AutoTextarea style={styles.textarea} value={data.psico.conductaNotas} onChange={(e) => setField("psico", "conductaNotas", e.target.value)} /></Field>
+            </Grid>
+            <h3 style={styles.subhead}>Motivación y adherencia</h3>
+            <Grid>
+              <Field label="Compromiso para el cambio (1–10)"><select style={styles.input} value={data.psico.compromiso} onChange={(e) => setField("psico", "compromiso", e.target.value)}><option value="">—</option>{[1,2,3,4,5,6,7,8,9,10].map((n) => <option key={n}>{n}</option>)}</select></Field>
+              <Field label="¿Se siente motivad@?"><select style={styles.input} value={data.psico.motivada} onChange={(e) => setField("psico", "motivada", e.target.value)}><option value="">Selecciona…</option><option>Sí</option><option>No</option></select></Field>
+              <Field label="¿Qué le motiva?" full><input style={styles.input} value={data.psico.queMotiva} onChange={(e) => setField("psico", "queMotiva", e.target.value)} /></Field>
+              <Field label="¿Cómo mantendrá la disciplina y constancia?" full><AutoTextarea style={styles.textarea} value={data.psico.disciplina} onChange={(e) => setField("psico", "disciplina", e.target.value)} /></Field>
+            </Grid>
+          </Section>
+        )}
+
         {/* 3. PADECIMIENTOS */}
         <Section reg={reg("padecimientos")} sid="padecimientos" title="Padecimientos" n="3"
           hint="Selecciona los padecimientos que presenta el paciente. Puedes elegir varios.">
@@ -1277,6 +1394,17 @@ function Section({ reg, sid, title, n, hint, children }) {
   );
 }
 function Grid({ children, style }) { return <div style={{ ...styles.grid, ...(style || {}) }}>{children}</div>; }
+function ChipRow({ opts, sel, onToggle }) {
+  const arr = sel || [];
+  return (
+    <div style={styles.chips}>
+      {opts.map((o) => {
+        const on = arr.includes(o);
+        return <button key={o} type="button" onClick={() => onToggle(o)} style={{ ...styles.chip, ...(on ? styles.chipOn : null) }}>{o}</button>;
+      })}
+    </div>
+  );
+}
 function Field({ label, children, full, style }) {
   return (
     <label style={{ ...styles.field, ...(full ? styles.fieldFull : null), ...(style || {}) }}>
@@ -1351,6 +1479,9 @@ const styles = {
   h2: { fontSize: 18, fontWeight: 750, margin: 0, letterSpacing: -0.3, color: T.ink },
   hint: { margin: "3px 0 0", fontSize: 13, color: T.inkSoft, lineHeight: 1.45 },
   subhead: { fontSize: 12, fontWeight: 700, color: T.pine, margin: "24px 0 10px", letterSpacing: 0.4, textTransform: "uppercase" },
+  chips: { display: "flex", flexWrap: "wrap", gap: 7 },
+  chip: { border: `1.4px solid ${T.sage}`, color: T.pine, background: "transparent", borderRadius: 999, padding: "5px 13px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
+  chipOn: { background: T.pine, color: T.bg, borderColor: T.pine },
   grid: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "14px 16px" },
   field: { display: "flex", flexDirection: "column", gap: 6, minWidth: 0 },
   fieldFull: { gridColumn: "1 / -1" },
