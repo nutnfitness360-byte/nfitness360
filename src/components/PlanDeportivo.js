@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import FechaInput from './FechaInput';
 import { db } from '../firebase/config';
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { selloDueno, cargarPerfilPdf } from '../utils/multiTenant';
@@ -243,7 +244,7 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
             </select>
           </Field>
           <Field label="Fecha">
-            <input type="date" style={S.input} value={comp.fecha} onChange={e => setCompCampo('fecha', e.target.value)} />
+            <FechaInput style={S.input} value={comp.fecha} onChange={(iso) => setCompCampo('fecha', iso)} />
           </Field>
           <Field label="Objetivo">
             <input style={S.input} value={comp.objetivo} onChange={e => setCompCampo('objetivo', e.target.value)} placeholder="Rendimiento deportivo" />

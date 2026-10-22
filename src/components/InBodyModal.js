@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import FechaInput from './FechaInput';
 
 /* =====================================================================
    PUNTO DE MIGRACIÓN A OCR (Opción 1)
@@ -85,7 +86,7 @@ export default function InBodyModal({ patient, onClose, onDesdeCero, onInBody })
 
             <div style={S.formTitle}>Datos del estudio</div>
             <div style={S.grid}>
-              <Field l="Fecha del test"><input type="date" style={S.inp} value={f.fecha} onChange={e => set('fecha', e.target.value)} /></Field>
+              <Field l="Fecha del test"><FechaInput style={S.inp} value={f.fecha} onChange={(iso) => set('fecha', iso)} /></Field>
               <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={f.peso} onChange={e => set('peso', e.target.value)} placeholder="74.0" /></Field>
               <Field l="% grasa (PGC)"><input style={S.inp} inputMode="decimal" value={f.grasa} onChange={e => set('grasa', e.target.value)} placeholder="18.2" /></Field>
               <Field l="MME · músculo (kg)"><input style={S.inp} inputMode="decimal" value={f.mme} onChange={e => set('mme', e.target.value)} placeholder="34.5" /></Field>

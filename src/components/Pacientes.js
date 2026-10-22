@@ -13,6 +13,7 @@ import InBodyModal from './InBodyModal';
 import ImportarPacientes from './ImportarPacientes';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import RichArea from './RichArea';
+import FechaInput from './FechaInput';
 import { renderRich } from '../utils/richText';
 import { apegoPorPeriodo } from '../utils/apego';
 
@@ -1160,7 +1161,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
           </div>
           {openMed && (
             <div style={S.formRow}>
-              <Field l="Fecha"><input type="date" style={S.inp} value={med.fecha} onChange={e => setMed({ ...med, fecha: e.target.value })} /></Field>
+              <Field l="Fecha"><FechaInput style={S.inp} value={med.fecha} onChange={(iso) => setMed({ ...med, fecha: iso })} /></Field>
               <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={med.peso} onChange={e => setMed({ ...med, peso: e.target.value })} /></Field>
               <Field l="% grasa"><input style={S.inp} inputMode="decimal" value={med.grasa} onChange={e => setMed({ ...med, grasa: e.target.value })} /></Field>
               <Field l="Músculo (kg)"><input style={S.inp} inputMode="decimal" value={med.musculo} onChange={e => setMed({ ...med, musculo: e.target.value })} /></Field>
@@ -1173,7 +1174,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
           )}
           {openEdit && (
             <div style={S.formRow}>
-              <Field l="Fecha"><input type="date" style={S.inp} value={editMed.fecha} onChange={e => setEditMed({ ...editMed, fecha: e.target.value })} /></Field>
+              <Field l="Fecha"><FechaInput style={S.inp} value={editMed.fecha} onChange={(iso) => setEditMed({ ...editMed, fecha: iso })} /></Field>
               <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={editMed.peso} onChange={e => setEditMed({ ...editMed, peso: e.target.value })} /></Field>
               <Field l="% grasa"><input style={S.inp} inputMode="decimal" value={editMed.grasa} onChange={e => setEditMed({ ...editMed, grasa: e.target.value })} /></Field>
               <Field l="Músculo (kg)"><input style={S.inp} inputMode="decimal" value={editMed.musculo} onChange={e => setEditMed({ ...editMed, musculo: e.target.value })} /></Field>
@@ -1204,7 +1205,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
             {openEditMM && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ maxWidth: 200, marginBottom: 6 }}>
-                  <Field l="Fecha de la medición"><input type="date" style={S.inp} value={editMM.fecha} onChange={e => setEditMM({ ...editMM, fecha: e.target.value })} /></Field>
+                  <Field l="Fecha de la medición"><FechaInput style={S.inp} value={editMM.fecha} onChange={(iso) => setEditMM({ ...editMM, fecha: iso })} /></Field>
                 </div>
                 <div style={S.subLbl}>Pliegues (mm)</div>
                 <div style={S.medGrid}>
@@ -1290,7 +1291,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                     {openPlan && (
                       <div style={S.formRow}>
                         <Field l="Nombre del plan"><input style={S.inp} value={plan.nombre} onChange={e => setPlan({ ...plan, nombre: e.target.value })} placeholder="Plan · 2200 kcal" /></Field>
-                        <Field l="Fecha"><input type="date" style={S.inp} value={plan.fecha} onChange={e => setPlan({ ...plan, fecha: e.target.value })} /></Field>
+                        <Field l="Fecha"><FechaInput style={S.inp} value={plan.fecha} onChange={(iso) => setPlan({ ...plan, fecha: iso })} /></Field>
                         <Field l="Enlace de Drive"><input style={S.inp} value={plan.link} onChange={e => setPlan({ ...plan, link: e.target.value })} placeholder="https://drive.google.com/…" /></Field>
                         <button style={S.saveBtn} onClick={addPlan}>Guardar</button>
                       </div>
@@ -1494,7 +1495,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                   <div>
                     <div style={S.note}>Captura pliegues (mm) y perímetros (cm). Se guardan con su fecha y alimentan las gráficas de seguimiento.</div>
                     <div style={{ maxWidth: 200, marginBottom: 6 }}>
-                      <Field l="Fecha de la medición"><input type="date" style={S.inp} value={manual.fecha} onChange={e => setManual({ ...manual, fecha: e.target.value })} /></Field>
+                      <Field l="Fecha de la medición"><FechaInput style={S.inp} value={manual.fecha} onChange={(iso) => setManual({ ...manual, fecha: iso })} /></Field>
                     </div>
 
                     <div style={S.subLbl}>Pliegues (mm)</div>

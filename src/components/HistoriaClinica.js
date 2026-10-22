@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import FechaInput from "./FechaInput";
 import { useBranding } from "../context/BrandingContext";
 import { LOGO_ARETIA, LOGO_ARETIA_CREMA } from "../report/logoAretia";
 import { LOGO_NUTRIALEGO, LOGO_NUTRIALEGO_BLANCO } from "../report/logoNutriAleGo";
@@ -792,16 +793,16 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
               </div>
             </Field>
             <Field label="Fecha de consulta">
-              <input type="date" style={styles.input} value={data.datos.fecha}
-                onChange={(e) => setFechaDato("fecha", e.target.value)} />
+              <FechaInput style={styles.input} value={data.datos.fecha}
+                onChange={(iso) => setFechaDato("fecha", iso)} />
             </Field>
             <Field label="Nombre" full>
               <input style={styles.input} value={data.datos.nombre} placeholder="Nombre completo"
                 onChange={(e) => setField("datos", "nombre", e.target.value)} />
             </Field>
             <Field label="Fecha de nacimiento">
-              <input type="date" style={styles.input} value={data.datos.fechaNacimiento || ""}
-                onChange={(e) => setFechaDato("fechaNacimiento", e.target.value)} />
+              <FechaInput style={styles.input} value={data.datos.fechaNacimiento || ""}
+                onChange={(iso) => setFechaDato("fechaNacimiento", iso)} />
             </Field>
             <Field label="Edad (años)">
               <div style={styles.autoWrap}>
@@ -908,8 +909,8 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
                   </select>
                 </Field>
                 <Field label="Última cita con ginecólogo">
-                  <input type="date" style={styles.input} value={data.antecedentes.ultimaCitaGineco || ""}
-                    onChange={(e) => setField("antecedentes", "ultimaCitaGineco", e.target.value)} />
+                  <FechaInput style={styles.input} value={data.antecedentes.ultimaCitaGineco || ""}
+                    onChange={(iso) => setField("antecedentes", "ultimaCitaGineco", iso)} />
                 </Field>
                 <Field label="Anticonceptivos" full>
                   <select style={styles.input} value={data.antecedentes.anticonceptivos || ""}
@@ -937,7 +938,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
             <h3 style={styles.subhead}>Ciclo menstrual</h3>
             <Grid>
               <Field label="Menarca (edad)"><input style={styles.input} value={data.gineco.menarca} onChange={(e) => setField("gineco", "menarca", e.target.value)} /></Field>
-              <Field label="FUM · última menstruación"><input type="date" style={styles.input} value={data.gineco.fum} onChange={(e) => setField("gineco", "fum", e.target.value)} /></Field>
+              <Field label="FUM · última menstruación"><FechaInput style={styles.input} value={data.gineco.fum} onChange={(iso) => setField("gineco", "fum", iso)} /></Field>
               <Field label="Ciclo"><select style={styles.input} value={data.gineco.ciclo} onChange={(e) => setField("gineco", "ciclo", e.target.value)}><option value="">Selecciona…</option><option>Regular</option><option>Irregular</option><option>Ausente</option><option>Menopausia</option></select></Field>
               <Field label="Duración del ciclo (días)"><input style={styles.input} value={data.gineco.duracion} onChange={(e) => setField("gineco", "duracion", e.target.value)} /></Field>
               <Field label="SPM / síntomas premenstruales" full><AutoTextarea style={styles.textarea} value={data.gineco.spm} onChange={(e) => setField("gineco", "spm", e.target.value)} /></Field>

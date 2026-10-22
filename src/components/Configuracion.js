@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import FechaInput from './FechaInput';
 import { doc, setDoc, onSnapshot, collection, addDoc, updateDoc, deleteDoc, query } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { HORARIO_DEFAULT, MODALIDADES, franjasDe, SERVICIOS_DEFAULT } from './Agenda';
@@ -625,7 +626,7 @@ export default function Configuracion() {
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-            <input type="date" value={excFecha} style={H.time} onChange={e => setExcFecha(e.target.value)} />
+            <FechaInput value={excFecha} style={H.time} onChange={(iso) => setExcFecha(iso)} />
             <button style={B.ghost} onClick={() => addExcepcion('cerrado')} disabled={horBusy}>Cerrar este día</button>
             <button style={B.ghost} onClick={() => addExcepcion('abierto')} disabled={horBusy}>Abrir este día</button>
           </div>
