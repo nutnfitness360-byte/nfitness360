@@ -18,6 +18,9 @@ import { REGIMENES_FISCALES, USOS_CFDI, CFDI_DEFAULT } from '../data/catalogosCF
 // Módulo de facturación (CFDI) en modo prueba: se OCULTA por completo salvo que la
 // instancia lo habilite con REACT_APP_FACTURACION=true. Así los clientes no lo ven.
 const FACTURACION_ON = String(process.env.REACT_APP_FACTURACION || '').toLowerCase() === 'true';
+// Biblioteca de suplementos con imagen (solo instancias que la activan, ej. Majo Luna).
+const SUPLE_BIBLIOTECA = String(process.env.REACT_APP_SUPLE_BIBLIOTECA || '').toLowerCase() === 'true';
+const _esUrlSup = (s) => /^https?:\/\//i.test((s || '').toString().trim());
 
 /* ===== mini gráfica de línea (SVG, idéntica a la del expediente) ===== */
 const METODO_LABEL = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', stripe: 'En línea', consultorio: 'Consultorio', reagendado: 'Reagendada' };
@@ -1265,6 +1268,32 @@ export default function PacienteDashboard() {
                             <div className="reco-rich" style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: renderRich(r[k]) }} />
                           </div>))
                         : <div className="reco-rich" style={{ fontSize: 13.5, color: 'var(--dark)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: renderRich(r.texto) }} />}
+                      {SUPLE_BIBLIOTECA && r.suplementacionTabla && Array.isArray(r.suplementacionTabla.items)
+                        && r.suplementacionTabla.items.filter(it => it && (it.nombre || it.dosis || it.img)).length > 0 && (
+                        <div style={{ marginTop: 10 }}>
+                          <div style={{ fontSize: 10.5, color: 'var(--gold)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 6 }}>Suplementación</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {r.suplementacionTabla.items.filter(it => it && (it.nombre || it.dosis || it.img)).map((it, j) => (
+                              <div key={j} style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'var(--card)', border: '0.5px solid var(--border)', borderRadius: 9, padding: 8 }}>
+                                {it.img
+                                  ? <img src={it.img} alt="" style={{ width: 46, height: 46, objectFit: 'cover', borderRadius: 7, border: '1px solid var(--border)', flexShrink: 0 }} />
+                                  : <div style={{ width: 46, height: 46, borderRadius: 7, border: '1px dashed var(--border)', flexShrink: 0 }} />}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--dark)' }}>{it.nombre}{it.marca ? ` · ${it.marca}` : ''}</div>
+                                  {it.dosis && <div style={{ fontSize: 12.5, color: 'var(--ink)', marginTop: 1 }}>{it.dosis}{it.frecuencia ? ` · ${it.frecuencia}` : ''}{it.horario ? ` · ${it.horario}` : ''}</div>}
+                                  {(it.donde || '').toString().trim() && (
+                                    <div style={{ fontSize: 11.5, color: 'var(--gold)', fontWeight: 600, marginTop: 3, wordBreak: 'break-word' }}>
+                                      Dónde comprar: {_esUrlSup(it.donde)
+                                        ? <a href={it.donde} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gold)' }}>{it.donde.replace(/^https?:\/\//i, '')}</a>
+                                        : it.donde}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                       <button onClick={() => generarPDFReco(r, false)} title="Ver esta recomendación en la app (sin enviar correo)"

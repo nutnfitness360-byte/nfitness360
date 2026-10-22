@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection, addDoc, updateDoc, deleteDoc, query } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { HORARIO_DEFAULT, MODALIDADES, franjasDe, SERVICIOS_DEFAULT } from './Agenda';
 import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
 import { useTheme, ES_FITMEAL } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { MULTI_NUTRI, slugDeNombre, linkNutri } from '../utils/multiTenant';
+import { MULTI_NUTRI, slugDeNombre, linkNutri, selloDueno, filtroDueno } from '../utils/multiTenant';
 import { PAQUETES_DEFAULT, FAMILIAS } from '../utils/creditos';
 import { CFDI_DEFAULT, CLAVES_UNIDAD, OPCIONES_IVA, REGIMENES_FISCALES } from '../data/catalogosCFDI';
 
@@ -16,6 +16,9 @@ const BRANDING_LOCKED = String(process.env.REACT_APP_BRANDING_LOCKED || '').toLo
 // Facturación (CFDI) en modo prueba: la tarjeta de config se OCULTA salvo que la
 // instancia la habilite con REACT_APP_FACTURACION=true.
 const FACTURACION_ON = String(process.env.REACT_APP_FACTURACION || '').toLowerCase() === 'true';
+
+// Biblioteca de suplementos con imagen (solo instancias que la activan, ej. Majo Luna).
+const SUPLE_BIBLIOTECA = String(process.env.REACT_APP_SUPLE_BIBLIOTECA || '').toLowerCase() === 'true';
 
 // Broker de pagos (MercadoPago) — conexión OAuth self-service. Por ahora solo Fitmeal
 // usa el broker (Natalia/Aretia cobran por Stripe). Una sola terminal para todo Fitmeal.
@@ -65,15 +68,93 @@ function comprimirLogo(file) {
   });
 }
 
+// Comprime la foto de un suplemento a un thumbnail cuadrado pequeño (JPEG) para
+// guardarlo como base64 directo en Firestore (Opción A, sin Storage). ~15-40 KB.
+function comprimirSuplemento(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const LADO = 300;
+        const c = document.createElement('canvas');
+        c.width = LADO; c.height = LADO;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, LADO, LADO);
+        // Encaja la imagen dentro del cuadro conservando proporción (contain).
+        const escala = Math.min(LADO / img.width, LADO / img.height);
+        const w = Math.max(1, Math.round(img.width * escala));
+        const h = Math.max(1, Math.round(img.height * escala));
+        ctx.drawImage(img, Math.round((LADO - w) / 2), Math.round((LADO - h) / 2), w, h);
+        resolve(c.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function Configuracion() {
   const { logo, colors } = useBranding();
   const { tema, setTema, temaDisponible } = useTheme();
-  const { esAdmin, user } = useAuth();
+  const { esAdmin, user, nutriDueno } = useAuth();
   // Facturación visible también para la cuenta de pruebas (para demos/presentación),
   // sin encenderla para los clientes reales de ninguna instancia.
   const correoFacturaPrueba = ['pruebasistnut@gmail.com', 'contacto@aretia.mx'].includes(String((user && user.email) || '').toLowerCase());
   const factOn = FACTURACION_ON || correoFacturaPrueba;
   const [colorsLocal, setColorsLocal] = useState(colors);
+
+  // --- Biblioteca de suplementos con imagen (solo si la instancia la activa) ---
+  const BIB_VACIO = { nombre: '', marca: '', dosis: '', donde: '', notas: '', img: '' };
+  const [biblio, setBiblio] = useState([]);
+  const [bibForm, setBibForm] = useState(BIB_VACIO);
+  const [bibEdit, setBibEdit] = useState(null);  // id en edición, o null
+  const [bibBusy, setBibBusy] = useState(false);
+  const [bibMsg, setBibMsg] = useState('');
+  const bibFileRef = useRef(null);
+  useEffect(() => {
+    if (!SUPLE_BIBLIOTECA) return undefined;
+    return onSnapshot(query(collection(db, 'bibliotecaSuplementos'), ...filtroDueno(nutriDueno)), snap => {
+      const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      arr.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+      setBiblio(arr);
+    }, () => {});
+  }, [nutriDueno]);
+  const bibCargarImg = async (file) => {
+    if (!file) return;
+    try { const d = await comprimirSuplemento(file); setBibForm(f => ({ ...f, img: d })); }
+    catch (e) { setBibMsg('No se pudo procesar la imagen.'); }
+  };
+  const bibGuardar = async () => {
+    const nombre = (bibForm.nombre || '').trim();
+    if (!nombre) { setBibMsg('Escribe al menos el nombre del suplemento.'); return; }
+    setBibBusy(true); setBibMsg('');
+    try {
+      const payload = {
+        nombre, marca: (bibForm.marca || '').trim(), dosis: (bibForm.dosis || '').trim(),
+        donde: (bibForm.donde || '').trim(), notas: (bibForm.notas || '').trim(),
+        img: bibForm.img || '', ...selloDueno(nutriDueno),
+      };
+      if (bibEdit) await updateDoc(doc(db, 'bibliotecaSuplementos', bibEdit), payload);
+      else await addDoc(collection(db, 'bibliotecaSuplementos'), payload);
+      setBibForm(BIB_VACIO); setBibEdit(null); setBibMsg('Guardado.');
+      if (bibFileRef.current) bibFileRef.current.value = '';
+    } catch (e) { setBibMsg('Error al guardar: ' + e.message); }
+    finally { setBibBusy(false); }
+  };
+  const bibEditar = (it) => {
+    setBibEdit(it.id);
+    setBibForm({ nombre: it.nombre || '', marca: it.marca || '', dosis: it.dosis || '', donde: it.donde || '', notas: it.notas || '', img: it.img || '' });
+    setBibMsg('');
+  };
+  const bibCancelar = () => { setBibEdit(null); setBibForm(BIB_VACIO); setBibMsg(''); if (bibFileRef.current) bibFileRef.current.value = ''; };
+  const bibEliminar = async (id) => {
+    try { await deleteDoc(doc(db, 'bibliotecaSuplementos', id)); if (bibEdit === id) bibCancelar(); }
+    catch (e) { setBibMsg('Error al eliminar: ' + e.message); }
+  };
 
   // --- Cobros MercadoPago (Fitmeal, solo admin) ---
   const [mpEstado, setMpEstado] = useState(null);   // null = cargando; {conectado, user_id, desde}
@@ -936,6 +1017,71 @@ export default function Configuracion() {
         </Seccion>
       )}
 
+      {SUPLE_BIBLIOTECA && (
+      <Seccion titulo="Biblioteca de suplementos" n={biblio.length}>
+        <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: -6, marginBottom: 2, maxWidth: 680 }}>
+          Guarda aquí los suplementos que más usas con su foto, dosis base y dónde comprarlos.
+          Al armar la suplementación de un paciente los eliges de esta lista y se llenan solos (la dosis queda editable).
+          La foto aparece en el panel del paciente y en el PDF de recomendaciones.
+        </div>
+
+        {/* Alta / edición */}
+        <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)', padding: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ flex: 'none' }}>
+            <div style={{ width: 110, height: 110, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--cream)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {bibForm.img
+                ? <img src={bibForm.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <span style={{ fontSize: 11, color: 'var(--stone)', textAlign: 'center', padding: 8 }}>Sin foto</span>}
+            </div>
+            <input ref={bibFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => bibCargarImg(e.target.files && e.target.files[0])} />
+            <button type="button" style={{ ...B.ghost, display: 'block', width: 110, marginTop: 8, padding: '7px 10px', fontSize: 12 }} onClick={() => bibFileRef.current && bibFileRef.current.click()}>Subir foto</button>
+            {bibForm.img && <button type="button" style={{ ...B.ghost, display: 'block', width: 110, marginTop: 6, padding: '7px 10px', fontSize: 12, color: 'var(--danger)' }} onClick={() => setBibForm(f => ({ ...f, img: '' }))}>Quitar foto</button>}
+          </div>
+          <div style={{ flex: 1, minWidth: 260, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <label style={SB.field}><span style={SB.lbl}>Nombre *</span><input style={SB.inp} value={bibForm.nombre} placeholder="Ej. Vitamina D3 5,000 UI" onChange={e => setBibForm(f => ({ ...f, nombre: e.target.value }))} /></label>
+              <label style={SB.field}><span style={SB.lbl}>Marca</span><input style={SB.inp} value={bibForm.marca} placeholder="Ej. Morebon" onChange={e => setBibForm(f => ({ ...f, marca: e.target.value }))} /></label>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <label style={SB.field}><span style={SB.lbl}>Dosis base</span><input style={SB.inp} value={bibForm.dosis} placeholder="Ej. 1 tableta post-desayuno" onChange={e => setBibForm(f => ({ ...f, dosis: e.target.value }))} /></label>
+              <label style={SB.field}><span style={SB.lbl}>Dónde comprar (link o tienda)</span><input style={SB.inp} value={bibForm.donde} placeholder="URL o nombre de la tienda (opcional)" onChange={e => setBibForm(f => ({ ...f, donde: e.target.value }))} /></label>
+            </div>
+            <label style={{ ...SB.field, width: '100%' }}><span style={SB.lbl}>Notas (opcional)</span><input style={SB.inp} value={bibForm.notas} placeholder="Indicaciones internas" onChange={e => setBibForm(f => ({ ...f, notas: e.target.value }))} /></label>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button type="button" style={SB.save} disabled={bibBusy} onClick={bibGuardar}>{bibEdit ? 'Guardar cambios' : 'Agregar a la biblioteca'}</button>
+              {bibEdit && <button type="button" style={B.ghost} onClick={bibCancelar}>Cancelar</button>}
+              {bibMsg && <span style={{ fontSize: 12, color: bibMsg.startsWith('Error') || bibMsg.startsWith('No se') ? 'var(--danger)' : 'var(--stone)' }}>{bibMsg}</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* Lista */}
+        {biblio.length === 0
+          ? <div style={{ fontSize: 12.5, color: 'var(--stone)', padding: '6px 2px' }}>Aún no hay suplementos en la biblioteca.</div>
+          : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+              {biblio.map(it => (
+                <div key={it.id} style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--card)', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ height: 120, background: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {it.img ? <img src={it.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 11, color: 'var(--stone)' }}>Sin foto</span>}
+                  </div>
+                  <div style={{ padding: '10px 12px', flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--dark)' }}>{it.nombre}</div>
+                    {it.marca && <div style={{ fontSize: 11.5, color: 'var(--stone)', marginTop: 1 }}>{it.marca}</div>}
+                    {it.dosis && <div style={{ fontSize: 12, color: 'var(--ink)', marginTop: 4 }}>{it.dosis}</div>}
+                    {it.donde && <div style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 600, marginTop: 6, wordBreak: 'break-word' }}>{it.donde}</div>}
+                  </div>
+                  <div style={{ display: 'flex', borderTop: '1px solid var(--border)' }}>
+                    <button type="button" style={SB.cardBtn} onClick={() => bibEditar(it)}>Editar</button>
+                    <button type="button" style={{ ...SB.cardBtn, color: 'var(--danger)', borderLeft: '1px solid var(--border)' }} onClick={() => bibEliminar(it.id)}>Eliminar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+      </Seccion>
+      )}
+
       <Seccion titulo="Automatizaciones" n={1}>
       <div className="card" style={{ maxWidth: 760 }}>
         <div className="card-title">Reactivación de pacientes inactivos</div>
@@ -1005,6 +1151,15 @@ const S = {
   sumN: { fontSize: 11, fontWeight: 700, background: 'var(--cream)', color: 'var(--stone)', borderRadius: 999, padding: '2px 9px' },
   chev: { marginLeft: 'auto', color: 'var(--stone)', fontSize: 13, transition: 'transform .15s' },
   body: { display: 'flex', flexDirection: 'column', gap: 24, padding: '2px 18px 22px' },
+};
+
+// Estilos de la Biblioteca de suplementos.
+const SB = {
+  field: { flex: 1, minWidth: 180, display: 'flex', flexDirection: 'column', gap: 4 },
+  lbl: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--stone)' },
+  inp: { width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--dark)', fontFamily: 'inherit', boxSizing: 'border-box' },
+  save: { padding: '9px 16px', fontSize: 13, fontWeight: 700, border: 'none', borderRadius: 8, background: 'var(--gold)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit' },
+  cardBtn: { flex: 1, padding: '8px 0', fontSize: 12, fontWeight: 600, border: 'none', background: 'transparent', color: 'var(--dark)', cursor: 'pointer', fontFamily: 'inherit' },
 };
 
 function Seccion({ titulo, n, defaultOpen, children }) {

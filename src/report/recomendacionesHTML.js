@@ -46,19 +46,31 @@ const R_LINE   = (ES_GENERICA_R && GEN_R) ? GEN_R.line : ES_FITMEAL_R ? '#EAD9E4
 
 const buildSupTable = (suplementacion) => {
   const items = (suplementacion && Array.isArray(suplementacion.items) ? suplementacion.items : [])
-    .filter((it) => it && (it.nombre || it.marca || it.dosis || it.frecuencia || it.horario));
+    .filter((it) => it && (it.nombre || it.marca || it.dosis || it.frecuencia || it.horario || it.img || it.donde));
   if (!items.length) return "";
+  // Columnas extra (foto del suplemento y "dónde comprar") solo aparecen si algún
+  // renglón las trae. Instancias que no usan la biblioteca mantienen la tabla de 5 columnas.
+  const hasImg = items.some((it) => it && it.img);
+  const hasDonde = items.some((it) => it && (it.donde || "").toString().trim());
+  const esUrl = (s) => /^https?:\/\//i.test((s || "").toString().trim());
+  const celdaDonde = (d) => {
+    const t = (d || "").toString().trim();
+    if (!t) return "—";
+    return esUrl(t) ? `<a href="${esc(t)}" style="color:inherit;">${esc(t.replace(/^https?:\/\//i, ""))}</a>` : esc(t);
+  };
   const filas = items.map((it) => `
     <tr>
+      ${hasImg ? `<td class="supfoto">${it.img ? `<img src="${esc(it.img)}" alt=""/>` : ""}</td>` : ""}
       <td>${esc(it.nombre)}</td><td>${esc(it.marca)}</td><td>${esc(it.dosis)}</td>
       <td>${esc(it.frecuencia)}</td><td>${esc(it.horario)}</td>
+      ${hasDonde ? `<td>${celdaDonde(it.donde)}</td>` : ""}
     </tr>`).join("");
   const notas = (suplementacion.notas || "").toString().trim();
   return `
     <div class="eyebrow">SUPLEMENTACIÓN ACTUAL</div>
     <div class="rule"></div>
     <table class="suptable">
-      <thead><tr><th>Suplemento</th><th>Marca</th><th>Dosis</th><th>Frecuencia</th><th>Horario</th></tr></thead>
+      <thead><tr>${hasImg ? `<th></th>` : ""}<th>Suplemento</th><th>Marca</th><th>Dosis</th><th>Frecuencia</th><th>Horario</th>${hasDonde ? `<th>Dónde comprar</th>` : ""}</tr></thead>
       <tbody>${filas}</tbody>
     </table>
     ${notas ? `<div class="supnotas"><b>Notas:</b> ${esc(notas)}</div>` : ""}
@@ -146,6 +158,8 @@ export function buildRecomendacionesHTML({ nombre, recomendaciones, fecha, suple
     .suptable th { text-align:left; font-size:9.5px; letter-spacing:0.5px; text-transform:uppercase; color:${R_MUTE}; padding:6px 8px; border-bottom:1.5px solid ${R_ACC}; }
     .suptable td { font-size:12px; color:${R_STRONG}; padding:7px 8px; border-bottom:1px solid ${R_LINE}; }
     .suptable tr:last-child td { border-bottom:none; }
+    .suptable td.supfoto { width:44px; padding:5px 6px; }
+    .suptable td.supfoto img { width:40px; height:40px; object-fit:cover; border-radius:6px; border:1px solid ${R_LINE}; display:block; }
     .supnotas { font-size:11.5px; color:${R_SOFT}; margin:8px 0 4px; }
     .anatable { width:100%; border-collapse:collapse; margin:6px 0 4px; }
     .anatable th { text-align:left; font-size:9.5px; letter-spacing:0.5px; text-transform:uppercase; color:${R_MUTE}; padding:6px 8px; border-bottom:1.5px solid ${R_ACC}; }
