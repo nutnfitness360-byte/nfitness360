@@ -47,6 +47,10 @@ input, select, textarea { max-width: 100%; }
 @media (min-width: 560px) { .form-2up { grid-template-columns: 1fr 1fr; } }
 .form-2up input, .form-2up select, .form-2up textarea { width: 100%; }
 
+html, body {
+  overflow-x: hidden;    /* móvil: nada desborda a lo ancho (evita que se corte el encabezado/menú) */
+  max-width: 100%;
+}
 body {
   font-family: 'Montserrat', sans-serif !important;
   background: var(--cream);
@@ -63,6 +67,7 @@ body {
   width: 100%;
   max-width: 100%;
   margin: 0 auto;
+  overflow-x: hidden;
 }
 
 @media (min-width: 768px) {
@@ -131,6 +136,11 @@ body {
 
 @media (max-width: 767px) {
   .nav-spacer { display: none; }
+  /* Menú inferior: los 6 ítems reparten el ancho por igual y nunca desbordan. */
+  .bottomnav { justify-content: space-between; padding-left: 2px; padding-right: 2px; }
+  .bottomnav .nav-item { flex: 1 1 0; min-width: 0; padding: 0.25rem 0.1rem; }
+  .bottomnav .nav-item svg { width: 21px; height: 21px; }
+  .bottomnav .nav-item span { font-size: 8.5px; letter-spacing: 0.1px; line-height: 1.1; text-align: center; max-width: 100%; word-break: break-word; }
 }
 
 /* Topbar */

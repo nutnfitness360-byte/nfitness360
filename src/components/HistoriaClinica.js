@@ -551,17 +551,18 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
     return (res && Array.isArray(res.fueraDeRango)) ? res.fueraDeRango.length : nuevas.filter((f) => f.estado === 'alto' || f.estado === 'bajo').length;
   };
 
-  // Chip de estado para la tabla bioquímica (editor). Sin estado → no muestra nada.
+  // Indicador compacto de estado para la tabla bioquímica (editor): icono con color,
+  // cabe en una columna angosta; la palabra completa va en el tooltip (title). Sin estado → nada.
   const estadoBadge = (estado) => {
     const map = {
-      alto: { t: '↑ Alto', bg: '#F4DBDB', fg: '#8B2F2F' },
-      bajo: { t: '↓ Bajo', bg: '#DBE4F4', fg: '#2F5A8B' },
-      normal: { t: 'En rango', bg: T.mint, fg: T.pine },
-      sin_rango: { t: 's/ rango', bg: T.lineSoft, fg: T.inkSoft },
+      alto: { s: '↑', t: 'Alto', bg: '#F4DBDB', fg: '#8B2F2F' },
+      bajo: { s: '↓', t: 'Bajo', bg: '#DBE4F4', fg: '#2F5A8B' },
+      normal: { s: '✓', t: 'En rango', bg: T.mint, fg: T.pine },
+      sin_rango: { s: '–', t: 'Sin rango impreso', bg: T.lineSoft, fg: T.inkSoft },
     };
     const e = map[String(estado || '').toLowerCase()];
     if (!e) return null;
-    return <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: e.bg, color: e.fg, whiteSpace: 'nowrap' }}>{e.t}</span>;
+    return <span title={e.t} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 20, fontSize: 12, fontWeight: 800, borderRadius: 6, background: e.bg, color: e.fg }}>{e.s}</span>;
   };
 
   const subirAnalisis = async (file) => {
@@ -1082,7 +1083,7 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
           </Grid>
           <div style={styles.tableWrap}>
             <div style={{ ...styles.bioRow, ...styles.bioHead }}>
-              <div>Parámetro</div><div>Resultado</div><div>Referencia</div><div>Estado</div><div></div>
+              <div style={styles.bioHeadCell}>Parámetro</div><div style={styles.bioHeadCell}>Resultado</div><div style={styles.bioHeadCell}>Referencia</div><div style={{ ...styles.bioHeadCell, padding: "8px 2px", textAlign: "center" }}>Edo.</div><div></div>
             </div>
             {data.bioquimica.filas.map((f, i) => (
               <div key={i} style={styles.bioRow}>
@@ -1550,7 +1551,7 @@ const styles = {
   fieldFull: { gridColumn: "1 / -1" },
   label: { fontSize: 12.5, fontWeight: 600, color: T.inkSoft, letterSpacing: 0.1 },
   input: { width: "100%", minWidth: 0, maxWidth: "100%", border: `1px solid ${T.line}`, borderRadius: 9, padding: "10px 12px", fontSize: 14, color: T.ink, background: "var(--card)", boxSizing: "border-box", fontFamily: "inherit" },
-  inputAuto: { background: T.mint, color: T.pine, fontWeight: 700, letterSpacing: 0.5 },
+  inputAuto: { background: T.mint, color: T.pine, fontWeight: 700, letterSpacing: 0.5, paddingRight: 52, textOverflow: "ellipsis" },
   autoWrap: { position: "relative", display: "flex", alignItems: "center" },
   autoTag: { position: "absolute", right: 10, fontSize: 10.5, fontWeight: 700, color: T.pineSoft, background: "var(--card)", border: `1px solid ${T.line}`, borderRadius: 6, padding: "1px 6px", textTransform: "uppercase", letterSpacing: 0.5 },
   textarea: { width: "100%", border: `1px solid ${T.line}`, borderRadius: 9, padding: "10px 12px", fontSize: 14, color: T.ink, background: "var(--card)", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 },
@@ -1558,8 +1559,9 @@ const styles = {
   likeNo: { borderLeft: `3px solid ${T.danger}` },
   note: { marginTop: 16, fontSize: 12.5, color: T.pineSoft, background: T.mint, borderRadius: 10, padding: "10px 13px", lineHeight: 1.5 },
   tableWrap: { border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" },
-  bioRow: { display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 78px 40px", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "center" },
-  bioEstado: { display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", borderRight: `1px solid ${T.lineSoft}` },
+  bioRow: { display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 34px 32px", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "center" },
+  bioEstado: { display: "flex", alignItems: "center", justifyContent: "center", padding: "0 2px", borderRight: `1px solid ${T.lineSoft}` },
+  bioHeadCell: { padding: "8px 10px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   supRow: { display: "grid", gridTemplateColumns: "1.4fr 1fr 0.9fr 1fr 1.1fr 40px", borderBottom: `1px solid ${T.lineSoft}` },
   bioHead: { background: T.mint, fontSize: 11, fontWeight: 700, color: T.pine, textTransform: "uppercase", letterSpacing: 0.4 },
   cellInput: { border: "none", borderRight: `1px solid ${T.lineSoft}`, padding: "10px 12px", fontSize: 13.5, background: "transparent", fontFamily: "inherit", color: T.ink, width: "100%", boxSizing: "border-box" },
@@ -1570,9 +1572,9 @@ const styles = {
   anaList: { marginTop: 10, display: "flex", flexDirection: "column", gap: 6 },
   anaItem: { display: "flex", alignItems: "center", gap: 10, background: "var(--mint)", border: `1px solid ${T.lineSoft}`, borderRadius: 8, padding: "8px 12px" },
   anaLink: { background: T.amber, color: "var(--dark)", textDecoration: "none", padding: "5px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700 },
-  dietRow: { display: "grid", gridTemplateColumns: "150px 1fr 34px", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "stretch" },
-  dietMomento: { background: "var(--mint)", padding: "12px 14px", fontSize: 13, fontWeight: 700, color: T.pine, borderRight: `1px solid ${T.lineSoft}`, display: "flex", alignItems: "center" },
-  dietMomentoInput: { background: "var(--mint)", padding: "12px 14px", fontSize: 13, fontWeight: 700, color: T.pine, borderRight: `1px solid ${T.lineSoft}`, border: "none", borderRadius: 0, fontFamily: "inherit", boxSizing: "border-box", width: "100%" },
+  dietRow: { display: "grid", gridTemplateColumns: "minmax(80px, 110px) minmax(0, 1fr) 32px", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "stretch" },
+  dietMomento: { background: "var(--mint)", padding: "12px 10px", fontSize: 13, fontWeight: 700, color: T.pine, borderRight: `1px solid ${T.lineSoft}`, display: "flex", alignItems: "center" },
+  dietMomentoInput: { background: "var(--mint)", padding: "12px 10px", fontSize: 13, fontWeight: 700, color: T.pine, borderRight: `1px solid ${T.lineSoft}`, border: "none", borderRadius: 0, fontFamily: "inherit", boxSizing: "border-box", width: "100%", minWidth: 0 },
   dietDel: { border: "none", background: "transparent", color: T.inkSoft, fontSize: 18, cursor: "pointer", lineHeight: 1, alignSelf: "center" },
   dietCell: { border: "none", padding: "11px 13px", fontSize: 13.5, background: "transparent", fontFamily: "inherit", color: T.ink, resize: "vertical", lineHeight: 1.5, minHeight: 42 },
   footer: { margin: "10px 24px 0", background: "var(--card)", border: `1px solid ${T.line}`, borderRadius: 14, padding: "16px 20px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end", gap: 12 },
