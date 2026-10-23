@@ -171,6 +171,26 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
   const [buscar, setBuscar] = useState('');
   const [showBuscar, setShowBuscar] = useState(false);
   const [detalle, setDetalle] = useState(null);
+  // Edición de notas de la cita desde la vista previa (solo nutrióloga).
+  const [editNotas, setEditNotas] = useState(false);
+  const [notasDraft, setNotasDraft] = useState('');
+  const [notasBusy, setNotasBusy] = useState(false);
+  const [notasMsg, setNotasMsg] = useState('');
+  // Al abrir/cambiar de cita, se sale del modo edición y se precarga la nota actual.
+  useEffect(() => { setEditNotas(false); setNotasMsg(''); setNotasDraft((detalle && detalle.notas) || ''); }, [detalle]);
+  const guardarNotas = async () => {
+    if (!detalle || !detalle.id) return;
+    setNotasBusy(true); setNotasMsg('');
+    try {
+      await updateDoc(doc(db, 'citas', detalle.id), { notas: notasDraft });
+      setDetalle((prev) => (prev ? { ...prev, notas: notasDraft } : prev));
+      setEditNotas(false);
+    } catch (e) {
+      setNotasMsg('No se pudo guardar: ' + (e && e.message ? e.message : e));
+    } finally {
+      setNotasBusy(false);
+    }
+  };
 
   // Campos del modal (unificados para nutrióloga y paciente)
   const [mPaciente, setMPaciente] = useState('');
@@ -801,13 +821,45 @@ export default function Agenda({ isNutri, reagendarDe = null, onReagendado, onSo
                   ['Hora', detalle.hora],
                   ['Tipo', detalle.tipoNombre || detalle.motivo || '—'],
                   ['Objetivo', detalle.objetivo || '—'],
-                  ['Notas', detalle.notas ? detalle.notas : <span style={{ color: '#a89e95', fontStyle: 'italic', fontWeight: 500 }}>Sin notas</span>],
                 ].map(([k, v], i) => (
-                  <div key={k} style={{ display: 'flex', gap: 10, padding: '9px 0', borderBottom: i === 6 ? 'none' : '1px solid var(--border)', fontSize: 13 }}>
+                  <div key={k} style={{ display: 'flex', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
                     <div style={{ width: 78, flexShrink: 0, color: 'var(--stone)', fontWeight: 700, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.03em', paddingTop: 1 }}>{k}</div>
                     <div style={{ flex: 1, color: 'var(--dark)', fontWeight: 600 }}>{v}</div>
                   </div>
                 ))}
+                {/* NOTAS: editable por la nutrióloga desde la vista previa */}
+                <div style={{ display: 'flex', gap: 10, padding: '9px 0', fontSize: 13, alignItems: 'flex-start' }}>
+                  <div style={{ width: 78, flexShrink: 0, color: 'var(--stone)', fontWeight: 700, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.03em', paddingTop: 1 }}>Notas</div>
+                  <div style={{ flex: 1 }}>
+                    {editNotas ? (
+                      <div>
+                        <textarea value={notasDraft} onChange={(e) => setNotasDraft(e.target.value)} rows={3} autoFocus
+                          placeholder="Observaciones de la consulta…"
+                          style={{ width: '100%', boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 9, padding: '8px 10px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', resize: 'vertical' }} />
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                          <button onClick={guardarNotas} disabled={notasBusy}
+                            style={{ background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>{notasBusy ? 'Guardando…' : 'Guardar'}</button>
+                          <button onClick={() => { setEditNotas(false); setNotasMsg(''); setNotasDraft(detalle.notas || ''); }}
+                            style={{ background: 'transparent', color: 'var(--stone)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>Cancelar</button>
+                          {notasMsg && <span style={{ fontSize: 11.5, color: 'var(--danger)' }}>{notasMsg}</span>}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <div style={{ flex: 1, color: 'var(--dark)', fontWeight: 600 }}>
+                          {detalle.notas ? detalle.notas : <span style={{ color: '#a89e95', fontStyle: 'italic', fontWeight: 500 }}>Sin notas</span>}
+                        </div>
+                        {isNutri && (
+                          <button onClick={() => { setEditNotas(true); setNotasMsg(''); setNotasDraft(detalle.notas || ''); }} title="Editar notas"
+                            style={{ background: 'transparent', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', padding: '0 0 0 4px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                            {detalle.notas ? 'Editar' : 'Agregar'}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 9, padding: '14px 18px 2px' }}>
                 {waNum && <a href={'https://wa.me/' + waNum} target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', borderRadius: 11, padding: '11px 8px', fontSize: 12, fontWeight: 700, textDecoration: 'none', background: '#25D366', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.82 11.82 0 018.413 3.488 11.82 11.82 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zM6.597 20.13c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.82 9.82 0 001.506 5.26l-.999 3.648 3.993-1.207z"/></svg>WhatsApp</a>}
