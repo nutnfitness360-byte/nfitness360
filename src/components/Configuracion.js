@@ -1125,7 +1125,7 @@ const P = {
 const H = {
   row: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)' },
   dayToggle: { display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, cursor: 'pointer', minWidth: 130, paddingTop: 6 },
-  hours: { display: 'flex', alignItems: 'center', gap: 8 },
+  hours: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   lbl: { fontSize: 12.5, color: 'var(--stone)' },
   time: { border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff' },
   week: { width: 30, height: 28, borderRadius: 7, border: '1px solid var(--border)', background: '#fff', color: 'var(--stone)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' },
