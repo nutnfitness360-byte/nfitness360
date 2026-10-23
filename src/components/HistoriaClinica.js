@@ -724,18 +724,9 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
 
       {/* ---------- ENCABEZADO ---------- */}
       <header style={styles.header}>
-        <div style={styles.brandRow}>
-          {(LOGO_CLARO) ? (
-            <img src={LOGO_CLARO} alt="" style={{ height: 34, width: "auto", display: "block" }} />
-          ) : (ES_NUTRIALEGO_HC) ? (
-            <img src={LOGO_NUTRIALEGO_BLANCO} alt="Nutri Ale Go" style={{ height: 30, width: "auto", display: "block" }} />
-          ) : (ES_ARETIA_HC) ? (
-            <img src={LOGO_ARETIA_CREMA} alt="Aretia" style={{ height: 32, width: "auto", display: "block" }} />
-          ) : logoSrc ? (
-            <img src={logoSrc} alt="" style={styles.logoImg} />
-          ) : (
-            <span style={styles.logoMark}>N</span>
-          )}
+        {/* El logo ya está en el topbar de la app; aquí solo el estado de guardado
+            (antes se veía el logo duplicado). */}
+        <div style={{ ...styles.brandRow, justifyContent: "flex-end" }}>
           <SaveBadge status={status} />
         </div>
 
@@ -1133,9 +1124,9 @@ export default function HistoriaClinica({ initial, codigo, onSave, onBack, readO
         {/* 6. SUPLEMENTACIÓN */}
         <Section reg={reg("suplementacion")} sid="suplementacion" title="Suplementación" n="6"
           hint="Suplementos que consume actualmente con dosis y frecuencia.">
-          <div style={styles.tableWrap}>
+          <div style={styles.tableWrapScroll}>
             <div style={{ ...styles.supRow, ...styles.bioHead }}>
-              <div>Suplemento</div><div>Marca</div><div>Dosis</div><div>Frecuencia</div><div>Horario</div><div></div>
+              <div style={styles.bioHeadCell}>Suplemento</div><div style={styles.bioHeadCell}>Marca</div><div style={styles.bioHeadCell}>Dosis</div><div style={styles.bioHeadCell}>Frecuencia</div><div style={styles.bioHeadCell}>Horario</div><div></div>
             </div>
             {data.suplementacion.items.map((it, i) => (
               <div key={i} style={styles.supRow}>
@@ -1551,9 +1542,9 @@ const styles = {
   fieldFull: { gridColumn: "1 / -1" },
   label: { fontSize: 12.5, fontWeight: 600, color: T.inkSoft, letterSpacing: 0.1 },
   input: { width: "100%", minWidth: 0, maxWidth: "100%", border: `1px solid ${T.line}`, borderRadius: 9, padding: "10px 12px", fontSize: 14, color: T.ink, background: "var(--card)", boxSizing: "border-box", fontFamily: "inherit" },
-  inputAuto: { background: T.mint, color: T.pine, fontWeight: 700, letterSpacing: 0.5, paddingRight: 52, textOverflow: "ellipsis" },
+  inputAuto: { background: T.mint, color: T.pine, fontWeight: 700, letterSpacing: 0.2, paddingRight: 44, textOverflow: "ellipsis", whiteSpace: "nowrap", overflow: "hidden" },
   autoWrap: { position: "relative", display: "flex", alignItems: "center" },
-  autoTag: { position: "absolute", right: 10, fontSize: 10.5, fontWeight: 700, color: T.pineSoft, background: "var(--card)", border: `1px solid ${T.line}`, borderRadius: 6, padding: "1px 6px", textTransform: "uppercase", letterSpacing: 0.5 },
+  autoTag: { position: "absolute", right: 6, fontSize: 9, fontWeight: 700, color: T.pineSoft, background: "var(--card)", border: `1px solid ${T.line}`, borderRadius: 6, padding: "1px 5px", textTransform: "uppercase", letterSpacing: 0.3, pointerEvents: "none" },
   textarea: { width: "100%", border: `1px solid ${T.line}`, borderRadius: 9, padding: "10px 12px", fontSize: 14, color: T.ink, background: "var(--card)", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 },
   likeYes: { borderLeft: `3px solid ${T.sage}` },
   likeNo: { borderLeft: `3px solid ${T.danger}` },
@@ -1562,7 +1553,8 @@ const styles = {
   bioRow: { display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 34px 32px", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "center" },
   bioEstado: { display: "flex", alignItems: "center", justifyContent: "center", padding: "0 2px", borderRight: `1px solid ${T.lineSoft}` },
   bioHeadCell: { padding: "8px 10px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-  supRow: { display: "grid", gridTemplateColumns: "1.4fr 1fr 0.9fr 1fr 1.1fr 40px", borderBottom: `1px solid ${T.lineSoft}` },
+  supRow: { display: "grid", gridTemplateColumns: "1.4fr 1fr 0.9fr 1fr 1.1fr 40px", borderBottom: `1px solid ${T.lineSoft}`, minWidth: 560 },
+  tableWrapScroll: { border: `1px solid ${T.line}`, borderRadius: 12, overflowX: "auto", WebkitOverflowScrolling: "touch" },
   bioHead: { background: T.mint, fontSize: 11, fontWeight: 700, color: T.pine, textTransform: "uppercase", letterSpacing: 0.4 },
   cellInput: { border: "none", borderRight: `1px solid ${T.lineSoft}`, padding: "10px 12px", fontSize: 13.5, background: "transparent", fontFamily: "inherit", color: T.ink, width: "100%", boxSizing: "border-box" },
   rowDel: { border: "none", background: "transparent", color: T.inkSoft, fontSize: 18, cursor: "pointer", lineHeight: 1 },
@@ -1572,7 +1564,7 @@ const styles = {
   anaList: { marginTop: 10, display: "flex", flexDirection: "column", gap: 6 },
   anaItem: { display: "flex", alignItems: "center", gap: 10, background: "var(--mint)", border: `1px solid ${T.lineSoft}`, borderRadius: 8, padding: "8px 12px" },
   anaLink: { background: T.amber, color: "var(--dark)", textDecoration: "none", padding: "5px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700 },
-  dietRow: { display: "grid", gridTemplateColumns: "minmax(80px, 110px) minmax(0, 1fr) 32px", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "stretch" },
+  dietRow: { display: "grid", gridTemplateColumns: "minmax(66px, 86px) minmax(0, 1fr) 30px", borderBottom: `1px solid ${T.lineSoft}`, alignItems: "stretch" },
   dietMomento: { background: "var(--mint)", padding: "12px 10px", fontSize: 13, fontWeight: 700, color: T.pine, borderRight: `1px solid ${T.lineSoft}`, display: "flex", alignItems: "center" },
   dietMomentoInput: { background: "var(--mint)", padding: "12px 10px", fontSize: 13, fontWeight: 700, color: T.pine, borderRight: `1px solid ${T.lineSoft}`, border: "none", borderRadius: 0, fontFamily: "inherit", boxSizing: "border-box", width: "100%", minWidth: 0 },
   dietDel: { border: "none", background: "transparent", color: T.inkSoft, fontSize: 18, cursor: "pointer", lineHeight: 1, alignSelf: "center" },
