@@ -1,0 +1,2144 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { db } from '../firebase/config';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, query, orderBy } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
+import { filtroDueno, selloDueno, cargarPerfilPdf } from '../utils/multiTenant';
+import { PAQUETES_DEFAULT, FAMILIAS, familiaLabel, resumenSaldo, venceDeLote, nuevoLote } from '../utils/creditos';
+import Plan from './Plan';
+import Menus from './Menus';
+import HistoriaClinica from './HistoriaClinica';
+import NotasSeguimiento from './Notasseguimiento';
+import PlanDeportivo from './PlanDeportivo';
+import InBodyModal from './InBodyModal';
+import ImportarPacientes from './ImportarPacientes';
+import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
+import RichArea from './RichArea';
+import { renderRich } from '../utils/richText';
+import { apegoPorPeriodo } from '../utils/apego';
+
+/* ===== utilidades ===== */
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MESES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const fmtMes = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} ${MESES[d.getMonth()]}`; };
+const bitacoraToApego = (bit) => (bit || []).filter(b => typeof b.apego === 'number').map(b => {
+  const d = new Date(b.fecha);
+  const iso = isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return { fecha: iso, apego: b.apego };
+});
+const fmtSello = (ts) => { const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+const fileToBase64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+const fmtFecha = (f) => { const d = new Date(f + 'T00:00:00'); return isNaN(d) ? f : `${d.getDate()} de ${MESES_L[d.getMonth()]} de ${d.getFullYear()}`; };
+// Fecha de creación del expediente: usa 'creado' (timestamp) o, si no existe, 'inicio' (ISO).
+const pacCreadoTs = (p) => (typeof p.creado === 'number' ? p.creado : (p.inicio ? (new Date(p.inicio + 'T00:00:00').getTime() || 0) : 0));
+const pacCreadoISO = (p) => {
+  if (typeof p.creado === 'number') { const d = new Date(p.creado); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+  return p.inicio || '';
+};
+const initials = (n) => n ? n.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase() : 'NU';
+const last = (a) => (a && a.length ? a[a.length - 1] : null);
+const hoyISO = () => new Date().toISOString().slice(0, 10);
+
+/* ===== mediciones manuales: pliegues (mm) y perímetros (cm) ===== */
+const PLIEGUES = [
+  { k: 'triceps', l: 'Tríceps' },
+  { k: 'subescapular', l: 'Subescapular' },
+  { k: 'supraespinal', l: 'Supraespinal / suprailiaco' },
+  { k: 'abdominal', l: 'Abdominal' },
+  { k: 'muslo', l: 'Muslo' },
+  { k: 'pantorrilla', l: 'Pantorrilla' },
+];
+const PERIMETROS = [
+  { k: 'brazoRelajado', l: 'Brazo relajado' },
+  { k: 'brazoFuerza', l: 'Brazo con fuerza' },
+  { k: 'cintura', l: 'Cintura' },
+  { k: 'abdomen', l: 'Abdomen' },
+  { k: 'cadera', l: 'Cadera' },
+];
+const MANUAL_CAMPOS = [...PLIEGUES, ...PERIMETROS].reduce((o, c) => { o[c.k] = ''; return o; }, {});
+const ANTRO_COLORS = ['var(--gold)', 'var(--stone)', 'var(--sage)', 'var(--danger)', '#5B7C99', '#3E6B5B', '#8E7CC3', '#C98A3F', '#6FA8A0', '#A0522D', '#4A7BA6'];
+
+/* ===== mini gráfica de línea (SVG, sin librerías) ===== */
+function Linea({ data, field, color, unit }) {
+  const valid = (data || []).filter(d => typeof d[field] === 'number');
+  if (valid.length === 0) return <div style={{ fontSize: 12, color: 'var(--stone)', padding: '14px 0', textAlign: 'center' }}>Sin mediciones aún</div>;
+  const w = 340, h = 150, pad = 34;
+  const vals = valid.map(d => d[field]);
+  const min = Math.min(...vals), max = Math.max(...vals), span = (max - min) || 1;
+  const n = valid.length;
+  const X = (i) => n === 1 ? w / 2 : pad + (i * (w - 2 * pad)) / (n - 1);
+  const Y = (v) => h - pad - ((v - min) / span) * (h - 2 * pad);
+  const pts = valid.map((d, i) => `${X(i)},${Y(d[field])}`).join(' ');
+  const fmtVal = (v) => Math.round(v * 10) / 10;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto', display: 'block', fontFamily: 'Montserrat, sans-serif' }}>
+      <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="var(--border)" strokeWidth="1" />
+      {valid.length > 1 && <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />}
+      {valid.map((d, i) => <circle key={i} cx={X(i)} cy={Y(d[field])} r="4" fill={color} />)}
+      {valid.map((d, i) => (
+        <text key={'v' + i} x={X(i)} y={Y(d[field]) - 9} fontSize="12" fontWeight="700" fill={color} textAnchor="middle">{fmtVal(d[field])}{unit}</text>
+      ))}
+      {valid.map((d, i) => (
+        <text key={'x' + i} x={X(i)} y={h - pad + 16} fontSize="11" fill="var(--stone)" textAnchor="middle">{fmtMes(d.fecha)}</text>
+      ))}
+    </svg>
+  );
+}
+
+/* ===== componente principal ===== */
+const RECO_SECCIONES = [
+  { key: 'estudios', titulo: 'Estudios', items: ['Estudio QS35', 'Estudio EGO', 'Estudio BH', 'Estudio perfil tiroideo', 'Estudio insulina en suero', 'Índice HOMA', 'Hemoglobina glucosilada'] },
+  { key: 'suplementos', titulo: 'Suplementos', items: ['Proteína', 'Creatina', 'Vitamina D', 'Omega 3', 'Magnesio', 'Beta-Alanina', 'Cafeína', 'Resveratrol', 'Berberina', 'Colágeno', 'Calcio', 'Hierro'] },
+  { key: 'ejercicio', titulo: 'Ejercicio', items: [{ l: 'Fuerza' }, { l: 'Cardio o funcional' }, { l: 'Tiempo', ins: 'Tiempo: ' }, { l: 'Frecuencia', ins: 'Frecuencia: ' }] },
+  { key: 'hidratacion', titulo: 'Hidratación', items: ['Agua', 'Electrolitos', 'Bebida deportiva'] },
+  { key: 'generales', titulo: 'Generales', items: [] },
+];
+const RECO_KEYS = RECO_SECCIONES.map(s => s.key);
+
+export default function Pacientes({ onRegisterExitGuard, resetToList }) {
+  const [pacientes, setPacientes] = useState([]);
+  const [historias, setHistorias] = useState({}); // { [pacienteId]: historiaClinica }
+  const [selId, setSelId] = useState(null);
+  const [sub, setSub] = useState('dash');
+  const [nuevo, setNuevo] = useState(false);
+  const [busca, setBusca] = useState('');
+  const [orden, setOrden] = useState('alfabetico'); // 'alfabetico' | 'creacion-desc' | 'creacion-asc'
+  const [vistaOpen, setVistaOpen] = useState(false);
+  const [openImport, setOpenImport] = useState(false);
+  const [menuId, setMenuId] = useState(null);
+  const [menuReabrir, setMenuReabrir] = useState(null);
+  // En móvil las gráficas van plegadas por defecto para no tener que hacer scroll
+  // largo hasta la generación del plan; en escritorio se muestran abiertas.
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 640px)');
+    const fn = (e) => setIsMobile(e.matches);
+    mq.addEventListener ? mq.addEventListener('change', fn) : mq.addListener(fn);
+    return () => { mq.removeEventListener ? mq.removeEventListener('change', fn) : mq.removeListener(fn); };
+  }, []);
+  const [graficasAbiertas, setGraficasAbiertas] = useState(() => !(typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches));
+  const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', apego: '' });
+  const [editMed, setEditMed] = useState({ fecha: '', peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', tmb: '' });
+  const [editApego, setEditApego] = useState('');
+  const [openEdit, setOpenEdit] = useState(false);
+  const [openInfo, setOpenInfo] = useState(false);
+  const [infoForm, setInfoForm] = useState({ edad: '', sexo: '', estatura: '', contacto: '', objetivo: '', correo: '' });
+  const [recoPdfMsg, setRecoPdfMsg] = useState('');
+  const [plan, setPlan] = useState({ nombre: '', fecha: hoyISO(), link: '' });
+  const [openMed, setOpenMed] = useState(false);
+  const [openPlan, setOpenPlan] = useState(false);
+  const [inbodyOpen, setInbodyOpen] = useState(false);
+  const [inbody, setInbody] = useState(null);
+  const [recoForm, setRecoForm] = useState({ estudios: '', suplementos: '', ejercicio: '', hidratacion: '', generales: '' });
+  const [hidMlKg, setHidMlKg] = useState(35);
+  const [hidPeso, setHidPeso] = useState('');
+  const [recoAnalisis, setRecoAnalisis] = useState(null);
+  const [recoSup, setRecoSup] = useState([{ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '' }]);
+  const [recoEditIdx, setRecoEditIdx] = useState(null);
+  const [recoChips, setRecoChips] = useState({});
+  const [verHistoria, setVerHistoria] = useState(false);
+  const [verNotas, setVerNotas] = useState(false);
+  const recoFormRef = useRef(null);
+  const recoLoadedForRef = useRef(null);
+  const [bitacoraTexto, setBitacoraTexto] = useState('');
+  const [bitacoraApego, setBitacoraApego] = useState('');
+  // Resumen IA + chat "pregúntale a la IA" del expediente
+  const [resumenBusy, setResumenBusy] = useState(false);
+  const [resumenMsg, setResumenMsg] = useState('');
+  const [chatMsgs, setChatMsgs] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatBusy, setChatBusy] = useState(false);
+  const [isakFile, setIsakFile] = useState(null);
+  const [isakBusy, setIsakBusy] = useState(false);
+  const [estudioFile, setEstudioFile] = useState(null);
+  const [estudioBusy, setEstudioBusy] = useState(false);
+  const [analizandoIdx, setAnalizandoIdx] = useState(null);
+  const [estudioAbierto, setEstudioAbierto] = useState(null);
+  const [archSec, setArchSec] = useState({ plan: false, isak: false, inbody: false, estudios: false });
+  const [panel, setPanel] = useState(null);
+  const [ibFile, setIbFile] = useState(null);
+  const [dragIb, setDragIb] = useState(false);
+  const [ibBusy, setIbBusy] = useState(false);
+  const [ibMsg, setIbMsg] = useState('');
+  const [medMode, setMedMode] = useState('inbody');
+  const [manual, setManual] = useState({ fecha: hoyISO(), ...MANUAL_CAMPOS });
+  const [manualBusy, setManualBusy] = useState(false);
+  const [manualMsg, setManualMsg] = useState('');
+  const [editMM, setEditMM] = useState({ fecha: '', ...MANUAL_CAMPOS });
+  const [openEditMM, setOpenEditMM] = useState(false);
+  const [editMMBusy, setEditMMBusy] = useState(false);
+  const [editMMMsg, setEditMMMsg] = useState('');
+  const [err, setErr] = useState('');
+  const { nutriDueno } = useAuth();   // dueño (multi-inquilino); null si la bandera está apagada
+
+  useEffect(() => {
+    const q = query(collection(db, 'pacientes'), ...filtroDueno(nutriDueno), orderBy('codigo', 'asc'));
+    return onSnapshot(q, snap => setPacientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      e => setErr('No se pudieron cargar los pacientes: ' + e.message));
+  }, [nutriDueno]);
+
+  // Historias clínicas: viven en la colección aparte 'historias' (reglas: SOLO nutrióloga),
+  // para que los datos clínicos y las notas profesionales NO viajen al navegador del paciente
+  // dentro de su documento de 'pacientes'. Se cargan aquí y se adjuntan al paciente en 'sel'.
+  useEffect(() => {
+    return onSnapshot(query(collection(db, 'historias'), ...filtroDueno(nutriDueno)),
+      snap => { const m = {}; snap.docs.forEach(d => { m[d.id] = d.data(); }); setHistorias(m); },
+      () => { /* si las reglas aún no permiten leer historias/, no rompas la vista */ });
+  }, [nutriDueno]);
+
+  // Enlaces rápidos personalizados de recomendaciones (compartidos entre todos los pacientes).
+  useEffect(() => {
+    return onSnapshot(doc(db, 'config', 'recomendaciones'), snap => {
+      const d = snap.exists() ? snap.data() : {};
+      setRecoChips((d && d.chips) || {});
+    }, () => {});
+  }, []);
+
+  // Al abrir un paciente, carga su borrador de recomendaciones una sola vez (sin pisar lo que se esté escribiendo).
+  useEffect(() => {
+    if (!selId) { recoLoadedForRef.current = null; return; }
+    if (recoLoadedForRef.current === selId) return;
+    const p = pacientes.find(x => x.id === selId);
+    if (!p) return;
+    recoLoadedForRef.current = selId;
+    const b = p.recomendacionBorrador || null;
+    setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = (b && b[k]) || ''; return o; }, {}));
+    setRecoAnalisis((b && b.analisis) || null);
+    setRecoSup((b && b.suplementacionTabla && Array.isArray(b.suplementacionTabla.items) && b.suplementacionTabla.items.length)
+      ? b.suplementacionTabla.items.map(x => ({ nombre: x.nombre || '', marca: x.marca || '', dosis: x.dosis || '', frecuencia: x.frecuencia || '', horario: x.horario || '' }))
+      : [{ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '' }]);
+    setRecoEditIdx(null);
+    setHidPeso(''); setHidMlKg(35);
+    setVerHistoria(false);
+    setVerNotas(false);
+  }, [selId, pacientes]);
+
+  const selBase = pacientes.find(p => p.id === selId);
+  // Adjuntamos la historia (de la colección aparte) al paciente seleccionado, para que
+  // Plan, Menús y la vista de historia sigan usando sel.historia igual que antes.
+  // Respaldo: si un paciente aún no está migrado, usa el campo embebido antiguo.
+  const sel = selBase ? { ...selBase, historia: historias[selBase.id] || selBase.historia || null } : undefined;
+
+  // Al cambiar de paciente, limpia el chat y los mensajes del resumen.
+  useEffect(() => { setChatMsgs([]); setChatInput(''); setResumenMsg(''); }, [selId]);
+
+  /* ----- Navegación con historial del navegador (botón Atrás / mouse / gesto) ----- */
+  const navRef = useRef({});
+  navRef.current = { nuevo, selId, sub };
+
+  // Guard de "cambios sin guardar" del hijo activo (Plan/Menús/Historia/Deportivo).
+  // El hijo lo registra vía onGuardChange; lo guardamos aquí para poder consultarlo
+  // también cuando el usuario regresa con el GESTO del trackpad o el botón del navegador
+  // (no solo con el botón "Atrás" dentro de la app).
+  const childGuardRef = useRef(null);
+  const bypassGuardRef = useRef(false);
+  const registerGuard = useCallback((fn) => {
+    childGuardRef.current = fn || null;
+    if (onRegisterExitGuard) onRegisterExitGuard(fn); // sigue avisando a NutriDashboard (cambio de pestaña)
+  }, [onRegisterExitGuard]);
+
+  // Empuja una entrada al historial al entrar a una vista más profunda
+  const pushNav = () => { try { window.history.pushState({ nf: true }, ''); } catch (e) {} };
+  // "Atrás" programático (botón de la app o "Salir" del modal): ya pasó por el guard,
+  // así que marca bypass para que el popstate resultante NO vuelva a preguntar.
+  const volver = () => { bypassGuardRef.current = true; try { window.history.back(); } catch (e) { bypassGuardRef.current = false; } };
+
+  useEffect(() => {
+    const onPop = () => {
+      const doNav = () => {
+        const s = navRef.current;
+        if (s.nuevo) { setNuevo(false); }
+        else if (s.selId && s.sub && s.sub !== 'dash') { setSub('dash'); }
+        else if (s.selId) { setSelId(null); }
+        setMenuId(null); setErr('');
+      };
+      const guard = childGuardRef.current;
+      // Gesto del trackpad / botón del navegador: si hay un hijo con posibles cambios,
+      // cancelamos este "atrás" (re-empujando la entrada) y lo enrutamos por el guard.
+      // Si el hijo no tiene cambios, el guard ejecuta la salida de inmediato; si los tiene,
+      // muestra el modal de "guardar antes de salir" y solo sale al confirmar.
+      if (guard && !bypassGuardRef.current) {
+        try { window.history.pushState({ nf: true }, ''); } catch (e) {}
+        guard(volver);
+      } else {
+        bypassGuardRef.current = false;
+        doNav();
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // Señal desde el menú lateral: al dar clic en "Pacientes" ya estando aquí, regresa al listado.
+  useEffect(() => {
+    if (!resetToList) return; // no corre en el montaje inicial (empieza en 0)
+    setSelId(null); setSub('dash'); setNuevo(false); setMenuId(null); setInbody(null); setMenuReabrir(null); setErr(''); setBusca('');
+  }, [resetToList]);
+
+  const irNuevo = () => { setErr(''); pushNav(); setNuevo(true); };
+  const irSub = (s) => { pushNav(); setPanel(null); setSub(s); };
+
+  const CODE_PREFIX = process.env.REACT_APP_CODE_PREFIX || 'NF-';
+  const nextCodigo = () => {
+    let mx = 0;
+    pacientes.forEach(p => { const m = /(\d+)/.exec(p.codigo || ''); if (m) mx = Math.max(mx, +m[1]); });
+    return CODE_PREFIX + String(mx + 1).padStart(4, '0');
+  };
+
+  const derivar = (h) => {
+    const d = (h && h.datos) || {};
+    const out = {
+      nombre: (d.nombre || '').trim(), edad: d.edad || '', sexo: d.sexo || 'Femenino',
+      estatura: d.talla || '', objetivo: d.objetivo || '', correo: (d.correo || '').trim().toLowerCase(),
+    };
+    const tel = (d.telefono || '').trim();
+    if (tel) out.contacto = tel;
+    return out;
+  };
+
+  // Opción C: copia el sexo (y nombre) al registro de suscriptor, si hay correo vinculado.
+  const mirrorSuscriptor = async (correo, sexo, nombre) => {
+    const c = (correo || '').trim().toLowerCase();
+    if (!c || c.indexOf('@') < 0) return;
+    try {
+      await setDoc(doc(db, 'suscriptores', c), {
+        correo: c,
+        ...(sexo ? { sexo } : {}),
+        ...(nombre ? { nombre } : {}),
+        ...selloDueno(nutriDueno),
+      }, { merge: true });
+    } catch (e) { /* secundario */ }
+  };
+
+  const guardarHistoriaNueva = async (h) => {
+    const der = derivar(h);
+    if (!der.nombre) { setErr('Escribe el nombre en "Datos generales".'); throw new Error('sin nombre'); }
+    // El expediente del paciente NO guarda la historia clínica embebida (así no llega a su navegador).
+    const ref = await addDoc(collection(db, 'pacientes'), {
+      codigo: (h.datos && h.datos.pacienteNo) || nextCodigo(), ...der,
+      inicio: hoyISO(), mediciones: [], planes: [], creado: Date.now(),
+      ...selloDueno(nutriDueno),
+    });
+    // La historia clínica va en la colección aparte 'historias' (solo-nutrióloga).
+    await setDoc(doc(db, 'historias', ref.id), { ...h, ...selloDueno(nutriDueno) });
+    mirrorSuscriptor(der.correo, der.sexo, der.nombre);
+    setNuevo(false); setErr(''); setSelId(ref.id); setSub('dash');
+  };
+
+  const guardarHistoriaExistente = async (h) => {
+    const der = derivar(h);
+    // Datos derivados (nombre, edad, correo…) sí van en pacientes/; la historia clínica, no.
+    await updateDoc(doc(db, 'pacientes', sel.id), { ...der });
+    // La historia clínica va en la colección aparte 'historias' (solo-nutrióloga).
+    await setDoc(doc(db, 'historias', sel.id), { ...h, ...selloDueno(sel.nutriDueno || nutriDueno) });
+    mirrorSuscriptor(der.correo, der.sexo, der.nombre);
+    setErr('');
+  };
+
+  const abrir = (id) => { pushNav(); setSelId(id); setSub('dash'); setInbody(null); setMenuId(null); };
+
+  const eliminar = async (p) => {
+    setMenuId(null);
+    const ok = window.confirm(
+      '¿Eliminar a ' + (p.nombre || 'este paciente') + '?\n\n' +
+      'Se borrará su expediente, mediciones, planes e historia clínica de forma permanente. ' +
+      'Los archivos que ya estén en Google Drive NO se eliminan.'
+    );
+    if (!ok) return;
+    try {
+      await deleteDoc(doc(db, 'pacientes', p.id));
+      // Borra también la historia clínica de la colección aparte (best-effort).
+      try { await deleteDoc(doc(db, 'historias', p.id)); } catch (e2) { /* si no existe, se ignora */ }
+      if (selId === p.id) { setSelId(null); setSub('dash'); }
+      setErr('');
+    } catch (e) { setErr('No se pudo eliminar: ' + e.message); }
+  };
+
+  // Editar los datos de "Información general" (no las mediciones de peso/grasa).
+  const abrirEditarInfo = () => {
+    setInfoForm({
+      edad: (sel.edad === 0 || sel.edad) ? String(sel.edad) : '',
+      sexo: sel.sexo || '',
+      estatura: (sel.estatura === 0 || sel.estatura) ? String(sel.estatura) : '',
+      contacto: sel.contacto || '',
+      objetivo: sel.objetivo || '',
+      correo: sel.correo || '',
+    });
+    setErr(''); setOpenInfo(true);
+  };
+  const guardarInfo = async () => {
+    const correo = (infoForm.correo || '').trim().toLowerCase();
+    const patch = {
+      edad: infoForm.edad === '' ? null : (parseInt(infoForm.edad, 10) || null),
+      sexo: infoForm.sexo || '',
+      estatura: infoForm.estatura === '' ? null : (parseFloat(infoForm.estatura) || null),
+      contacto: infoForm.contacto || '',
+      objetivo: infoForm.objetivo || '',
+      correo: correo,
+    };
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), patch);
+      // Vincula/actualiza la cuenta del paciente (para que vea su plan al entrar con ese correo).
+      if (correo && correo.indexOf('@') >= 0) {
+        try { await setDoc(doc(db, 'suscriptores', correo), { correo, sexo: infoForm.sexo || sel.sexo || '', nombre: sel.nombre || '', ...selloDueno(sel.nutriDueno || nutriDueno) }, { merge: true }); } catch (e) {}
+      }
+      setOpenInfo(false); setErr('');
+    } catch (e) { setErr('No se pudo guardar: ' + e.message); }
+  };
+
+  // Índice de la última nota de bitácora con un % de apego numérico.
+  const lastApegoIdx = (bit) => {
+    const b = bit || [];
+    for (let k = b.length - 1; k >= 0; k--) if (typeof b[k].apego === 'number') return k;
+    return -1;
+  };
+
+  const addMedicion = async () => {
+    if (!med.fecha || !med.peso) { setErr('Fecha y peso son necesarios.'); return; }
+    const num = (x) => (x === '' || x === null || x === undefined || isNaN(+x)) ? undefined : +x;
+    const nm = { fecha: med.fecha, peso: +med.peso, grasa: +med.grasa || 0, musculo: +med.musculo || 0 };
+    if (num(med.grasaKg) !== undefined) nm.grasaKg = +med.grasaKg;
+    if (num(med.visceral) !== undefined) nm.visceral = +med.visceral;
+    if (num(med.agua) !== undefined) nm.agua = +med.agua;
+    const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const updates = { mediciones: arr };
+    // % de apego: agrega un punto nuevo (en bitácora) con la fecha de esta medición.
+    const ap = num(med.apego);
+    if (ap !== undefined) {
+      const ts = new Date(med.fecha + 'T00:00:00').getTime();
+      updates.bitacora = [...(sel.bitacora || []), { texto: '', apego: ap, fecha: isNaN(ts) ? Date.now() : ts }];
+    }
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), updates);
+      setMed({ fecha: hoyISO(), peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', apego: '' }); setOpenMed(false); setErr('');
+    } catch (e) { setErr('No se pudo guardar: ' + e.message); }
+  };
+
+  // Editar la ÚLTIMA medición (corrige una lectura errónea del InBody/PDF).
+  const abrirEditarUltima = () => {
+    const u = last((sel.mediciones || []).slice().sort((a, b) => a.fecha.localeCompare(b.fecha)));
+    if (!u) return;
+    const v = (x) => (x === 0 || x ? String(x) : '');
+    setEditMed({ fecha: u.fecha || hoyISO(), peso: v(u.peso), grasa: v(u.grasa), musculo: v(u.musculo), grasaKg: v(u.grasaKg), visceral: v(u.visceral), agua: v(u.agua), tmb: v(u.tmb) });
+    const ai = lastApegoIdx(sel.bitacora);
+    setEditApego(ai >= 0 ? String(sel.bitacora[ai].apego) : '');
+    setOpenMed(false); setErr(''); setOpenEdit(true);
+  };
+
+  const guardarEditUltima = async () => {
+    if (!editMed.fecha || editMed.peso === '') { setErr('Fecha y peso son necesarios.'); return; }
+    const base = [...(sel.mediciones || [])].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    if (!base.length) { setOpenEdit(false); return; }
+    base.pop(); // quita la última (la más reciente), que es la que estamos editando
+    const num = (x) => (x === '' || x === null || x === undefined || isNaN(+x)) ? undefined : +x;
+    const edited = { fecha: editMed.fecha, peso: +editMed.peso, grasa: +editMed.grasa || 0, musculo: +editMed.musculo || 0 };
+    if (num(editMed.grasaKg) !== undefined) edited.grasaKg = +editMed.grasaKg;
+    if (num(editMed.visceral) !== undefined) edited.visceral = +editMed.visceral;
+    if (num(editMed.agua) !== undefined) edited.agua = +editMed.agua;
+    if (num(editMed.tmb) !== undefined) edited.tmb = +editMed.tmb;
+    const arr = [...base, edited].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const updates = { mediciones: arr };
+    // % de apego: edita el valor más reciente (o lo asigna a la última nota si no hay).
+    const apRaw = (editApego || '').trim();
+    if (apRaw !== '') {
+      const ap = parseFloat(apRaw);
+      if (isFinite(ap)) {
+        const bit = [...(sel.bitacora || [])];
+        const ai = lastApegoIdx(bit);
+        if (ai >= 0) bit[ai] = { ...bit[ai], apego: ap };
+        else if (bit.length) bit[bit.length - 1] = { ...bit[bit.length - 1], apego: ap };
+        else bit.push({ texto: '', apego: ap, fecha: Date.now() });
+        updates.bitacora = bit;
+      }
+    }
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), updates);
+      setOpenEdit(false); setErr('');
+    } catch (e) { setErr('No se pudo guardar: ' + e.message); }
+  };
+
+  const addPlan = async () => {
+    if (!plan.nombre.trim()) { setErr('Escribe el nombre del plan.'); return; }
+    const arr = [...(sel.planes || []), { nombre: plan.nombre.trim(), fecha: plan.fecha || hoyISO(), link: plan.link.trim() }];
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), { planes: arr });
+      setPlan({ nombre: '', fecha: hoyISO(), link: '' }); setOpenPlan(false); setErr('');
+    } catch (e) { setErr('No se pudo guardar: ' + e.message); }
+  };
+
+  const removePlan = async (i) => {
+    const pl = (sel.planes || [])[i];
+    if (!window.confirm('¿Eliminar el plan "' + ((pl && pl.nombre) || 'sin nombre') + '"?\n\nDesaparecerá también de la vista del paciente. (El archivo seguirá en Drive.)')) return;
+    const arr = (sel.planes || []).filter((_, k) => k !== i);
+    const updates = { planes: arr };
+    // Si tiene un menú gemelo en el historial (mismo enlace de Drive), quítalo también.
+    if (pl && pl.link) {
+      const hist = (sel.menusHistorial || []).filter(mh => mh.link !== pl.link);
+      if (hist.length !== (sel.menusHistorial || []).length) updates.menusHistorial = hist;
+    }
+    try { await updateDoc(doc(db, 'pacientes', sel.id), updates); } catch (e) { setErr(e.message); }
+  };
+
+  const removeMenuHistorial = async (idx) => {
+    const mh = (sel.menusHistorial || [])[idx];
+    if (!mh) return;
+    if (!window.confirm('¿Eliminar el menú "' + (mh.nombre || 'sin nombre') + '"?\n\nDesaparecerá de aquí y también del panel del paciente (en "Mis archivos"). El archivo seguirá en Drive.')) return;
+    const hist = (sel.menusHistorial || []).filter((_, k) => k !== idx);
+    const updates = { menusHistorial: hist };
+    // Quita también el plan gemelo que ve el paciente (mismo enlace de Drive).
+    if (mh.link) {
+      const planes = (sel.planes || []).filter(p => p.link !== mh.link);
+      if (planes.length !== (sel.planes || []).length) updates.planes = planes;
+    }
+    try { await updateDoc(doc(db, 'pacientes', sel.id), updates); } catch (e) { setErr(e.message); }
+  };
+
+  const addChipTo = (key, texto) => {
+    const linea = '• ' + texto;
+    setRecoForm(prev => {
+      const cur = prev[key] || '';
+      const lineas = cur ? cur.split('\n') : [];
+      if (lineas.some(x => x.trim() === linea.trim())) return prev; // ya está
+      const base = cur && !cur.endsWith('\n') ? cur + '\n' : cur;
+      return { ...prev, [key]: base + linea + '\n' };
+    });
+  };
+
+  // --- Tabla de suplementos (editable) para la recomendación ---
+  const EMPTY_SUP = () => ({ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '' });
+  const supRowVacia = (r) => !(r && (r.nombre || r.marca || r.dosis || r.frecuencia || r.horario));
+  const setSupCampo = (i, campo, val) => setRecoSup(rows => rows.map((r, k) => k === i ? { ...r, [campo]: val } : r));
+  const addSupFila = (nombre = '') => setRecoSup(rows => [...rows, { ...EMPTY_SUP(), nombre }]);
+  const removeSupFila = (i) => setRecoSup(rows => { const nx = rows.filter((_, k) => k !== i); return nx.length ? nx : [EMPTY_SUP()]; });
+  const supInputStyle = { width: '100%', padding: '5px 7px', fontSize: 12, border: '0.5px solid var(--border)', borderRadius: 6, background: '#fff', color: 'var(--dark)', fontFamily: 'inherit', boxSizing: 'border-box' };
+
+  // "Agregar": guarda un enlace rápido nuevo (compartido) y lo deja listo para usarse.
+  const agregarChip = async (key) => {
+    const txt = (window.prompt('Escribe el enlace rápido que quieres guardar (quedará disponible para futuras recomendaciones):') || '').trim();
+    if (!txt) return;
+    const cur = recoChips[key] || [];
+    if (!cur.some(x => (x || '').toLowerCase() === txt.toLowerCase())) {
+      const next = { ...recoChips, [key]: [...cur, txt] };
+      try {
+        await setDoc(doc(db, 'config', 'recomendaciones'), { chips: next }, { merge: true });
+      } catch (e) { setErr('No se pudo guardar el enlace rápido: ' + e.message); return; }
+    }
+    addChipTo(key, txt); // queda listo y además lo inserta en la recomendación actual
+  };
+
+  const recoSeccionesConContenido = (r) => RECO_SECCIONES
+    .filter(s => (r[s.key] || '').toString().trim())
+    .map(s => ({ titulo: s.titulo, texto: r[s.key] }));
+
+  const guardarBorradorReco = async () => {
+    if (!sel) return;
+    const b = RECO_KEYS.reduce((o, k) => { o[k] = (recoForm[k] || ''); return o; }, {});
+    if (recoAnalisis) b.analisis = recoAnalisis;
+    const supB = recoSup.filter(r => !supRowVacia(r));
+    if (supB.length) b.suplementacionTabla = { items: supB };
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), { recomendacionBorrador: b });
+      setRecoPdfMsg('Borrador guardado ✓');
+    } catch (e) { setRecoPdfMsg('No se pudo guardar el borrador: ' + e.message); }
+  };
+
+  const addReco = async () => {
+    const r = {};
+    RECO_KEYS.forEach(k => { r[k] = (recoForm[k] || '').trim(); });
+    if (recoAnalisis) r.analisis = recoAnalisis;
+    // Tabla de suplementos que la nutrióloga llenó a mano para esta recomendación (viaja con ella y sale en el PDF).
+    const supItems = recoSup.filter(x => !supRowVacia(x));
+    if (supItems.length) r.suplementacionTabla = { items: supItems };
+    if (!RECO_KEYS.some(k => r[k]) && !recoAnalisis && !supItems.length) { setErr('Escribe al menos una recomendación en alguna sección (o llena la tabla de suplementos).'); return; }
+    let arr;
+    if (recoEditIdx != null && (sel.recomendaciones || [])[recoEditIdx]) {
+      // Editar: reemplaza esa recomendación, conservando su fecha original.
+      const orig = sel.recomendaciones[recoEditIdx];
+      arr = (sel.recomendaciones || []).map((x, k) => k === recoEditIdx ? { ...x, ...r, fecha: orig.fecha } : x);
+    } else {
+      arr = [...(sel.recomendaciones || []), { ...r, fecha: Date.now() }];
+    }
+    try {
+      // Al publicar, se limpia el borrador guardado.
+      await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr, recomendacionBorrador: {} });
+      setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = ''; return o; }, {}));
+      setRecoAnalisis(null);
+      setRecoSup([EMPTY_SUP()]);
+      setRecoEditIdx(null);
+      setErr('');
+    } catch (e) { setErr('No se pudo guardar la recomendación: ' + e.message); }
+  };
+
+  const editarReco = (idx) => {
+    const r = (sel.recomendaciones || [])[idx];
+    if (!r) return;
+    setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = r[k] || ''; return o; }, {}));
+    setRecoAnalisis(r.analisis || null);
+    setRecoSup((r.suplementacionTabla && Array.isArray(r.suplementacionTabla.items) && r.suplementacionTabla.items.length)
+      ? r.suplementacionTabla.items.map(x => ({ nombre: x.nombre || '', marca: x.marca || '', dosis: x.dosis || '', frecuencia: x.frecuencia || '', horario: x.horario || '' }))
+      : [EMPTY_SUP()]);
+    setRecoEditIdx(idx);
+    setErr('');
+    setTimeout(() => { try { recoFormRef.current && recoFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 50);
+  };
+
+  const cancelarEdicionReco = () => {
+    setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = ''; return o; }, {}));
+    setRecoAnalisis(null);
+    setRecoSup([EMPTY_SUP()]);
+    setRecoEditIdx(null);
+    setErr('');
+  };
+
+  // Adjunta la tabla de análisis de un estudio al borrador de recomendación actual.
+  const adjuntarAnalisisAReco = (i) => {
+    const est = (sel.estudios || [])[i];
+    if (!est || !est.analisis) { setErr('Primero analiza el estudio.'); return; }
+    setRecoAnalisis({
+      tipo: est.analisis.tipo || '', fecha: est.analisis.fecha || '',
+      fueraDeRango: est.analisis.fueraDeRango || [],
+      dentroDeRango: est.analisis.dentroDeRango || 0,
+      valores: est.analisis.valores || [],
+    });
+    setPanel('reco');
+    setRecoPdfMsg('Tabla de análisis adjuntada a la recomendación. Publícala o genera el PDF para incluirla.');
+    setTimeout(() => { try { recoFormRef.current && recoFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 60);
+  };
+
+  const removeReco = async (i) => {
+    if (!window.confirm('¿Eliminar esta recomendación?')) return;
+    const arr = (sel.recomendaciones || []).filter((_, k) => k !== i);
+    try { await updateDoc(doc(db, 'pacientes', sel.id), { recomendaciones: arr }); } catch (e) { setErr(e.message); }
+  };
+
+  const generarPDFReco = async (reco) => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setRecoPdfMsg('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales || reco.analisis)) { setRecoPdfMsg('No hay recomendación para generar el PDF.'); return; }
+    setRecoPdfMsg('Generando PDF…');
+    try {
+      const perfil = await cargarPerfilPdf(db, sel && sel.nutriDueno);
+      const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: Date.now(), suplementacion: reco.suplementacionTabla || null, perfil });
+      const fechaImp = hoyISO(); // fecha de impresión (AAAA-MM-DD)
+      const filename = `Recomendacion_${(sel.nombre || 'paciente').replace(/[^\w-]+/g, '_')}_${fechaImp}.pdf`;
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveRecomendaciones', patient: sel.nombre || 'Paciente', correo: sel.correo || '', filename, html }),
+        redirect: 'follow',
+      });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: 'Respuesta no válida del servidor.' }; }
+      if (!d.ok || !d.link) throw new Error(d.error || 'No se recibió el enlace del PDF.');
+      setRecoPdfMsg('PDF generado y guardado en Drive ✓');
+      window.open(d.link, '_blank', 'noopener');
+    } catch (e) {
+      setRecoPdfMsg('No se pudo generar: ' + e.message);
+    }
+  };
+
+  // Vista previa del documento tal como lo verá el paciente (mismo HTML que se
+  // convierte en PDF), abierta en una pestaña nueva. NO envía correo ni toca Drive:
+  // es solo para revisar desde el perfil del nutriólogo.
+  const abrirReco = async (reco) => {
+    if (!reco || !(reco.texto || reco.estudios || reco.suplementos || reco.ejercicio || reco.hidratacion || reco.generales || reco.analisis)) {
+      setRecoPdfMsg('No hay recomendación para previsualizar.'); return;
+    }
+    const win = window.open('', '_blank');   // abrir ANTES del await, para no gatillar el bloqueador de popups
+    const perfil = await cargarPerfilPdf(db, sel && sel.nutriDueno);
+    const html = buildRecomendacionesHTML({ nombre: sel.nombre, recomendaciones: [reco], fecha: reco.fecha || Date.now(), suplementacion: reco.suplementacionTabla || null, perfil });
+    if (win) { win.document.open(); win.document.write(html); win.document.close(); }
+    else { window.open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank', 'noopener'); }
+  };
+
+  // Contexto del paciente que se manda a la IA (resumen y chat).
+  const construirContextoIA = () => ({
+    nombre: sel.nombre, edad: sel.edad, sexo: sel.sexo, estatura: sel.estatura,
+    objetivo: sel.objetivo, inicio: sel.inicio,
+    mediciones: (sel.mediciones || []).slice().sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).slice(-8),
+    apego: bitacoraToApego(sel.bitacora).slice(-8),
+    bitacora: (sel.bitacora || []).slice(-6).map(b => ({ fecha: b.fecha, texto: b.texto, apego: b.apego })),
+    historia: sel.historia || null,
+    recomendaciones: (sel.recomendaciones || []).slice(-3),
+    planes: (sel.planes || []).map(p => ({ nombre: p.nombre, fecha: p.fecha })),
+  });
+
+  // Genera (o actualiza) el resumen IA y lo guarda en el documento del paciente.
+  const generarResumen = async () => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setResumenMsg('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    if (!sel) return;
+    setResumenBusy(true); setResumenMsg('');
+    try {
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'resumenPacienteIA', contexto: construirContextoIA() }),
+        redirect: 'follow',
+      });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = null; }
+      if (d && d.ok && d.resumen) {
+        await updateDoc(doc(db, 'pacientes', sel.id), { resumenIA: { ...d.resumen, fecha: Date.now() } });
+      } else {
+        setResumenMsg('No se pudo generar el resumen: ' + ((d && d.error) || 'error desconocido') + '.');
+      }
+    } catch (e) { setResumenMsg('No se pudo generar: ' + e.message); }
+    setResumenBusy(false);
+  };
+
+  // Chat "pregúntale a la IA sobre este paciente".
+  const preguntarIA = async () => {
+    const q = (chatInput || '').trim();
+    if (!q || chatBusy || !sel) return;
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    const previos = chatMsgs.slice(-6);
+    setChatMsgs(m => [...m, { rol: 'nutri', texto: q }]);
+    setChatInput('');
+    if (!url) { setChatMsgs(m => [...m, { rol: 'ia', texto: 'Falta configurar la conexión con el servicio de IA.' }]); return; }
+    setChatBusy(true);
+    try {
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'preguntarPacienteIA', contexto: construirContextoIA(), pregunta: q, historial: previos }),
+        redirect: 'follow',
+      });
+      let d; try { d = JSON.parse(await res.text()); } catch (_) { d = null; }
+      const resp = (d && d.ok && d.respuesta) ? d.respuesta : ('No se pudo responder: ' + ((d && d.error) || 'error desconocido') + '.');
+      setChatMsgs(m => [...m, { rol: 'ia', texto: resp }]);
+    } catch (e) {
+      setChatMsgs(m => [...m, { rol: 'ia', texto: 'No se pudo responder: ' + e.message }]);
+    }
+    setChatBusy(false);
+  };
+
+  const addBitacora = async () => {
+    const t = bitacoraTexto.trim();
+    if (!t) { setErr('Escribe la nota de la consulta.'); return; }
+    const entry = { texto: t, fecha: Date.now() };
+    const ap = parseFloat(bitacoraApego);
+    if (isFinite(ap)) entry.apego = ap;
+    const arr = [...(sel.bitacora || []), entry];
+    try {
+      await updateDoc(doc(db, 'pacientes', sel.id), { bitacora: arr });
+      setBitacoraTexto(''); setBitacoraApego(''); setErr('');
+    } catch (e) { setErr('No se pudo guardar la nota: ' + e.message); }
+  };
+
+  const removeBitacora = async (i) => {
+    if (!window.confirm('¿Eliminar esta nota de la bitácora?')) return;
+    const arr = (sel.bitacora || []).filter((_, k) => k !== i);
+    try { await updateDoc(doc(db, 'pacientes', sel.id), { bitacora: arr }); } catch (e) { setErr(e.message); }
+  };
+
+  const subirIsak = async () => {
+    if (!isakFile) { setErr('Selecciona el PDF del reporte ISAK.'); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setErr('No está configurada la conexión para subir archivos.'); return; }
+    setIsakBusy(true); setErr('');
+    try {
+      const b64 = await fileToBase64(isakFile);
+      const fecha = hoyISO();
+      const filename = 'ISAK_' + (sel.codigo || '') + '_' + fecha + '.pdf';
+      const resp = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveISAK', patient: sel.nombre, correo: (sel.correo || ''), filename, pdfBase64: b64 }),
+        redirect: 'follow',
+      });
+      const data = await resp.json().catch(() => null);
+      if (!data || !data.ok || !data.link) throw new Error((data && data.error) || 'No se recibió el enlace del archivo.');
+      const arr = [...(sel.isak || []), { nombre: data.filename || filename, fecha, link: data.link }];
+      await updateDoc(doc(db, 'pacientes', sel.id), { isak: arr });
+      setIsakFile(null); setErr('');
+    } catch (e) { setErr('No se pudo cargar el reporte ISAK: ' + e.message); }
+    setIsakBusy(false);
+  };
+
+  const removeIsak = async (i) => {
+    if (!window.confirm('¿Quitar este reporte de la lista? (El archivo seguirá en Drive.)')) return;
+    const arr = (sel.isak || []).filter((_, k) => k !== i);
+    try { await updateDoc(doc(db, 'pacientes', sel.id), { isak: arr }); } catch (e) { setErr(e.message); }
+  };
+
+  const removeInbodyArchivo = async (i) => {
+    if (!window.confirm('¿Quitar este archivo de InBody de la lista?\n\nDesaparecerá también de la vista del paciente. (El archivo seguirá en Drive y la medición de las gráficas no se toca.)')) return;
+    const arr = (sel.inbodyArchivos || []).filter((_, k) => k !== i);
+    try { await updateDoc(doc(db, 'pacientes', sel.id), { inbodyArchivos: arr }); } catch (e) { setErr(e.message); }
+  };
+
+  const subirEstudio = async () => {
+    if (!estudioFile) { setErr('Selecciona el archivo del estudio (PDF o imagen).'); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setErr('No está configurada la conexión para subir archivos.'); return; }
+    setEstudioBusy(true); setErr('');
+    try {
+      const b64 = await fileToBase64(estudioFile);
+      const fecha = hoyISO();
+      const ext = (estudioFile.name.split('.').pop() || 'pdf').toLowerCase();
+      const filename = 'Estudio_' + (sel.codigo || '') + '_' + fecha + '.' + ext;
+      const resp = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveEstudio', patient: sel.nombre, correo: (sel.correo || ''), filename, mime: estudioFile.type || 'application/pdf', fileBase64: b64 }),
+        redirect: 'follow',
+      });
+      const data = await resp.json().catch(() => null);
+      if (!data || !data.ok || !data.link) throw new Error((data && data.error) || 'No se recibió el enlace del archivo.');
+      const arr = [...(sel.estudios || []), { nombre: estudioFile.name || filename, fecha, link: data.link, fileId: data.fileId || '' }];
+      await updateDoc(doc(db, 'pacientes', sel.id), { estudios: arr });
+      setEstudioFile(null); setErr('');
+    } catch (e) { setErr('No se pudo cargar el estudio: ' + e.message); }
+    setEstudioBusy(false);
+  };
+
+  const removeEstudio = async (i) => {
+    if (!window.confirm('¿Quitar este estudio de la lista? (El archivo seguirá en Drive.)')) return;
+    const arr = (sel.estudios || []).filter((_, k) => k !== i);
+    try { await updateDoc(doc(db, 'pacientes', sel.id), { estudios: arr }); } catch (e) { setErr(e.message); }
+  };
+
+  const analizarEstudio = async (i) => {
+    const est = (sel.estudios || [])[i];
+    if (!est) return;
+    if (!est.fileId && !est.link) { setErr('Este estudio no tiene archivo asociado para analizar.'); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setErr('No está configurada la conexión para analizar archivos.'); return; }
+    setAnalizandoIdx(i); setErr('');
+    try {
+      const resp = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'analizarEstudio', fileId: est.fileId || '', link: est.link || '' }),
+        redirect: 'follow',
+      });
+      const data = await resp.json().catch(() => null);
+      if (!data || !data.ok) throw new Error((data && data.error) || 'No se pudo analizar el estudio.');
+      const analisis = {
+        fecha: data.fecha || '', tipo: data.tipo || '',
+        valores: data.valores || [], fueraDeRango: data.fueraDeRango || [],
+        dentroDeRango: data.dentroDeRango || 0, generadoEn: data.generadoEn || new Date().toISOString(),
+      };
+      const arr = (sel.estudios || []).map((r, k) => (k === i ? { ...r, analisis } : r));
+      await updateDoc(doc(db, 'pacientes', sel.id), { estudios: arr });
+      setEstudioAbierto(i);
+    } catch (e) {
+      setErr('No se pudo analizar el estudio: ' + e.message);
+    }
+    setAnalizandoIdx(null);
+  };
+
+  const archHeader = (id, titulo) => (
+    <button type="button" onClick={() => setArchSec(s => ({ ...s, [id]: !s[id] }))} style={S.archHead}>
+      <span>{titulo}</span>
+      <span style={{ display: 'inline-block', transition: 'transform .15s', transform: archSec[id] ? 'rotate(90deg)' : 'none', fontSize: 12 }}>▸</span>
+    </button>
+  );
+
+  const leerYGuardarInBody = async (fileArg) => {
+    const file = (fileArg && fileArg.name) ? fileArg : ibFile;
+    if (!file) { setErr('Selecciona el archivo del InBody (PDF o imagen).'); return; }
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    if (!url) { setErr('Falta la configuración del servidor (REACT_APP_APPSCRIPT_URL).'); return; }
+    setIbBusy(true); setErr(''); setIbMsg('Leyendo el InBody con IA… (puede tardar unos segundos)');
+    try {
+      const b64 = await fileToBase64(file);
+      const IB_EXT = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+      const ibExt = IB_EXT[(file.type || '').toLowerCase()] || ((file.name || '').split('.').pop() || 'pdf').toLowerCase();
+      const filename = 'InBody_' + (sel.codigo || '') + '_' + hoyISO() + '.' + ibExt;
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'leerInBody', patient: sel.nombre, correo: (sel.correo || ''), filename, pdfBase64: b64, mime: file.type || '' }),
+        redirect: 'follow',
+      });
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = null; }
+      // El backend puede devolver los valores planos (data.peso…) o dentro de data.datos; aceptamos ambos.
+      const d = (data && data.ok) ? (data.datos || data) : null;
+      if (d && (parseFloat(d.peso) || parseFloat(d.grasa) || parseFloat(d.mme) || parseFloat(d.tmb))) {
+        const nm = {
+          fecha: (d.fecha && /^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) ? d.fecha : hoyISO(),
+          peso: parseFloat(d.peso) || 0,
+          grasa: parseFloat(d.grasa) || 0,
+          musculo: parseFloat(d.mme) || 0,
+          grasaKg: parseFloat(d.grasaKg) || 0,
+          visceral: parseFloat(d.visceral) || 0,
+          agua: parseFloat(d.agua) || 0,
+          tmb: parseFloat(d.tmb) || 0,
+        };
+        const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
+        const updates = { mediciones: arr };
+        // La estatura (Altura del InBody) alimenta el cálculo del plan. Se guarda solo si el paciente aún no tiene una.
+        const tallaIB = parseFloat(d.talla) || 0;
+        if (tallaIB > 0 && !(parseFloat(sel.estatura) > 0)) updates.estatura = tallaIB;
+        if (data.link) updates.inbodyArchivos = [...(sel.inbodyArchivos || []), { nombre: data.filename || filename, fecha: nm.fecha, link: data.link }];
+        await updateDoc(doc(db, 'pacientes', sel.id), updates);
+        setIbFile(null);
+        setIbMsg('InBody leído y guardado ✓ — revisa los valores en las gráficas y, si algo quedó mal, usa “Editar última” en Gráficas de avance.');
+      } else {
+        // La lectura falló; si el PDF alcanzó a guardarse, al menos registramos el archivo.
+        if (data && data.link) {
+          await updateDoc(doc(db, 'pacientes', sel.id), { inbodyArchivos: [...(sel.inbodyArchivos || []), { nombre: data.filename || 'InBody', fecha: hoyISO(), link: data.link }] });
+        }
+        setIbMsg('');
+        setErr('No se pudo leer el InBody automáticamente: ' + ((data && data.error) || 'intenta con un archivo más nítido.'));
+      }
+    } catch (e) {
+      setIbMsg('');
+      setErr('No se pudo procesar el InBody: ' + e.message);
+    }
+    setIbBusy(false);
+  };
+
+  const guardarMedicionManual = async () => {
+    const numOrU = (s) => { const v = parseFloat(s); return isNaN(v) ? undefined : v; };
+    const entry = { fecha: manual.fecha || hoyISO() };
+    let algo = false;
+    [...PLIEGUES, ...PERIMETROS].forEach(({ k }) => { const v = numOrU(manual[k]); if (v !== undefined) { entry[k] = v; algo = true; } });
+    if (!algo) { setManualMsg('Escribe al menos un valor antes de guardar.'); return; }
+    if (PLIEGUES.some(({ k }) => typeof entry[k] === 'number')) {
+      const suma = PLIEGUES.reduce((a, { k }) => a + (typeof entry[k] === 'number' ? entry[k] : 0), 0);
+      entry.suma6 = Math.round(suma * 10) / 10;
+    }
+    setManualBusy(true); setManualMsg('');
+    try {
+      const arr = [...(sel.medicionesManual || []), entry].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+      await updateDoc(doc(db, 'pacientes', sel.id), { medicionesManual: arr });
+      setManual({ fecha: hoyISO(), ...MANUAL_CAMPOS });
+      setManualMsg('Medición guardada ✓ — revísala en las gráficas de pliegues y perímetros.');
+    } catch (e) { setManualMsg('No se pudo guardar: ' + e.message); }
+    setManualBusy(false);
+  };
+
+  // Editar la ULTIMA medicion manual (pliegues y perimetros).
+  const abrirEditarUltimaMM = () => {
+    const u = last((sel.medicionesManual || []).slice().sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '')));
+    if (!u) return;
+    const v = (x) => (x === 0 || x ? String(x) : '');
+    const campos = {};
+    [...PLIEGUES, ...PERIMETROS].forEach(({ k }) => { campos[k] = v(u[k]); });
+    setEditMM({ fecha: u.fecha || hoyISO(), ...campos });
+    setEditMMMsg(''); setOpenEditMM(true);
+  };
+
+  const guardarEditUltimaMM = async () => {
+    const numOrU = (str) => { const val = parseFloat(str); return isNaN(val) ? undefined : val; };
+    const entry = { fecha: editMM.fecha || hoyISO() };
+    let algo = false;
+    [...PLIEGUES, ...PERIMETROS].forEach(({ k }) => { const val = numOrU(editMM[k]); if (val !== undefined) { entry[k] = val; algo = true; } });
+    if (!algo) { setEditMMMsg('Escribe al menos un valor antes de guardar.'); return; }
+    if (PLIEGUES.some(({ k }) => typeof entry[k] === 'number')) {
+      const suma = PLIEGUES.reduce((a, { k }) => a + (typeof entry[k] === 'number' ? entry[k] : 0), 0);
+      entry.suma6 = Math.round(suma * 10) / 10;
+    }
+    const base = [...(sel.medicionesManual || [])].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+    if (!base.length) { setOpenEditMM(false); return; }
+    base.pop(); // quita la ultima (la mas reciente), que es la que estamos editando
+    setEditMMBusy(true); setEditMMMsg('');
+    try {
+      const arr = [...base, entry].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+      await updateDoc(doc(db, 'pacientes', sel.id), { medicionesManual: arr });
+      setOpenEditMM(false);
+      setEditMMMsg('Ultima medicion actualizada - revisala en las graficas.');
+    } catch (e) { setEditMMMsg('No se pudo guardar: ' + e.message); }
+    setEditMMBusy(false);
+  };
+
+  const onInBody = async (data) => {
+    const peso = parseFloat(data.peso);
+    if (isFinite(peso)) {
+      const nm = { fecha: data.fecha || hoyISO(), peso, grasa: parseFloat(data.grasa) || 0, musculo: parseFloat(data.mme) || 0, grasaKg: parseFloat(data.grasaKg) || 0, tmb: parseFloat(data.tmb) || 0 };
+      const arr = [...(sel.mediciones || []), nm].sort((a, b) => a.fecha.localeCompare(b.fecha));
+      try { await updateDoc(doc(db, 'pacientes', sel.id), { mediciones: arr }); }
+      catch (e) { setErr('No se pudo guardar la medición: ' + e.message); }
+    }
+    setInbody({ peso: data.peso, grasa: data.grasa, mme: data.mme, tmb: data.tmb, fecha: data.fecha });
+    setInbodyOpen(false);
+    irSub('plan');
+  };
+
+  const S = styles;
+
+  /* ----- VISTA: historia clínica (alta de paciente nuevo) ----- */
+  if (nuevo) {
+    return <HistoriaClinica codigo={nextCodigo()} onSave={guardarHistoriaNueva} onBack={volver} onGuardChange={registerGuard} />;
+  }
+  /* ----- VISTA: historia clínica de un paciente existente ----- */
+  if (sel && sub === 'historia') {
+    return <HistoriaClinica initial={sel.historia} codigo={sel.codigo} onSave={guardarHistoriaExistente} onBack={volver} onGuardChange={registerGuard} />;
+  }
+
+  /* ----- VISTA: dashboard de un paciente ----- */
+  if (sel) {
+    const m = last(sel.mediciones);
+    const mm = last(sel.medicionesManual);
+    const sumaManual = PLIEGUES.reduce((a, p) => { const v = parseFloat(manual[p.k]); return a + (isNaN(v) ? 0 : v); }, 0);
+    const hayPliegueManual = PLIEGUES.some(p => !isNaN(parseFloat(manual[p.k])));
+    const manualMasculino = /masc|hombre|var[oó]n|^m$/i.test((sel.sexo || '').trim());
+    const umbralPliegues = manualMasculino ? 50 : 30;
+    // Apego = promedio de los % diarios que el paciente registró con el contador
+    // de equivalencias, entre una consulta y otra (respaldo: apego manual de bitácora).
+    const apegoData = apegoPorPeriodo(sel.mediciones, sel.seguimientoEq, sel.bitacora);
+    const ultApego = apegoData.length ? apegoData[apegoData.length - 1].apego : null;
+    if (sub === 'plan') {
+      // La talla/edad/sexo alimentan el cálculo. Viven en el campo de nivel superior,
+      // pero para pacientes importados quedaron solo en la historia clínica: se toma de ahí como respaldo.
+      const hd = (sel.historia && sel.historia.datos) || {};
+      const tallaFb = (sel.estatura === 0 || sel.estatura) ? sel.estatura : (hd.talla || '');
+      const edadFb = (sel.edad === 0 || sel.edad) ? sel.edad : (hd.edad || '');
+      const sexoFb = sel.sexo || hd.sexo || 'Femenino';
+      const pdata = inbody
+        ? { peso: inbody.peso || (m ? m.peso : ''), talla: tallaFb, edad: edadFb, sexo: sexoFb, grasa: inbody.grasa || (m ? m.grasa : ''), tmb: inbody.tmb || '' }
+        : { peso: m ? m.peso : '', talla: tallaFb, edad: edadFb, sexo: sexoFb, grasa: m ? m.grasa : '', tmb: (m && m.tmb) || '' };
+      return <Plan patient={sel} pdata={pdata} onBack={volver} onGuardChange={registerGuard} />;
+    }
+    if (sub === 'menus') {
+      return <Menus key={menuReabrir ? ('h-' + (menuReabrir.fecha || '') + (menuReabrir.nombre || '')) : 'actual'} patient={sel} onBack={volver} initialMenus={menuReabrir} onGuardChange={registerGuard} />;
+    }
+    if (sub === 'deportivo') {
+      return <PlanDeportivo patient={sel} onBack={volver} onGuardChange={registerGuard} />;
+    }
+    return (
+      <div>
+        {err && <div style={S.err}>{err}</div>}
+
+        <button style={S.back} onClick={volver}>← Atrás</button>
+
+        <div className="card">
+          <div style={S.headRow}>
+            <div className="pac-avatar">{initials(sel.nombre)}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--dark)' }}>{sel.nombre}</div>
+              <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 2 }}>{sel.codigo} · {sel.objetivo || 'sin objetivo'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Resumen para la consulta (IA) */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="card-title" style={{ margin: 0 }}>Resumen para la consulta</div>
+              <span style={{ background: '#fff', border: '1px solid var(--gold)', color: 'var(--gold)', borderRadius: 7, fontSize: 10, fontWeight: 800, padding: '2px 7px', letterSpacing: '0.3px' }}>IA ✦</span>
+            </div>
+            {sel.resumenIA && !resumenBusy && (
+              <button style={S.smallBtn} onClick={generarResumen}>Actualizar</button>
+            )}
+          </div>
+
+          {resumenBusy ? (
+            <div style={{ padding: '18px 6px', textAlign: 'center', color: 'var(--stone)', fontSize: 13 }}>Generando resumen…</div>
+          ) : sel.resumenIA ? (
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--stone)', margin: '4px 0 10px' }}>
+                Generado el {(() => { try { return new Date(sel.resumenIA.fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return '—'; } })()}
+              </div>
+              {[['Cómo llega', sel.resumenIA.estado], ['Evolución', sel.resumenIA.evolucion], ['Adherencia', sel.resumenIA.adherencia]]
+                .filter(x => x[1]).map(([l, t], i) => (
+                  <div key={i} style={{ marginTop: 11 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>{l}</div>
+                    <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--dark)' }}>{t}</div>
+                  </div>
+                ))}
+              {Array.isArray(sel.resumenIA.clave) && sel.resumenIA.clave.length > 0 && (
+                <div style={{ marginTop: 11 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>Puntos clave</div>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>{sel.resumenIA.clave.map((x, i) => <li key={i} style={{ fontSize: 13.5, lineHeight: 1.5, marginBottom: 3 }}>{x}</li>)}</ul>
+                </div>
+              )}
+              {sel.resumenIA.ultimaConsulta && (
+                <div style={{ marginTop: 11 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>Última consulta</div>
+                  <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--dark)' }}>{sel.resumenIA.ultimaConsulta}</div>
+                </div>
+              )}
+              {Array.isArray(sel.resumenIA.revisar) && sel.resumenIA.revisar.length > 0 && (
+                <div style={{ background: '#F4F8F6', border: '1px solid #d9e7e0', borderRadius: 11, padding: '10px 12px', marginTop: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: '#3E6B5B', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>A revisar hoy</div>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>{sel.resumenIA.revisar.map((x, i) => <li key={i} style={{ fontSize: 13.5, lineHeight: 1.5, marginBottom: 3 }}>{x}</li>)}</ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px 8px', textAlign: 'center' }}>
+              <div style={{ fontSize: 24 }} aria-hidden>📝</div>
+              <div style={{ fontSize: 13, color: 'var(--stone)', lineHeight: 1.5, maxWidth: 440 }}>Aún no has generado el resumen de este paciente. Genéralo antes de la consulta para ponerte al día en segundos.</div>
+              <button style={S.saveBtn} onClick={generarResumen}>Generar resumen</button>
+            </div>
+          )}
+          {resumenMsg && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 10 }}>{resumenMsg}</div>}
+        </div>
+
+        {/* Pregúntale a la IA sobre este paciente */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="card-title" style={{ margin: 0 }}>Pregúntale a la IA sobre este paciente</div>
+              <span style={{ background: '#fff', border: '1px solid var(--gold)', color: 'var(--gold)', borderRadius: 7, fontSize: 10, fontWeight: 800, padding: '2px 7px', letterSpacing: '0.3px' }}>IA ✦</span>
+            </div>
+            <span style={{ background: 'rgba(154,185,173,0.18)', border: '1px solid #cfe0d8', color: '#3E6B5B', borderRadius: 999, fontSize: 9.5, fontWeight: 800, padding: '2px 8px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>solo usa el expediente</span>
+          </div>
+          {chatMsgs.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12 }}>
+              {chatMsgs.map((mensaje, i) => (
+                <div key={i} style={{ maxWidth: '88%', padding: '9px 12px', borderRadius: 13, fontSize: 13.5, lineHeight: 1.5,
+                  alignSelf: mensaje.rol === 'nutri' ? 'flex-end' : 'flex-start',
+                  background: mensaje.rol === 'nutri' ? 'var(--gold)' : '#F4F1EC',
+                  color: mensaje.rol === 'nutri' ? '#fff' : 'var(--dark)',
+                  border: mensaje.rol === 'nutri' ? 'none' : '1px solid var(--border)' }}>
+                  {mensaje.rol === 'ia' && <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>IA</div>}
+                  {mensaje.texto}
+                </div>
+              ))}
+              {chatBusy && <div style={{ alignSelf: 'flex-start', fontSize: 12.5, color: 'var(--stone)', padding: '4px 2px' }}>La IA está revisando el expediente…</div>}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <input style={{ ...S.inp, flex: 1 }} value={chatInput} onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') preguntarIA(); }} placeholder="Escribe tu pregunta sobre el paciente…" />
+            <button style={S.saveBtn} onClick={preguntarIA} disabled={chatBusy || !chatInput.trim()}>Enviar</button>
+          </div>
+        </div>
+
+        <div style={S.metricGrid}>
+          <div style={S.metric}><div style={S.metricLbl}>Peso actual</div><div style={S.metricVal}>{m ? m.peso : '—'}<span style={S.metricUnit}> kg</span></div></div>
+          <div style={S.metric}><div style={S.metricLbl}>% de grasa</div><div style={S.metricVal}>{m ? m.grasa : '—'}<span style={S.metricUnit}> %</span></div></div>
+          <div style={S.metric}><div style={S.metricLbl}>Masa muscular</div><div style={S.metricVal}>{m ? m.musculo : '—'}<span style={S.metricUnit}> kg</span></div></div>
+        </div>
+
+        <div className="card">
+          <div style={S.titleRow}>
+            <div className="card-title" style={{ margin: 0 }}>Información general</div>
+            <button style={S.smallBtn} onClick={openInfo ? () => setOpenInfo(false) : abrirEditarInfo}>{openInfo ? 'Cancelar' : 'Editar'}</button>
+          </div>
+          {openInfo ? (
+            <div style={S.formRow}>
+              <Field l="Edad (años)"><input style={S.inp} inputMode="numeric" value={infoForm.edad} onChange={e => setInfoForm({ ...infoForm, edad: e.target.value })} /></Field>
+              <Field l="Sexo">
+                <select style={S.inp} value={infoForm.sexo} onChange={e => setInfoForm({ ...infoForm, sexo: e.target.value })}>
+                  <option value="">—</option>
+                  <option value="Femenino">Femenino</option>
+                  <option value="Masculino">Masculino</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </Field>
+              <Field l="Estatura (cm)"><input style={S.inp} inputMode="decimal" value={infoForm.estatura} onChange={e => setInfoForm({ ...infoForm, estatura: e.target.value })} /></Field>
+              <Field l="Número telefónico"><input style={S.inp} inputMode="tel" value={infoForm.contacto} onChange={e => setInfoForm({ ...infoForm, contacto: e.target.value })} /></Field>
+              <Field l="Objetivo"><input style={S.inp} value={infoForm.objetivo} onChange={e => setInfoForm({ ...infoForm, objetivo: e.target.value })} /></Field>
+              <label style={{ ...S.field, gridColumn: '1 / -1' }}><span style={S.fieldLbl}>Correo del paciente (para su acceso)</span>
+                <input style={S.inp} value={infoForm.correo} onChange={e => setInfoForm({ ...infoForm, correo: e.target.value })} placeholder="correo@gmail.com" inputMode="email" /></label>
+              <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--stone)', marginTop: -4, lineHeight: 1.5 }}>Debe ser el mismo de su cuenta de Google; con ese correo el paciente verá su plan al iniciar sesión.</div>
+              <button style={S.saveBtn} onClick={guardarInfo}>Guardar cambios</button>
+            </div>
+          ) : (
+            <div style={S.infoGrid}>
+              <Info l="Edad" v={sel.edad ? sel.edad + ' años' : '—'} />
+              <Info l="Sexo" v={sel.sexo || '—'} />
+              <Info l="Estatura" v={sel.estatura ? sel.estatura + ' cm' : '—'} />
+              <Info l="Inicio" v={sel.inicio ? fmtFecha(sel.inicio) : '—'} />
+              <Info l="Número telefónico" v={sel.contacto || '—'} />
+              <Info l="Objetivo" v={sel.objetivo || '—'} />
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Info l="Correo del paciente (acceso a su cuenta)" v={sel.correo || 'Sin vincular'} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <SaldoConsultas patient={sel} key={'saldo-' + sel.id} />
+
+        <div className="card">
+          <div style={S.titleRow}>
+            <div onClick={() => setGraficasAbiertas(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1, minWidth: 0 }} title={graficasAbiertas ? 'Ocultar gráficas' : 'Ver gráficas'}>
+              <div className="card-title" style={{ margin: 0 }}>Gráficas de avance</div>
+              <span style={graficasAbiertas ? S.chevOpen : S.chev}>⌄</span>
+            </div>
+            {graficasAbiertas && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {m && <button style={S.smallBtn} onClick={openEdit ? () => setOpenEdit(false) : abrirEditarUltima}>{openEdit ? 'Cancelar' : 'Editar última'}</button>}
+                <button style={S.smallBtn} onClick={() => { setOpenEdit(false); setOpenMed(v => !v); }}>{openMed ? 'Cancelar' : '+ Medición'}</button>
+              </div>
+            )}
+          </div>
+          {graficasAbiertas && openMed && (
+            <div style={S.formRow}>
+              <Field l="Fecha"><input type="date" style={S.inp} value={med.fecha} onChange={e => setMed({ ...med, fecha: e.target.value })} /></Field>
+              <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={med.peso} onChange={e => setMed({ ...med, peso: e.target.value })} /></Field>
+              <Field l="% grasa"><input style={S.inp} inputMode="decimal" value={med.grasa} onChange={e => setMed({ ...med, grasa: e.target.value })} /></Field>
+              <Field l="Músculo (kg)"><input style={S.inp} inputMode="decimal" value={med.musculo} onChange={e => setMed({ ...med, musculo: e.target.value })} /></Field>
+              <Field l="Masa grasa (kg)"><input style={S.inp} inputMode="decimal" value={med.grasaKg} onChange={e => setMed({ ...med, grasaKg: e.target.value })} /></Field>
+              <Field l="Grasa visceral"><input style={S.inp} inputMode="decimal" value={med.visceral} onChange={e => setMed({ ...med, visceral: e.target.value })} /></Field>
+              <Field l="Agua (L)"><input style={S.inp} inputMode="decimal" value={med.agua} onChange={e => setMed({ ...med, agua: e.target.value })} /></Field>
+              <Field l="% apego al plan"><input style={S.inp} inputMode="decimal" value={med.apego} onChange={e => setMed({ ...med, apego: e.target.value })} placeholder="Ej. 100" /></Field>
+              <button style={S.saveBtn} onClick={addMedicion}>Guardar</button>
+            </div>
+          )}
+          {graficasAbiertas && openEdit && (
+            <div style={S.formRow}>
+              <Field l="Fecha"><input type="date" style={S.inp} value={editMed.fecha} onChange={e => setEditMed({ ...editMed, fecha: e.target.value })} /></Field>
+              <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={editMed.peso} onChange={e => setEditMed({ ...editMed, peso: e.target.value })} /></Field>
+              <Field l="% grasa"><input style={S.inp} inputMode="decimal" value={editMed.grasa} onChange={e => setEditMed({ ...editMed, grasa: e.target.value })} /></Field>
+              <Field l="Músculo (kg)"><input style={S.inp} inputMode="decimal" value={editMed.musculo} onChange={e => setEditMed({ ...editMed, musculo: e.target.value })} /></Field>
+              <Field l="Masa grasa (kg)"><input style={S.inp} inputMode="decimal" value={editMed.grasaKg} onChange={e => setEditMed({ ...editMed, grasaKg: e.target.value })} /></Field>
+              <Field l="Grasa visceral"><input style={S.inp} inputMode="decimal" value={editMed.visceral} onChange={e => setEditMed({ ...editMed, visceral: e.target.value })} /></Field>
+              <Field l="Agua (L)"><input style={S.inp} inputMode="decimal" value={editMed.agua} onChange={e => setEditMed({ ...editMed, agua: e.target.value })} /></Field>
+              <Field l="% apego al plan"><input style={S.inp} inputMode="decimal" value={editApego} onChange={e => setEditApego(e.target.value)} placeholder="Ej. 100" /></Field>
+              <button style={S.saveBtn} onClick={guardarEditUltima}>Guardar cambios</button>
+            </div>
+          )}
+          {graficasAbiertas && (
+          <div style={S.chartGrid}>
+            <ChartCard title="Peso" unit=" kg" valor={m ? m.peso : null}><Linea data={sel.mediciones} field="peso" color="var(--gold)" unit="" /></ChartCard>
+            <ChartCard title="% de grasa" unit="%" valor={m ? m.grasa : null}><Linea data={sel.mediciones} field="grasa" color="var(--stone)" unit="" /></ChartCard>
+            <ChartCard title="Masa muscular" unit=" kg" valor={m ? m.musculo : null}><Linea data={sel.mediciones} field="musculo" color="var(--sage)" unit="" /></ChartCard>
+            <ChartCard title="Masa grasa" unit=" kg" valor={m ? m.grasaKg : null}><Linea data={sel.mediciones} field="grasaKg" color="var(--danger)" unit="" /></ChartCard>
+            <ChartCard title="Grasa visceral" unit="" valor={m ? m.visceral : null}><Linea data={sel.mediciones} field="visceral" color="var(--ink)" unit="" /></ChartCard>
+            <ChartCard title="Agua corporal total" unit=" L" valor={m ? m.agua : null}><Linea data={sel.mediciones} field="agua" color="#5B7C99" unit="" /></ChartCard>
+            <ChartCard title="Apego al plan" unit="%" valor={ultApego}><Linea data={apegoData} field="apego" color="#3E6B5B" unit="%" /></ChartCard>
+          </div>
+          )}
+        </div>
+
+        {sel.medicionesManual && sel.medicionesManual.length > 0 && (
+          <div className="card">
+            <div style={S.titleRow}>
+              <div onClick={() => setGraficasAbiertas(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1, minWidth: 0 }} title={graficasAbiertas ? 'Ocultar gráficas' : 'Ver gráficas'}>
+                <div className="card-title" style={{ margin: 0 }}>Gráficas de pliegues y perímetros</div>
+                <span style={graficasAbiertas ? S.chevOpen : S.chev}>⌄</span>
+              </div>
+              {graficasAbiertas && mm && <button style={S.smallBtn} onClick={openEditMM ? () => setOpenEditMM(false) : abrirEditarUltimaMM}>{openEditMM ? 'Cancelar' : 'Editar última'}</button>}
+            </div>
+            {graficasAbiertas && openEditMM && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ maxWidth: 200, marginBottom: 6 }}>
+                  <Field l="Fecha de la medición"><input type="date" style={S.inp} value={editMM.fecha} onChange={e => setEditMM({ ...editMM, fecha: e.target.value })} /></Field>
+                </div>
+                <div style={S.subLbl}>Pliegues (mm)</div>
+                <div style={S.medGrid}>
+                  {PLIEGUES.map(p => (
+                    <Field key={p.k} l={p.l}><input style={S.inp} inputMode="decimal" value={editMM[p.k]} onChange={e => setEditMM({ ...editMM, [p.k]: e.target.value })} /></Field>
+                  ))}
+                </div>
+                <div style={{ ...S.subLbl, marginTop: 6 }}>Perímetros (cm)</div>
+                <div style={S.medGrid}>
+                  {PERIMETROS.map(p => (
+                    <Field key={p.k} l={p.l}><input style={S.inp} inputMode="decimal" value={editMM[p.k]} onChange={e => setEditMM({ ...editMM, [p.k]: e.target.value })} /></Field>
+                  ))}
+                </div>
+                <button style={{ ...S.saveBtn, marginTop: 6 }} onClick={guardarEditUltimaMM} disabled={editMMBusy}>{editMMBusy ? 'Guardando…' : 'Guardar cambios'}</button>
+                {editMMMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{editMMMsg}</div>}
+              </div>
+            )}
+            {graficasAbiertas && (<>
+            <div style={S.subLbl}>Pliegues (mm)</div>
+            <div style={S.chartGrid}>
+              {PLIEGUES.map((p, i) => (
+                <ChartCard key={p.k} title={p.l} unit=" mm" valor={mm && typeof mm[p.k] === 'number' ? mm[p.k] : null}>
+                  <Linea data={sel.medicionesManual} field={p.k} color={ANTRO_COLORS[i % ANTRO_COLORS.length]} unit="" />
+                </ChartCard>
+              ))}
+              <ChartCard title="Sumatoria 6 pliegues" unit=" mm" valor={mm && typeof mm.suma6 === 'number' ? mm.suma6 : null}>
+                <Linea data={sel.medicionesManual} field="suma6" color="#3E6B5B" unit="" />
+              </ChartCard>
+            </div>
+            <div style={{ ...S.subLbl, marginTop: 6 }}>Perímetros (cm)</div>
+            <div style={S.chartGrid}>
+              {PERIMETROS.map((p, i) => (
+                <ChartCard key={p.k} title={p.l} unit=" cm" valor={mm && typeof mm[p.k] === 'number' ? mm[p.k] : null}>
+                  <Linea data={sel.medicionesManual} field={p.k} color={ANTRO_COLORS[(i + 6) % ANTRO_COLORS.length]} unit="" />
+                </ChartCard>
+              ))}
+            </div>
+            </>)}
+          </div>
+        )}
+
+        <div className="panel-grid">
+          {/* Historial clínico */}
+          <div className="card" style={panel === 'historia' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'historia' ? null : 'historia')}>
+              <span style={S.panelTitle}>Historial clínico nutricio</span>
+              <span style={panel === 'historia' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'historia' && (
+              <div style={S.panelBody}>
+                <div style={S.titleRow}>
+                  <div style={S.note}>Datos generales, padecimientos, bioquímica, suplementación, síntomas, antecedentes, historia dietética, ejercicio y notas generales.</div>
+                  <button style={S.smallBtn} onClick={() => irSub('historia')}>Ver / editar</button>
+                </div>
+                {sel.historia
+                  ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Historia clínica registrada.</div>
+                  : <div className="empty-state">Aún no hay historia clínica.</div>}
+              </div>
+            )}
+          </div>
+
+          {/* Archivos del paciente (mismas secciones que ve el paciente) */}
+          <div className="card" style={panel === 'archivos' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'archivos' ? null : 'archivos')}>
+              <span style={S.panelTitle}>Archivos del paciente</span>
+              <span style={panel === 'archivos' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'archivos' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Todos los archivos del paciente, organizados como en su panel. El paciente ve estos mismos archivos.</div>
+
+                {archHeader('plan', 'Mi plan alimenticio')}
+                {archSec.plan && (
+                  <div style={S.archBody}>
+                    {sel.plan && sel.plan.totales && (
+                      <div style={{ background: 'var(--cream)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: 600 }}>Plan vigente</div>
+                        <div style={{ fontSize: 14, color: 'var(--dark)', fontWeight: 700, marginTop: 2 }}>{sel.plan.totales.kcal} kcal · {fmtFecha(sel.plan.fecha)}</div>
+                      </div>
+                    )}
+                    <div style={S.titleRow}>
+                      <div style={S.note}>El PDF del plan se guarda en Drive y aquí se registra su enlace.</div>
+                      <button style={S.smallBtn} onClick={() => setOpenPlan(v => !v)}>{openPlan ? 'Cancelar' : '+ Plan'}</button>
+                    </div>
+                    {openPlan && (
+                      <div style={S.formRow}>
+                        <Field l="Nombre del plan"><input style={S.inp} value={plan.nombre} onChange={e => setPlan({ ...plan, nombre: e.target.value })} placeholder="Plan · 2200 kcal" /></Field>
+                        <Field l="Fecha"><input type="date" style={S.inp} value={plan.fecha} onChange={e => setPlan({ ...plan, fecha: e.target.value })} /></Field>
+                        <Field l="Enlace de Drive"><input style={S.inp} value={plan.link} onChange={e => setPlan({ ...plan, link: e.target.value })} placeholder="https://drive.google.com/…" /></Field>
+                        <button style={S.saveBtn} onClick={addPlan}>Guardar</button>
+                      </div>
+                    )}
+                    {(!sel.planes || sel.planes.length === 0)
+                      ? <div className="empty-state">Aún no hay planes para este paciente.</div>
+                      : sel.planes.map((pl, i) => (
+                        <div key={i} style={S.planRow}>
+                          <div style={S.planIcon}>PDF</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{pl.nombre}</div>
+                            <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{pl.fecha ? fmtFecha(pl.fecha) : ''}</div>
+                          </div>
+                          {pl.link
+                            ? <a href={pl.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>
+                            : <span style={{ fontSize: 11, color: 'var(--stone)', fontStyle: 'italic' }}>Sin enlace</span>}
+                          <button style={S.rm} onClick={() => removePlan(i)} title="Quitar">×</button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                {archHeader('isak', 'Reportes ISAK')}
+                {archSec.isak && (
+                  <div style={S.archBody}>
+                    <label style={S.upload}>
+                      <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => setIsakFile(e.target.files && e.target.files[0])} />
+                      {isakFile ? ('PDF seleccionado: ' + isakFile.name) : 'Seleccionar PDF del reporte ISAK'}
+                    </label>
+                    <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={subirIsak} disabled={isakBusy}>{isakBusy ? 'Cargando…' : 'Cargar reporte ISAK'}</button>
+                    <div style={{ marginTop: 14 }}>
+                      {(!sel.isak || sel.isak.length === 0)
+                        ? <div className="empty-state">Aún no hay reportes ISAK.</div>
+                        : [...sel.isak].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                          <div key={idx} style={S.planRow}>
+                            <div style={S.planIcon}>PDF</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Reporte ISAK'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+                            </div>
+                            {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                            <button style={S.rm} onClick={() => removeIsak(idx)} title="Quitar">×</button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {archHeader('inbody', 'Mediciones')}
+                {archSec.inbody && (
+                  <div style={S.archBody}>
+                    <div style={S.note}>Las mediciones se cargan y leen con IA (PDF o imagen del InBody) desde el panel <b>Mediciones</b>. Aquí ves los archivos guardados.</div>
+                    {(!sel.inbodyArchivos || sel.inbodyArchivos.length === 0)
+                      ? <div className="empty-state">Aún no hay archivos de InBody.</div>
+                      : [...sel.inbodyArchivos].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                        <div key={idx} style={S.planRow}>
+                          <div style={S.planIcon}>PDF</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'InBody'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{r.fecha ? fmtFecha(r.fecha) : ''}</div>
+                          </div>
+                          {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                          <button style={S.rm} onClick={() => removeInbodyArchivo(idx)} title="Quitar">×</button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                {archHeader('estudios', 'Estudios clínicos')}
+                {archSec.estudios && (
+                  <div style={S.archBody}>
+                    <div style={S.note}>El paciente los sube desde su panel; también puedes subirlos tú.</div>
+                    <label style={S.upload}>
+                      <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }} onChange={e => setEstudioFile(e.target.files && e.target.files[0])} />
+                      {estudioFile ? ('Archivo seleccionado: ' + estudioFile.name) : 'Seleccionar estudio (PDF o imagen)'}
+                    </label>
+                    <button style={{ ...S.saveBtn, marginTop: 10 }} onClick={subirEstudio} disabled={estudioBusy}>{estudioBusy ? 'Cargando…' : 'Cargar estudio'}</button>
+                    <div style={{ marginTop: 14 }}>
+                      {(!sel.estudios || sel.estudios.length === 0)
+                        ? <div className="empty-state">Aún no hay estudios clínicos.</div>
+                        : [...sel.estudios].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                          <div key={idx} style={{ marginBottom: 8 }}>
+                            <div style={{ ...S.planRow, marginBottom: 0 }}>
+                              <div style={S.planIcon}>PDF</div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{r.nombre || 'Estudio clínico'}</div>
+                                <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>
+                                  {r.fecha ? fmtFecha(r.fecha) : ''}{r.analisis ? ' · Analizado' : ''}
+                                </div>
+                              </div>
+                              {r.analisis
+                                ? <button style={{ ...S.openBtn, border: 'none', cursor: 'pointer' }} onClick={() => setEstudioAbierto(estudioAbierto === idx ? null : idx)}>
+                                    {estudioAbierto === idx ? 'Ocultar' : 'Ver análisis'}
+                                  </button>
+                                : <button style={{ ...S.openBtn, border: 'none', cursor: 'pointer', opacity: analizandoIdx === idx ? 0.6 : 1 }} onClick={() => analizarEstudio(idx)} disabled={analizandoIdx === idx}>
+                                    {analizandoIdx === idx ? 'Analizando…' : 'Analizar'}
+                                  </button>}
+                              {r.link && <a href={r.link} target="_blank" rel="noreferrer" style={S.openBtn}>Abrir</a>}
+                              <button style={S.rm} onClick={() => removeEstudio(idx)} title="Quitar">×</button>
+                            </div>
+                            {r.analisis && estudioAbierto === idx && (
+                              <div style={{ marginTop: 6, padding: '12px 14px', background: 'var(--mint)', border: '0.5px solid var(--border)', borderRadius: 10 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--dark)' }}>
+                                  {r.analisis.tipo || 'Análisis del estudio'}{r.analisis.fecha ? ' · ' + r.analisis.fecha : ''}
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 2, marginBottom: 10 }}>
+                                  Lectura automática para revisión. No sustituye el criterio de la nutrióloga.
+                                </div>
+                                {(r.analisis.fueraDeRango && r.analisis.fueraDeRango.length > 0) ? (
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                                    <thead>
+                                      <tr style={{ textAlign: 'left', color: 'var(--stone)' }}>
+                                        <th style={{ padding: '4px 6px', fontWeight: 600 }}>Parámetro</th>
+                                        <th style={{ padding: '4px 6px', fontWeight: 600 }}>Resultado</th>
+                                        <th style={{ padding: '4px 6px', fontWeight: 600 }}>Referencia</th>
+                                        <th style={{ padding: '4px 6px', fontWeight: 600 }}>Estado</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {r.analisis.fueraDeRango.map((vv, k) => (
+                                        <tr key={k} style={{ borderTop: '0.5px solid var(--border)' }}>
+                                          <td style={{ padding: '6px', fontWeight: 600, color: 'var(--dark)' }}>{vv.parametro}</td>
+                                          <td style={{ padding: '6px', color: 'var(--dark)' }}>{vv.resultado}{vv.unidad ? ' ' + vv.unidad : ''}</td>
+                                          <td style={{ padding: '6px', color: 'var(--stone)' }}>{vv.referencia || '—'}</td>
+                                          <td style={{ padding: '6px' }}>
+                                            <span style={{ padding: '1px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#fff', background: vv.estado === 'alto' ? '#c0392b' : '#2563eb' }}>
+                                              {vv.estado === 'alto' ? '↑ Alto' : '↓ Bajo'}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                ) : (
+                                  <div style={{ fontSize: 12, color: 'var(--dark)' }}>Todos los valores leídos están dentro del rango de referencia.</div>
+                                )}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+                                  <button style={{ ...S.openBtn, border: 'none', cursor: 'pointer' }} onClick={() => adjuntarAnalisisAReco(idx)}>
+                                    Adjuntar a recomendaciones
+                                  </button>
+                                  <button style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: 11 }} onClick={() => analizarEstudio(idx)} disabled={analizandoIdx === idx}>
+                                    {analizandoIdx === idx ? 'Analizando…' : 'Volver a analizar'}
+                                  </button>
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 8 }}>
+                                  {(r.analisis.dentroDeRango || 0)} dentro de rango · {(r.analisis.valores || []).length} parámetro(s) leídos.
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* InBody */}
+          <div className="card" style={panel === 'inbody' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'inbody' ? null : 'inbody')}>
+              <span style={S.panelTitle}>Mediciones</span>
+              <span style={panel === 'inbody' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'inbody' && (
+              <div style={S.panelBody}>
+                <div style={S.segWrap}>
+                  <button style={medMode === 'inbody' ? S.segOn : S.segOff} onClick={() => setMedMode('inbody')}>InBody</button>
+                  <button style={medMode === 'manual' ? S.segOn : S.segOff} onClick={() => setMedMode('manual')}>Manual</button>
+                </div>
+
+                {medMode === 'inbody' && (
+                  <div>
+                    <div style={S.note}>Sube el PDF o la imagen (JPG/PNG) del InBody y el sistema lo lee automáticamente (IA): extrae peso, % de grasa, masa muscular, masa grasa, grasa visceral, agua y TMB, y alimenta las gráficas. Si algún valor sale mal, corrígelo con “Editar última” en Gráficas de avance.</div>
+                    <label
+                      style={{ ...S.upload, ...(dragIb ? { border: '2px dashed var(--dark)', background: '#EFE3D2' } : null) }}
+                      onDragOver={e => { e.preventDefault(); if (!ibBusy) setDragIb(true); }}
+                      onDragEnter={e => { e.preventDefault(); if (!ibBusy) setDragIb(true); }}
+                      onDragLeave={e => { e.preventDefault(); setDragIb(false); }}
+                      onDrop={e => {
+                        e.preventDefault(); setDragIb(false);
+                        if (ibBusy) return;
+                        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                        if (!f) return;
+                        const ok = /pdf|image\//i.test(f.type || '') || /\.(pdf|jpe?g|png|webp|gif)$/i.test(f.name || '');
+                        if (!ok) { setErr('Arrastra un PDF o una imagen (JPG/PNG) del InBody.'); return; }
+                        setIbFile(f); setIbMsg(''); setErr('');
+                        leerYGuardarInBody(f);
+                      }}
+                    >
+                      <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }} onChange={e => { setIbFile(e.target.files && e.target.files[0]); setIbMsg(''); }} />
+                      {dragIb ? 'Suelta el archivo para cargarlo automáticamente…' : (ibFile ? ('Archivo seleccionado: ' + ibFile.name) : 'Arrastra aquí el PDF o imagen del InBody, o haz clic para seleccionarlo')}
+                    </label>
+                    <button style={{ ...S.saveBtn, marginTop: 4 }} onClick={leerYGuardarInBody} disabled={ibBusy}>{ibBusy ? 'Leyendo…' : 'Leer y guardar InBody'}</button>
+                    {ibMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{ibMsg}</div>}
+                    <div style={{ ...S.note, marginTop: 12, marginBottom: 0 }}>Los archivos guardados aparecen en <b>Archivos del paciente → Mediciones</b>.</div>
+                  </div>
+                )}
+
+                {medMode === 'manual' && (
+                  <div>
+                    <div style={S.note}>Captura pliegues (mm) y perímetros (cm). Se guardan con su fecha y alimentan las gráficas de seguimiento.</div>
+                    <div style={{ maxWidth: 200, marginBottom: 6 }}>
+                      <Field l="Fecha de la medición"><input type="date" style={S.inp} value={manual.fecha} onChange={e => setManual({ ...manual, fecha: e.target.value })} /></Field>
+                    </div>
+
+                    <div style={S.subLbl}>Pliegues (mm)</div>
+                    <div style={S.medGrid}>
+                      {PLIEGUES.map(p => (
+                        <Field key={p.k} l={p.l}><input style={S.inp} inputMode="decimal" value={manual[p.k]} onChange={e => setManual({ ...manual, [p.k]: e.target.value })} /></Field>
+                      ))}
+                    </div>
+
+                    <div style={S.sumaBox}>
+                      <div>
+                        <div style={{ fontSize: 12, color: 'var(--stone)' }}>Sumatoria de 6 pliegues</div>
+                        <div style={{ fontFamily: 'var(--font)', fontWeight: 800, fontSize: 22, color: 'var(--dark)' }}>{hayPliegueManual ? (Math.round(sumaManual * 10) / 10) : '—'} <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--stone)' }}>mm</span></div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 11, color: 'var(--stone)', marginBottom: 4 }}>Ideal {manualMasculino ? 'hombres' : 'mujeres'} &lt; {umbralPliegues} mm</div>
+                        {hayPliegueManual && (
+                          <span style={sumaManual < umbralPliegues ? S.badgeOk : S.badgeWarn}>{sumaManual < umbralPliegues ? 'Dentro del rango ideal' : 'Por encima del rango ideal'}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={S.subLbl}>Perímetros (cm)</div>
+                    <div style={S.medGrid}>
+                      {PERIMETROS.map(p => (
+                        <Field key={p.k} l={p.l}><input style={S.inp} inputMode="decimal" value={manual[p.k]} onChange={e => setManual({ ...manual, [p.k]: e.target.value })} /></Field>
+                      ))}
+                    </div>
+
+                    <button style={{ ...S.saveBtn, marginTop: 6 }} onClick={guardarMedicionManual} disabled={manualBusy}>{manualBusy ? 'Guardando…' : 'Guardar medición manual'}</button>
+                    {manualMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{manualMsg}</div>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
+          {/* Plan nutricional */}
+          <div className="card" style={panel === 'plan' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'plan' ? null : 'plan')}>
+              <span style={S.panelTitle}>Plan nutricional</span>
+              <span style={panel === 'plan' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'plan' && (
+              <div style={S.panelBody}>
+                <div style={S.titleRow}>
+                  <div style={S.note}>Calcula los equivalentes (SMAE) y los macros del plan a partir de los datos del paciente.</div>
+                  <button style={S.smallBtn} onClick={() => { setInbody(null); irSub('plan'); }}>Abrir cálculo</button>
+                </div>
+                {sel.plan && sel.plan.totales
+                  ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>Plan guardado: <b>{sel.plan.totales.kcal} kcal</b> · {fmtFecha(sel.plan.fecha)}</div>
+                  : <div className="empty-state">Aún no hay cálculo de plan.</div>}
+              </div>
+            )}
+          </div>
+
+          {/* Plan deportivo (alto rendimiento) */}
+          <div className="card" style={panel === 'deportivo' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'deportivo' ? null : 'deportivo')}>
+              <span style={S.panelTitle}>Plan deportivo <span style={{ fontWeight: 400, color: 'var(--stone)', fontSize: 12 }}>(alto rendimiento)</span></span>
+              <span style={panel === 'deportivo' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'deportivo' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Marca al paciente como alto rendimiento para habilitar el plan de competencia (hidratación y alimentación antes, durante y después).</div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--dark)', cursor: 'pointer', marginBottom: 12 }}>
+                  <input type="checkbox" checked={!!sel.altoRendimiento}
+                    onChange={async e => { try { await updateDoc(doc(db, 'pacientes', sel.id), { altoRendimiento: e.target.checked }); } catch (er) { setErr('No se pudo actualizar: ' + er.message); } }} />
+                  Paciente de alto rendimiento
+                </label>
+                {sel.altoRendimiento
+                  ? <button style={S.smallBtn} onClick={() => irSub('deportivo')}>Abrir / editar plan deportivo</button>
+                  : <div className="empty-state">Actívalo para capturar el plan de competencia.</div>}
+              </div>
+            )}
+          </div>
+
+          {/* Menús */}
+          <div className="card" style={panel === 'menus' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'menus' ? null : 'menus')}>
+              <span style={S.panelTitle}>Menús o equivalencias</span>
+              <span style={panel === 'menus' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'menus' && (
+              <div style={S.panelBody}>
+                <div style={S.titleRow}>
+                  <div style={S.note}>Reparte los equivalentes del plan en los tiempos de comida y arma las opciones de menú.</div>
+                  <button style={S.smallBtn} onClick={() => { setMenuReabrir(null); irSub('menus'); }}>Nuevo menú</button>
+                </div>
+                {!(sel.plan && sel.plan.eq)
+                  ? <div className="empty-state">Primero calcula y guarda el plan.</div>
+                  : (sel.plan.menus && sel.plan.menus.tiempos
+                    ? <div style={{ fontSize: 13, color: 'var(--dark)' }}>{sel.plan.menus.tiempos.length} tiempos de comida configurados.</div>
+                    : <div className="empty-state">Aún no hay menús generados.</div>)}
+                {Array.isArray(sel.menusHistorial) && sel.menusHistorial.length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={S.note}>Menús anteriores · reábrelos para editar o abre su PDF.</div>
+                    {[...sel.menusHistorial].map((mh, idx) => ({ mh, idx })).reverse().map(({ mh, idx }) => (
+                      <div key={idx} style={S.planRow}>
+                        <div style={S.planIcon}>PDF</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--dark)' }}>{mh.nombre || 'Menú'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 1 }}>{mh.fecha ? fmtFecha(mh.fecha) : ''}{mh.tiempos ? ' · ' + mh.tiempos.length + ' tiempos' : ''}</div>
+                        </div>
+                        <button style={S.smallBtn} onClick={() => { setMenuReabrir(mh); irSub('menus'); }}>Reabrir</button>
+                        {mh.link && <a href={mh.link} target="_blank" rel="noreferrer" style={S.openBtn}>PDF</a>}
+                        <button style={S.rm} onClick={() => removeMenuHistorial(idx)} title="Quitar">×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
+          {/* Recomendaciones */}
+          <div className="card" style={panel === 'reco' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'reco' ? null : 'reco')}>
+              <span style={S.panelTitle}>Recomendaciones</span>
+              <span style={panel === 'reco' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'reco' && (
+              <div style={S.panelBody} ref={recoFormRef}>
+                <div style={S.note}>Cada recomendación se publica con fecha y hora; el paciente la verá en su sección "Recomendaciones". Usa los botones para agregar atajos a cada apartado.</div>
+                {sel.historia && (
+                  <button style={{ ...S.smallBtn, marginBottom: 12, marginRight: 8 }} onClick={() => setVerHistoria(true)} title="Consultar la historia clínica sin salir">
+                    Ver historia clínica
+                  </button>
+                )}
+                <button style={{ ...S.smallBtn, marginBottom: 12 }} onClick={() => setVerNotas(true)} title="Consultar las notas de seguimiento sin salir">
+                  Ver notas de seguimiento
+                </button>
+                {verNotas && (
+                  <NotasSeguimiento notas={sel.bitacora} nombre={sel.nombre} onClose={() => setVerNotas(false)} closeBtnStyle={S.smallBtn} />
+                )}
+                {verHistoria && (
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+                    <div onClick={() => setVerHistoria(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} />
+                    <div style={{ position: 'relative', width: 'min(640px, 94vw)', height: '100%', background: 'var(--bg)', boxShadow: '-10px 0 30px rgba(0,0,0,0.22)', display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--card)' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--dark)', fontSize: 14 }}>Historia clínica · {sel.nombre || ''} <span style={{ fontWeight: 400, color: 'var(--stone)', fontSize: 12 }}>(solo lectura)</span></span>
+                        <button style={S.smallBtn} onClick={() => setVerHistoria(false)}>Cerrar ✕</button>
+                      </div>
+                      <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <HistoriaClinica initial={sel.historia} codigo={sel.codigo} readOnly onBack={() => setVerHistoria(false)} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {RECO_SECCIONES.map(sec => (
+                  <div key={sec.key} style={S.recoSeccion}>
+                    <div style={S.recoSeccionTitulo}>{sec.titulo}</div>
+                    {sec.key === 'hidratacion' && (() => {
+                      const pesoDefault = (m && (m.peso || m.peso === 0)) ? String(m.peso) : '';
+                      const pesoShown = hidPeso !== '' ? hidPeso : pesoDefault;
+                      const pesoNum = parseFloat(pesoShown) || 0;
+                      const hidMl = Math.round(pesoNum * hidMlKg);
+                      const fmtMl = hidMl.toLocaleString('es-MX');
+                      const hidL = (hidMl / 1000).toFixed(1).replace('.', ',');
+                      const insertarHid = () => {
+                        if (!pesoNum) return;
+                        const linea = '• Consumo de agua: ' + fmtMl + ' ml al día (≈ ' + hidL + ' L) — ' + pesoNum + ' kg × ' + hidMlKg + ' ml/kg.';
+                        setRecoForm(prev => { const cur = prev.hidratacion || ''; const base = cur && !cur.endsWith('\n') ? cur + '\n' : cur; return { ...prev, hidratacion: base + linea + '\n' }; });
+                      };
+                      return (
+                        <div style={{ border: '0.5px solid var(--border)', background: 'var(--mint)', borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, color: 'var(--stone)', fontWeight: 700, marginBottom: 10 }}>Calculadora de agua · Peso × ml/kg</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              <label style={{ fontSize: 10, color: 'var(--stone)', fontWeight: 600 }}>Peso (kg)</label>
+                              <input style={{ ...S.inp, width: 90 }} inputMode="decimal" value={pesoShown} onChange={e => setHidPeso(e.target.value)} placeholder="kg" />
+                            </div>
+                            <div style={{ fontSize: 16, color: 'var(--stone)', paddingBottom: 8 }}>×</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              <label style={{ fontSize: 10, color: 'var(--stone)', fontWeight: 600 }}>ml por kg</label>
+                              <select style={{ ...S.inp, width: 110, cursor: 'pointer' }} value={hidMlKg} onChange={e => setHidMlKg(+e.target.value)}>
+                                <option value={30}>30 ml</option>
+                                <option value={35}>35 ml</option>
+                                <option value={40}>40 ml</option>
+                              </select>
+                            </div>
+                            <div style={{ fontSize: 16, color: 'var(--stone)', paddingBottom: 8 }}>=</div>
+                            <div style={{ flex: 1, minWidth: 140, background: '#fff', border: '1px dashed var(--gold)', borderRadius: 9, padding: '7px 10px', textAlign: 'center' }}>
+                              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--dark)', lineHeight: 1.1 }}>{pesoNum ? fmtMl + ' ml' : '—'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--stone)', marginTop: 2 }}>{pesoNum ? '≈ ' + hidL + ' L al día' : 'Captura el peso'}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 10.5, color: 'var(--stone)' }}>El peso viene de la última medición; puedes ajustarlo.</span>
+                            <button type="button" style={{ ...S.saveBtn, padding: '8px 14px' }} onClick={insertarHid} disabled={!pesoNum}>Insertar en Hidratación ↓</button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {sec.key === 'suplementos' && (
+                      <div style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--mint)', border: '0.5px solid var(--border)', borderRadius: 10 }}>
+                        <div style={{ fontSize: 11, color: 'var(--stone)', fontWeight: 600, marginBottom: 8 }}>Tabla de suplementos de esta recomendación · se imprime en el PDF</div>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 560 }}>
+                            <thead>
+                              <tr style={{ textAlign: 'left', color: 'var(--stone)' }}>
+                                <th style={{ padding: '2px 4px', fontWeight: 600 }}>Suplemento</th>
+                                <th style={{ padding: '2px 4px', fontWeight: 600 }}>Marca</th>
+                                <th style={{ padding: '2px 4px', fontWeight: 600 }}>Dosis</th>
+                                <th style={{ padding: '2px 4px', fontWeight: 600 }}>Frecuencia</th>
+                                <th style={{ padding: '2px 4px', fontWeight: 600 }}>Horario</th>
+                                <th style={{ width: 26 }}></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {recoSup.map((row, i) => (
+                                <tr key={i}>
+                                  <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.nombre} placeholder="Ej. Vitamina D" onChange={e => setSupCampo(i, 'nombre', e.target.value)} /></td>
+                                  <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.marca} onChange={e => setSupCampo(i, 'marca', e.target.value)} /></td>
+                                  <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.dosis} placeholder="Ej. 2000 UI" onChange={e => setSupCampo(i, 'dosis', e.target.value)} /></td>
+                                  <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.frecuencia} placeholder="Ej. Diario" onChange={e => setSupCampo(i, 'frecuencia', e.target.value)} /></td>
+                                  <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.horario} placeholder="Ej. Mañana" onChange={e => setSupCampo(i, 'horario', e.target.value)} /></td>
+                                  <td style={{ padding: '3px 4px', textAlign: 'center' }}><button type="button" style={S.rm} title="Quitar" onClick={() => removeSupFila(i)}>×</button></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <button type="button" style={{ ...S.chipAdd, marginTop: 8 }} onClick={() => addSupFila()}>＋ Agregar suplemento</button>
+                      </div>
+                    )}
+                    <div style={S.chipRow}>
+                      {sec.items.map(it => {
+                        const label = typeof it === 'string' ? it : it.l;
+                        const ins = typeof it === 'string' ? it : (it.ins || it.l);
+                        const onClick = sec.key === 'suplementos' ? (() => addSupFila(label)) : (() => addChipTo(sec.key, ins));
+                        return <button key={'p-' + label} type="button" style={S.chip} onClick={onClick}>+ {label}</button>;
+                      })}
+                      {(recoChips[sec.key] || []).map(c => (
+                        <button key={'c-' + c} type="button" style={S.chip} onClick={sec.key === 'suplementos' ? (() => addSupFila(c)) : (() => addChipTo(sec.key, c))}>+ {c}</button>
+                      ))}
+                      <button type="button" style={S.chipAdd} onClick={() => agregarChip(sec.key)} title="Guardar un enlace rápido nuevo para futuras recomendaciones">＋ Agregar</button>
+                    </div>
+                    <RichArea value={recoForm[sec.key]}
+                      onChange={html => setRecoForm(prev => ({ ...prev, [sec.key]: html }))}
+                      placeholder={sec.key === 'suplementos' ? 'Notas adicionales de suplementos (opcional)…' : `Recomendaciones de ${sec.titulo.toLowerCase()}…`} />
+                  </div>
+                ))}
+                {recoAnalisis && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 12, background: 'var(--mint)', border: '0.5px solid var(--border)', borderRadius: 10 }}>
+                    <div style={{ flex: 1, fontSize: 12, color: 'var(--dark)' }}>
+                      <b>Tabla de análisis adjunta</b>
+                      {recoAnalisis.tipo ? ' · ' + recoAnalisis.tipo : ''} ·{' '}
+                      {(recoAnalisis.fueraDeRango || []).length} valor(es) fuera de rango. Se incluirá en el PDF.
+                    </div>
+                    <button style={S.rm} onClick={() => setRecoAnalisis(null)} title="Quitar la tabla adjunta">×</button>
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, marginBottom: 14, flexWrap: 'wrap' }}>
+                  <button style={S.saveBtn} onClick={addReco}>{recoEditIdx != null ? 'Guardar cambios' : '+ Agregar recomendación'}</button>
+                  {recoEditIdx == null && <button style={S.smallBtn} onClick={guardarBorradorReco}>Guardar borrador</button>}
+                  {recoEditIdx != null && <button style={S.smallBtn} onClick={cancelarEdicionReco}>Cancelar</button>}
+                  {recoEditIdx != null && <span style={{ fontSize: 12, color: '#9A7B2E', fontWeight: 600 }}>Editando una recomendación existente</span>}
+                  {recoPdfMsg && <span style={{ fontSize: 12, color: 'var(--stone)' }}>{recoPdfMsg}</span>}
+                </div>
+                {(!sel.recomendaciones || sel.recomendaciones.length === 0)
+                  ? <div className="empty-state">Aún no hay recomendaciones.</div>
+                  : [...sel.recomendaciones].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => {
+                    const secs = recoSeccionesConContenido(r);
+                    return (
+                      <div key={idx} style={S.recoItem}>
+                        <div style={{ flex: 1 }}>
+                          <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
+                          {secs.length > 0
+                            ? secs.map(s => (
+                              <div key={s.titulo} style={{ marginTop: 7 }}>
+                                <div style={S.recoItemSecTitulo}>{s.titulo}</div>
+                                <div className="reco-rich" style={S.recoText} dangerouslySetInnerHTML={{ __html: renderRich(s.texto) }} />
+                              </div>))
+                            : <div className="reco-rich" style={S.recoText} dangerouslySetInnerHTML={{ __html: renderRich(r.texto || '') }} />}
+                        </div>
+                        <button style={S.smallBtn} onClick={() => abrirReco(r)} title="Ver cómo se verá el documento (sin enviar correo)">Abrir</button>
+                        <button style={S.smallBtn} onClick={() => editarReco(idx)} title="Editar esta recomendación">Editar</button>
+                        <button style={S.smallBtn} onClick={() => generarPDFReco(r)} title="Generar PDF y enviarlo por correo al paciente">PDF</button>
+                        <button style={S.rm} onClick={() => removeReco(idx)} title="Eliminar">×</button>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+
+          {/* Seguimientos (notas internas de consulta, no visibles para el paciente) */}
+          <div className="card" style={panel === 'bitacora' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'bitacora' ? null : 'bitacora')}>
+              <span style={S.panelTitle}>Seguimientos</span>
+              <span style={panel === 'bitacora' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'bitacora' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Notas de seguimiento de la consulta (texto libre). <b>El paciente no las ve.</b></div>
+                <div style={{ marginBottom: 12 }}>
+                  <textarea style={S.recoArea} rows={3} value={bitacoraTexto} onChange={e => setBitacoraTexto(e.target.value)}
+                    placeholder="Anota lo que comente el paciente, observaciones, acuerdos…" />
+                  <div style={{ marginTop: 8, maxWidth: 200 }}>
+                    <Field l="% apego al plan (opcional)"><input style={S.inp} inputMode="decimal" value={bitacoraApego} onChange={e => setBitacoraApego(e.target.value)} placeholder="Ej. 100" /></Field>
+                  </div>
+                  <button style={{ ...S.saveBtn, marginTop: 8 }} onClick={addBitacora}>+ Agregar nota</button>
+                </div>
+                {(!sel.bitacora || sel.bitacora.length === 0)
+                  ? <div className="empty-state">Aún no hay notas de consulta.</div>
+                  : [...sel.bitacora].map((r, idx) => ({ r, idx })).reverse().map(({ r, idx }) => (
+                    <div key={idx} style={S.recoItem}>
+                      <div style={{ flex: 1 }}>
+                        <div style={S.recoDate}>{fmtSello(r.fecha)}</div>
+                        <div style={S.recoText}>{r.texto}</div>
+                      </div>
+                      <button style={S.rm} onClick={() => removeBitacora(idx)} title="Eliminar">×</button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          {panel === null && <div style={S.rowSep} aria-hidden="true" />}
+        </div>
+
+        <button style={{ ...S.back, marginTop: 16, marginBottom: 0 }} onClick={volver}>← Atrás</button>
+
+        {inbodyOpen && (
+          <InBodyModal
+            patient={sel}
+            onClose={() => setInbodyOpen(false)}
+            onDesdeCero={() => { setInbody(null); setInbodyOpen(false); irSub('plan'); }}
+            onInBody={onInBody}
+          />
+        )}
+      </div>
+    );
+  }
+
+  /* ----- VISTA: lista de pacientes ----- */
+  return (
+    <div>
+      <div style={S.titleRow}>
+        <div className="card-title" style={{ margin: 0, fontSize: 16 }}>Pacientes</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <input style={S.search} value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar paciente…" />
+          <div style={{ position: 'relative' }}>
+            <button style={S.smallBtn} onClick={() => setVistaOpen(v => !v)}>Vista ▾</button>
+            {vistaOpen && (
+              <>
+                <div style={S.menuOverlay} onClick={() => setVistaOpen(false)} />
+                <div style={{ ...S.menu, top: 42, right: 0, minWidth: 250 }}>
+                  {[['alfabetico', 'Orden alfabético'], ['creacion-desc', 'Fecha de creación · más reciente'], ['creacion-asc', 'Fecha de creación · más antigua']].map(([val, label]) => (
+                    <button key={val} style={{ ...S.menuItem, fontWeight: orden === val ? 800 : 500, background: orden === val ? 'var(--cream)' : 'transparent' }}
+                      onClick={() => { setOrden(val); setVistaOpen(false); }}>{label}</button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <button style={S.smallBtn} onClick={() => setOpenImport(true)}>Importar</button>
+          <button style={S.smallBtn} onClick={irNuevo}>+ Nuevo paciente</button>
+        </div>
+      </div>
+      <ImportarPacientes
+        open={openImport}
+        onClose={() => setOpenImport(false)}
+        pacientes={pacientes}
+        prefix={CODE_PREFIX}
+        nutriDueno={nutriDueno}
+      />
+
+
+      {err && <div style={S.err}>{err}</div>}
+
+      <div className="card">
+        {(() => {
+          const q = busca.trim().toLowerCase();
+          const filtrados = q
+            ? pacientes.filter(p => (p.nombre || '').toLowerCase().includes(q) || (p.codigo || '').toLowerCase().includes(q))
+            : pacientes;
+          const ordenados = [...filtrados].sort((a, b) => {
+            if (orden === 'alfabetico') return (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' });
+            if (orden === 'creacion-asc') return pacCreadoTs(a) - pacCreadoTs(b);
+            return pacCreadoTs(b) - pacCreadoTs(a); // creacion-desc (más reciente primero)
+          });
+          return (
+            <>
+              <div className="card-title">Mis pacientes ({filtrados.length})</div>
+              {pacientes.length === 0
+                ? <div className="empty-state">No hay pacientes registrados aún. Usa “+ Nuevo paciente”.</div>
+                : filtrados.length === 0
+                  ? <div className="empty-state">No se encontraron pacientes con “{busca}”.</div>
+                  : ordenados.map(p => {
+                    const m = last(p.mediciones);
+                    return (
+                      <div className="pac-item" key={p.id} style={{ position: 'relative' }}
+                        onClick={() => abrir(p.id)}>
+                        <div className="pac-avatar">{initials(p.nombre)}</div>
+                        <div style={{ flex: 1 }}>
+                          <div className="pac-nombre">{p.nombre}</div>
+                          <div className="pac-detalle">{p.codigo} · {p.objetivo || 'sin objetivo'}</div>
+                        </div>
+                        {orden.startsWith('creacion') && (
+                          <div style={{ flexShrink: 0, textAlign: 'right', marginLeft: 8, minWidth: 130 }}>
+                            <div style={{ fontSize: 9.5, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Fecha de creación</div>
+                            <div style={{ fontSize: 12.5, color: 'var(--dark)', fontWeight: 600 }}>{fmtFecha(pacCreadoISO(p)) || '—'}</div>
+                          </div>
+                        )}
+                        <div className="pac-citas">{m ? m.peso + ' kg' : '—'}</div>
+                        <button style={S.kebab} title="Opciones rápidas"
+                          onClick={(e) => { e.stopPropagation(); setMenuId(menuId === p.id ? null : p.id); }}>⋮</button>
+                        {menuId === p.id && (
+                          <>
+                            <div style={S.menuOverlay} onClick={(e) => { e.stopPropagation(); setMenuId(null); }} />
+                            <div style={S.menu} onClick={(e) => e.stopPropagation()}>
+                              <button style={S.menuItem} onClick={() => abrir(p.id)}>Ver paciente</button>
+                              <button style={{ ...S.menuItem, color: 'var(--danger)' }} onClick={() => eliminar(p)}>Eliminar</button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })
+              }
+            </>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
+/* ===== piezas pequeñas ===== */
+function Info({ l, v }) {
+  return <div style={styles.infoCell}><div style={styles.infoLbl}>{l}</div><div style={styles.infoVal}>{v}</div></div>;
+}
+
+function SaldoConsultas({ patient }) {
+  const correo = (patient.correo || '').trim().toLowerCase();
+  const [cred, setCred] = useState({ lotes: [], usos: [] });
+  const [paquetes, setPaquetes] = useState(PAQUETES_DEFAULT);
+  const [sel, setSel] = useState('');
+  const [origen, setOrigen] = useState('efectivo');
+  const [custom, setCustom] = useState({ familia: 'normal', consultas: '', monto: '', vigenciaMeses: '' });
+  const [st, setSt] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [abonarOpen, setAbonarOpen] = useState(false);   // abono manual colapsado (efectivo/transferencia)
+
+  useEffect(() => {
+    if (!correo) return undefined;
+    return onSnapshot(doc(db, 'creditosConsultas', correo), snap => {
+      setCred(snap.exists() ? { lotes: [], usos: [], ...snap.data() } : { lotes: [], usos: [] });
+    }, () => {});
+  }, [correo]);
+  useEffect(() => onSnapshot(doc(db, 'config', 'dashboard'), snap => {
+    const d = (snap && snap.data()) || {};
+    setPaquetes(Array.isArray(d.paquetes) && d.paquetes.length ? d.paquetes : PAQUETES_DEFAULT);
+  }, () => {}), []);
+
+  if (!correo) {
+    return (
+      <div className="card">
+        <div className="card-title">Saldo de consultas (paquetes)</div>
+        <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5 }}>
+          Para llevar el saldo de consultas primero captura el correo del paciente en <b>Información general</b>. El saldo se guarda por correo.
+        </div>
+      </div>
+    );
+  }
+
+  const now = new Date().toISOString();
+  const resumen = resumenSaldo(cred, now);
+  const pkg = paquetes.find(p => p.id === sel) || null;
+  const fmt = (iso) => { if (!iso) return '—'; return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }); };
+  const familiasConLotes = ['normal', 'deportiva'].filter(f => resumen[f].lotes.length > 0);
+
+  const abonar = async () => {
+    const familia = pkg ? pkg.familia : custom.familia;
+    const consultas = pkg ? pkg.consultas : (parseInt(custom.consultas, 10) || 0);
+    const monto = pkg ? pkg.precio : (custom.monto === '' ? null : (parseFloat(custom.monto) || 0));
+    const vigenciaMeses = pkg ? pkg.vigenciaMeses : (parseInt(custom.vigenciaMeses, 10) || 6);
+    if (!consultas || consultas < 1) { setSt('Indica cuántas consultas abonar.'); return; }
+    setBusy(true); setSt('');
+    try {
+      const lote = nuevoLote({ familia, consultas, monto, vigenciaMeses, origen, paqueteId: pkg ? pkg.id : null, paqueteNombre: pkg ? pkg.nombre : null });
+      const next = { correo, lotes: [...(cred.lotes || []), lote], usos: cred.usos || [], ...selloDueno(patient && patient.nutriDueno) };
+      await setDoc(doc(db, 'creditosConsultas', correo), next, { merge: true });
+      setSt('Abonado ✓'); setSel(''); setCustom({ familia: 'normal', consultas: '', monto: '', vigenciaMeses: '' });
+    } catch (e) { setSt('Error: ' + e.message); }
+    setBusy(false);
+  };
+  const quitarLote = async (loteId) => {
+    if (typeof window !== 'undefined' && !window.confirm('¿Quitar este lote de consultas del saldo del paciente?')) return;
+    try {
+      const next = { correo, lotes: (cred.lotes || []).filter(l => l.id !== loteId), usos: cred.usos || [], ...selloDueno(patient && patient.nutriDueno) };
+      await setDoc(doc(db, 'creditosConsultas', correo), next, { merge: true });
+    } catch (e) { setSt('Error: ' + e.message); }
+  };
+
+  return (
+    <div className="card">
+      <div className="card-title">Saldo de consultas (paquetes)</div>
+      {familiasConLotes.length > 0 ? (
+        <div style={{ display: 'grid', gridTemplateColumns: familiasConLotes.length === 1 ? '1fr' : 'repeat(2, 1fr)', gap: 12, marginBottom: 12 }}>
+          {familiasConLotes.map(f => (
+            <div key={f} style={{ background: 'var(--cream)', borderRadius: 12, padding: '12px 14px' }}>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)' }}>{familiaLabel(f)}</div>
+              <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--dark)', lineHeight: 1.1 }}>{resumen[f].disponible}<span style={{ fontSize: 12, fontWeight: 600, color: 'var(--stone)' }}> disponibles</span></div>
+              {resumen[f].lotes.map(l => (
+                <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, fontSize: 12, color: 'var(--dark)', marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                  <span><b>{l.restantes}/{l.consultas}</b> · {l.paqueteNombre || 'manual'} · {l.origen || 'manual'}<br />
+                    <span style={{ color: 'var(--stone)' }}>{l.primeraConsultaFecha ? ('vence ' + fmt(venceDeLote(l))) : 'sin usar (no vence aún)'}</span>
+                  </span>
+                  <button title="Quitar lote" onClick={() => quitarLote(l.id)} style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 13, flexShrink: 0 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 12.5, color: 'var(--stone)', lineHeight: 1.5, marginBottom: 10 }}>
+          Este paciente aún no tiene consultas de paquete. Las compras en línea se acreditan <b>automáticamente</b>; si pagó en efectivo o transferencia, cárgalas con “Abonar consultas”.
+        </div>
+      )}
+
+      <button onClick={() => setAbonarOpen(o => !o)}
+        style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: '4px 0' }}>
+        {abonarOpen ? '× Cerrar' : '＋ Abonar consultas (pago en efectivo / transferencia)'}
+      </button>
+      {abonarOpen && (
+        <div style={{ background: 'var(--cream)', borderRadius: 12, padding: 12, marginTop: 6 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select value={sel} onChange={e => setSel(e.target.value)} style={{ ...styles.inp, flex: '1 1 180px' }}>
+              <option value="">Personalizado…</option>
+              {paquetes.map(p => <option key={p.id} value={p.id}>{p.nombre} — {'$' + Number(p.precio || 0).toLocaleString('es-MX')} ({familiaLabel(p.familia)}, {p.vigenciaMeses}m)</option>)}
+            </select>
+            {!pkg && (
+              <>
+                <select value={custom.familia} onChange={e => setCustom(c => ({ ...c, familia: e.target.value }))} style={{ ...styles.inp, width: 130 }}>
+                  {FAMILIAS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+                </select>
+                <input inputMode="numeric" placeholder="# consultas" value={custom.consultas} onChange={e => setCustom(c => ({ ...c, consultas: e.target.value }))} style={{ ...styles.inp, width: 110 }} />
+                <input inputMode="numeric" placeholder="$ monto" value={custom.monto} onChange={e => setCustom(c => ({ ...c, monto: e.target.value }))} style={{ ...styles.inp, width: 100 }} />
+                <input inputMode="numeric" placeholder="meses vig." value={custom.vigenciaMeses} onChange={e => setCustom(c => ({ ...c, vigenciaMeses: e.target.value }))} style={{ ...styles.inp, width: 100 }} />
+              </>
+            )}
+            <select value={origen} onChange={e => setOrigen(e.target.value)} style={{ ...styles.inp, width: 150 }}>
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="cortesia">Cortesía</option>
+            </select>
+            <button style={styles.saveBtn} onClick={abonar} disabled={busy}>{busy ? 'Abonando…' : 'Abonar'}</button>
+          </div>
+          {pkg && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{pkg.consultas} consultas · {familiaLabel(pkg.familia)} · {'$' + Number(pkg.precio || 0).toLocaleString('es-MX')} · vigencia {pkg.vigenciaMeses} meses desde la 1ª consulta.</div>}
+          {st && <div style={{ fontSize: 12, color: 'var(--stone)', marginTop: 8 }}>{st}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+function Field({ l, children }) {
+  return <label style={styles.field}><span style={styles.fieldLbl}>{l}</span>{children}</label>;
+}
+function ChartCard({ title, unit, valor, children }) {
+  return (
+    <div style={styles.chartCard}>
+      <div style={styles.chartTop}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dark)' }}>{title}</span>
+        <span style={{ fontFamily: 'var(--font)', fontWeight: 800, fontSize: 22, color: 'var(--dark)' }}>{valor != null ? valor : '—'}<span style={{ fontSize: 11, fontWeight: 600, color: 'var(--stone)' }}>{unit}</span></span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+const styles = {
+  back: { background: '#fff', border: '0.5px solid var(--border)', color: 'var(--dark)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 14px', borderRadius: 8, marginBottom: 14 },
+  err: { background: '#fef0f0', color: '#c0392b', fontSize: 12.5, padding: '10px 12px', borderRadius: 10, marginBottom: 12 },
+  headRow: { display: 'flex', alignItems: 'center', gap: 12 },
+  titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  infoGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 },
+  infoCell: { background: 'var(--cream)', borderRadius: 10, padding: '9px 11px' },
+  infoLbl: { fontSize: 9.5, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: 3 },
+  infoVal: { fontSize: 13, color: 'var(--dark)', fontWeight: 600 },
+  chartGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
+  metricGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 12 },
+  metric: { background: '#fff', border: '0.5px solid var(--border)', borderRadius: 14, padding: '14px 16px' },
+  metricLbl: { fontSize: 11, color: 'var(--stone)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 },
+  metricVal: { fontSize: 26, fontWeight: 800, color: 'var(--dark)', marginTop: 4, lineHeight: 1.1 },
+  metricUnit: { fontSize: 12, fontWeight: 600, color: 'var(--stone)' },
+  recoArea: { width: '100%', border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', resize: 'vertical', boxSizing: 'border-box' },
+  chipGroups: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 },
+  chipGroup: { display: 'flex', flexDirection: 'column', gap: 6 },
+  chipLabel: { fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)' },
+  chipRow: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  chip: { background: 'var(--cream)', border: '1px solid var(--gold)', borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 600, color: 'var(--dark)', cursor: 'pointer', fontFamily: 'var(--font)' },
+  chipAdd: { background: 'transparent', border: '1px dashed var(--gold)', borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 700, color: 'var(--gold)', cursor: 'pointer', fontFamily: 'var(--font)' },
+  recoSeccion: { marginBottom: 14 },
+  recoSeccionTitulo: { fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--stone)', marginBottom: 7 },
+  recoItemSecTitulo: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 2 },
+  archHead: { width: '100%', background: 'var(--dark)', color: '#fff', fontWeight: 700, fontSize: 13.5, padding: '9px 13px', borderRadius: 9, letterSpacing: 0.3, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'var(--font)', marginTop: 10 },
+  archBody: { marginTop: 12, marginBottom: 6, paddingLeft: 2 },
+  segWrap: { display: 'inline-flex', background: 'var(--cream)', borderRadius: 9, padding: 3, gap: 3, marginBottom: 14 },
+  segOn: { border: 'none', background: '#fff', color: 'var(--dark)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, padding: '7px 16px', borderRadius: 7, cursor: 'pointer', boxShadow: '0 0 0 0.5px var(--border)' },
+  segOff: { border: 'none', background: 'transparent', color: 'var(--stone)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 7, cursor: 'pointer' },
+  subLbl: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--stone)', margin: '4px 0 10px' },
+  medGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '4px 12px', marginBottom: 14 },
+  sumaBox: { background: 'var(--cream)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 18 },
+  badgeOk: { fontSize: 12, padding: '4px 10px', borderRadius: 8, background: '#e6f4ea', color: '#2e7d4f', fontWeight: 600 },
+  badgeWarn: { fontSize: 12, padding: '4px 10px', borderRadius: 8, background: '#fdf0e3', color: '#b5701f', fontWeight: 600 },
+  recoItem: { display: 'flex', alignItems: 'flex-start', gap: 10, border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, background: 'var(--cream)' },
+  recoDate: { fontSize: 10.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 },
+  recoText: { fontSize: 13, color: 'var(--dark)', lineHeight: 1.5, whiteSpace: 'pre-wrap' },
+  panelGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, alignItems: 'start' },
+  panel: { padding: 0, overflow: 'hidden' },
+  panelOpen: { padding: 0, overflow: 'hidden', gridColumn: '1 / -1' },
+  rowSep: { gridColumn: '1 / -1', height: 2, background: 'var(--gold)', borderRadius: 2, margin: '2px 0' },
+  panelHead: { width: '100%', minHeight: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', padding: '16px 18px', textAlign: 'left' },
+  panelTitle: { flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: 'var(--dark)', lineHeight: 1.3, letterSpacing: '0.1px', whiteSpace: 'normal', overflowWrap: 'anywhere' },
+  chev: { color: 'var(--stone)', fontSize: 16, lineHeight: 1, transition: 'transform .15s', flexShrink: 0 },
+  chevOpen: { color: 'var(--gold)', fontSize: 16, lineHeight: 1, transform: 'rotate(180deg)', flexShrink: 0 },
+  panelBody: { padding: '14px 16px 16px', borderTop: '1px solid rgba(54,48,43,0.14)' },
+  upload: { display: 'block', textAlign: 'center', background: 'var(--cream)', border: '1px dashed var(--gold)', borderRadius: 10, padding: '14px', fontSize: 13, fontWeight: 600, color: 'var(--dark)', cursor: 'pointer', marginBottom: 12 },
+  chartCard: { border: '0.5px solid var(--border)', borderRadius: 12, padding: '10px 12px', background: '#fff' },
+  chartTop: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 },
+  field: { display: 'flex', flexDirection: 'column', gap: 5 },
+  fieldLbl: { fontSize: 9.5, color: 'var(--stone)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' },
+  fieldsWrap: {},
+  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 },
+  formRow: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, background: 'var(--cream)', borderRadius: 10, padding: 12, marginBottom: 12, alignItems: 'end' },
+  inp: { border: '0.5px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--dark)', background: '#fff', width: '100%' },
+  saveBtn: { background: 'var(--gold)', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
+  smallBtn: { background: '#fff', color: 'var(--dark)', border: '0.5px solid var(--border)', padding: '7px 13px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' },
+  search: { flex: '1 1 160px', minWidth: 150, maxWidth: 260, background: '#fff', color: 'var(--dark)', border: '0.5px solid var(--border)', padding: '7px 12px', borderRadius: 8, fontSize: 13, fontFamily: 'var(--font)', boxSizing: 'border-box' },
+  kebab: { flexShrink: 0, width: 34, height: 34, marginLeft: 8, borderRadius: '50%', border: '0.5px solid var(--border)', background: '#fff', color: 'var(--stone)', fontSize: 18, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+  menuOverlay: { position: 'fixed', inset: 0, zIndex: 25, background: 'transparent' },
+  menu: { position: 'absolute', top: 46, right: 10, zIndex: 30, background: '#fff', border: '0.5px solid var(--border)', borderRadius: 10, boxShadow: '0 10px 30px rgba(33,28,23,0.18)', padding: 5, minWidth: 150 },
+  menuItem: { display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: '9px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600, color: 'var(--dark)', cursor: 'pointer', fontFamily: 'var(--font)' },
+  note: { fontSize: 11.5, color: 'var(--stone)', marginBottom: 12, lineHeight: 1.5 },
+  planRow: { display: 'flex', alignItems: 'center', gap: 12, border: '0.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 8 },
+  planIcon: { width: 36, height: 36, borderRadius: 8, background: 'var(--dark)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 },
+  openBtn: { background: 'var(--gold)', color: '#fff', textDecoration: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' },
+  rm: { background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 19, cursor: 'pointer', lineHeight: 1, padding: '0 4px' },
+};
