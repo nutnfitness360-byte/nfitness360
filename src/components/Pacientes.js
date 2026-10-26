@@ -13,7 +13,6 @@ import InBodyModal from './InBodyModal';
 import ImportarPacientes from './ImportarPacientes';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import RichArea from './RichArea';
-import FechaInput from './FechaInput';
 import { renderRich } from '../utils/richText';
 import { apegoPorPeriodo } from '../utils/apego';
 
@@ -94,9 +93,6 @@ const RECO_SECCIONES = [
   { key: 'generales', titulo: 'Generales', items: [] },
 ];
 const RECO_KEYS = RECO_SECCIONES.map(s => s.key);
-// Biblioteca de suplementos con imagen (solo instancias que la activan, ej. Majo Luna).
-// Aditivo: si la bandera está apagada, la tabla de suplementos queda idéntica a hoy.
-const SUPLE_BIBLIOTECA = String(process.env.REACT_APP_SUPLE_BIBLIOTECA || '').toLowerCase() === 'true';
 
 export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [pacientes, setPacientes] = useState([]);
@@ -187,18 +183,6 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     }, () => {});
   }, []);
 
-  // Biblioteca de suplementos (solo instancias con la bandera, ej. Majo). Se usa para
-  // precargar nombre/dosis/foto/dónde comprar al armar la suplementación del paciente.
-  const [biblioSup, setBiblioSup] = useState([]);
-  useEffect(() => {
-    if (!SUPLE_BIBLIOTECA) return undefined;
-    return onSnapshot(query(collection(db, 'bibliotecaSuplementos'), ...filtroDueno(nutriDueno)), snap => {
-      const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      arr.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
-      setBiblioSup(arr);
-    }, () => {});
-  }, [nutriDueno]);
-
   // Al abrir un paciente, carga su borrador de recomendaciones una sola vez (sin pisar lo que se esté escribiendo).
   useEffect(() => {
     if (!selId) { recoLoadedForRef.current = null; return; }
@@ -210,7 +194,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = (b && b[k]) || ''; return o; }, {}));
     setRecoAnalisis((b && b.analisis) || null);
     setRecoSup((b && b.suplementacionTabla && Array.isArray(b.suplementacionTabla.items) && b.suplementacionTabla.items.length)
-      ? b.suplementacionTabla.items.map(x => ({ nombre: x.nombre || '', marca: x.marca || '', dosis: x.dosis || '', frecuencia: x.frecuencia || '', horario: x.horario || '', img: x.img || '', donde: x.donde || '' }))
+      ? b.suplementacionTabla.items.map(x => ({ nombre: x.nombre || '', marca: x.marca || '', dosis: x.dosis || '', frecuencia: x.frecuencia || '', horario: x.horario || '' }))
       : [{ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '' }]);
     setRecoEditIdx(null);
     setHidPeso(''); setHidMlKg(35);
@@ -510,15 +494,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   };
 
   // --- Tabla de suplementos (editable) para la recomendación ---
-  const EMPTY_SUP = () => ({ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '', img: '', donde: '' });
+  const EMPTY_SUP = () => ({ nombre: '', marca: '', dosis: '', frecuencia: '', horario: '' });
   const supRowVacia = (r) => !(r && (r.nombre || r.marca || r.dosis || r.frecuencia || r.horario));
-  // Precarga un suplemento desde la biblioteca de Majo (nombre, dosis, foto y dónde comprar).
-  // Si el último renglón está vacío lo reemplaza; si no, agrega uno nuevo. La dosis queda editable.
-  const agregarDeBiblio = (it) => setRecoSup(rows => {
-    const fila = { ...EMPTY_SUP(), nombre: it.nombre || '', marca: it.marca || '', dosis: it.dosis || '', img: it.img || '', donde: it.donde || '' };
-    const ultimaVacia = rows.length && supRowVacia(rows[rows.length - 1]);
-    return ultimaVacia ? [...rows.slice(0, -1), fila] : [...rows, fila];
-  });
   const setSupCampo = (i, campo, val) => setRecoSup(rows => rows.map((r, k) => k === i ? { ...r, [campo]: val } : r));
   const addSupFila = (nombre = '') => setRecoSup(rows => [...rows, { ...EMPTY_SUP(), nombre }]);
   const removeSupFila = (i) => setRecoSup(rows => { const nx = rows.filter((_, k) => k !== i); return nx.length ? nx : [EMPTY_SUP()]; });
@@ -587,7 +564,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     setRecoForm(RECO_KEYS.reduce((o, k) => { o[k] = r[k] || ''; return o; }, {}));
     setRecoAnalisis(r.analisis || null);
     setRecoSup((r.suplementacionTabla && Array.isArray(r.suplementacionTabla.items) && r.suplementacionTabla.items.length)
-      ? r.suplementacionTabla.items.map(x => ({ nombre: x.nombre || '', marca: x.marca || '', dosis: x.dosis || '', frecuencia: x.frecuencia || '', horario: x.horario || '', img: x.img || '', donde: x.donde || '' }))
+      ? r.suplementacionTabla.items.map(x => ({ nombre: x.nombre || '', marca: x.marca || '', dosis: x.dosis || '', frecuencia: x.frecuencia || '', horario: x.horario || '' }))
       : [EMPTY_SUP()]);
     setRecoEditIdx(idx);
     setErr('');
@@ -1161,7 +1138,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
           </div>
           {openMed && (
             <div style={S.formRow}>
-              <Field l="Fecha"><FechaInput style={S.inp} value={med.fecha} onChange={(iso) => setMed({ ...med, fecha: iso })} /></Field>
+              <Field l="Fecha"><input type="date" style={S.inp} value={med.fecha} onChange={e => setMed({ ...med, fecha: e.target.value })} /></Field>
               <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={med.peso} onChange={e => setMed({ ...med, peso: e.target.value })} /></Field>
               <Field l="% grasa"><input style={S.inp} inputMode="decimal" value={med.grasa} onChange={e => setMed({ ...med, grasa: e.target.value })} /></Field>
               <Field l="Músculo (kg)"><input style={S.inp} inputMode="decimal" value={med.musculo} onChange={e => setMed({ ...med, musculo: e.target.value })} /></Field>
@@ -1174,7 +1151,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
           )}
           {openEdit && (
             <div style={S.formRow}>
-              <Field l="Fecha"><FechaInput style={S.inp} value={editMed.fecha} onChange={(iso) => setEditMed({ ...editMed, fecha: iso })} /></Field>
+              <Field l="Fecha"><input type="date" style={S.inp} value={editMed.fecha} onChange={e => setEditMed({ ...editMed, fecha: e.target.value })} /></Field>
               <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={editMed.peso} onChange={e => setEditMed({ ...editMed, peso: e.target.value })} /></Field>
               <Field l="% grasa"><input style={S.inp} inputMode="decimal" value={editMed.grasa} onChange={e => setEditMed({ ...editMed, grasa: e.target.value })} /></Field>
               <Field l="Músculo (kg)"><input style={S.inp} inputMode="decimal" value={editMed.musculo} onChange={e => setEditMed({ ...editMed, musculo: e.target.value })} /></Field>
@@ -1205,7 +1182,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
             {openEditMM && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ maxWidth: 200, marginBottom: 6 }}>
-                  <Field l="Fecha de la medición"><FechaInput style={S.inp} value={editMM.fecha} onChange={(iso) => setEditMM({ ...editMM, fecha: iso })} /></Field>
+                  <Field l="Fecha de la medición"><input type="date" style={S.inp} value={editMM.fecha} onChange={e => setEditMM({ ...editMM, fecha: e.target.value })} /></Field>
                 </div>
                 <div style={S.subLbl}>Pliegues (mm)</div>
                 <div style={S.medGrid}>
@@ -1291,7 +1268,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                     {openPlan && (
                       <div style={S.formRow}>
                         <Field l="Nombre del plan"><input style={S.inp} value={plan.nombre} onChange={e => setPlan({ ...plan, nombre: e.target.value })} placeholder="Plan · 2200 kcal" /></Field>
-                        <Field l="Fecha"><FechaInput style={S.inp} value={plan.fecha} onChange={(iso) => setPlan({ ...plan, fecha: iso })} /></Field>
+                        <Field l="Fecha"><input type="date" style={S.inp} value={plan.fecha} onChange={e => setPlan({ ...plan, fecha: e.target.value })} /></Field>
                         <Field l="Enlace de Drive"><input style={S.inp} value={plan.link} onChange={e => setPlan({ ...plan, link: e.target.value })} placeholder="https://drive.google.com/…" /></Field>
                         <button style={S.saveBtn} onClick={addPlan}>Guardar</button>
                       </div>
@@ -1495,7 +1472,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                   <div>
                     <div style={S.note}>Captura pliegues (mm) y perímetros (cm). Se guardan con su fecha y alimentan las gráficas de seguimiento.</div>
                     <div style={{ maxWidth: 200, marginBottom: 6 }}>
-                      <Field l="Fecha de la medición"><FechaInput style={S.inp} value={manual.fecha} onChange={(iso) => setManual({ ...manual, fecha: iso })} /></Field>
+                      <Field l="Fecha de la medición"><input type="date" style={S.inp} value={manual.fecha} onChange={e => setManual({ ...manual, fecha: e.target.value })} /></Field>
                     </div>
 
                     <div style={S.subLbl}>Pliegues (mm)</div>
@@ -1695,51 +1672,26 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                     {sec.key === 'suplementos' && (
                       <div style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--mint)', border: '0.5px solid var(--border)', borderRadius: 10 }}>
                         <div style={{ fontSize: 11, color: 'var(--stone)', fontWeight: 600, marginBottom: 8 }}>Tabla de suplementos de esta recomendación · se imprime en el PDF</div>
-                        {SUPLE_BIBLIOTECA && biblioSup.length > 0 && (
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
-                            <span style={{ fontSize: 11, color: 'var(--stone)', fontWeight: 600 }}>Desde la biblioteca:</span>
-                            <select
-                              style={{ ...supInputStyle, width: 'auto', maxWidth: 300, cursor: 'pointer' }}
-                              value=""
-                              onChange={e => { const it = biblioSup.find(x => x.id === e.target.value); if (it) agregarDeBiblio(it); e.target.value = ''; }}>
-                              <option value="">Elegir suplemento…</option>
-                              {biblioSup.map(it => (
-                                <option key={it.id} value={it.id}>{it.nombre}{it.dosis ? ` · ${it.dosis}` : ''}</option>
-                              ))}
-                            </select>
-                            <span style={{ fontSize: 10.5, color: 'var(--stone)' }}>Trae nombre, dosis, foto y dónde comprar · la dosis es editable.</span>
-                          </div>
-                        )}
                         <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: SUPLE_BIBLIOTECA ? 700 : 560 }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 560 }}>
                             <thead>
                               <tr style={{ textAlign: 'left', color: 'var(--stone)' }}>
-                                {SUPLE_BIBLIOTECA && <th style={{ width: 42, padding: '2px 4px', fontWeight: 600 }}>Foto</th>}
                                 <th style={{ padding: '2px 4px', fontWeight: 600 }}>Suplemento</th>
                                 <th style={{ padding: '2px 4px', fontWeight: 600 }}>Marca</th>
                                 <th style={{ padding: '2px 4px', fontWeight: 600 }}>Dosis</th>
                                 <th style={{ padding: '2px 4px', fontWeight: 600 }}>Frecuencia</th>
                                 <th style={{ padding: '2px 4px', fontWeight: 600 }}>Horario</th>
-                                {SUPLE_BIBLIOTECA && <th style={{ padding: '2px 4px', fontWeight: 600 }}>Dónde comprar</th>}
                                 <th style={{ width: 26 }}></th>
                               </tr>
                             </thead>
                             <tbody>
                               {recoSup.map((row, i) => (
                                 <tr key={i}>
-                                  {SUPLE_BIBLIOTECA && (
-                                    <td style={{ padding: '3px 4px' }}>
-                                      {row.img
-                                        ? <img src={row.img} alt="" style={{ width: 34, height: 34, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', display: 'block' }} />
-                                        : <div style={{ width: 34, height: 34, borderRadius: 6, border: '1px dashed var(--border)' }} />}
-                                    </td>
-                                  )}
                                   <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.nombre} placeholder="Ej. Vitamina D" onChange={e => setSupCampo(i, 'nombre', e.target.value)} /></td>
                                   <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.marca} onChange={e => setSupCampo(i, 'marca', e.target.value)} /></td>
                                   <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.dosis} placeholder="Ej. 2000 UI" onChange={e => setSupCampo(i, 'dosis', e.target.value)} /></td>
                                   <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.frecuencia} placeholder="Ej. Diario" onChange={e => setSupCampo(i, 'frecuencia', e.target.value)} /></td>
                                   <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.horario} placeholder="Ej. Mañana" onChange={e => setSupCampo(i, 'horario', e.target.value)} /></td>
-                                  {SUPLE_BIBLIOTECA && <td style={{ padding: '3px 4px' }}><input style={supInputStyle} value={row.donde || ''} placeholder="URL o tienda" onChange={e => setSupCampo(i, 'donde', e.target.value)} /></td>}
                                   <td style={{ padding: '3px 4px', textAlign: 'center' }}><button type="button" style={S.rm} title="Quitar" onClick={() => removeSupFila(i)}>×</button></td>
                                 </tr>
                               ))}
