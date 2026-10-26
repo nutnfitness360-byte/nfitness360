@@ -35,6 +35,10 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Móvil: nada desborda a lo ancho (evita el scroll horizontal y el "espacio en blanco"
+   a la derecha, y que la navegación no se ajuste al ancho de la pantalla). */
+html, body { overflow-x: hidden; max-width: 100%; }
+
 /* Móvil: ningún control de formulario debe exceder el ancho de su contenedor (evita scroll horizontal). */
 input, select, textarea { max-width: 100%; }
 
@@ -63,6 +67,7 @@ body {
   width: 100%;
   max-width: 100%;
   margin: 0 auto;
+  overflow-x: hidden;
 }
 
 @media (min-width: 768px) {
@@ -131,12 +136,33 @@ body {
 
 @media (max-width: 767px) {
   .nav-spacer { display: none; }
+  /* Menú inferior FLOTANTE: fijo al fondo de la pantalla (no al final de la página).
+     Se usa .app .bottomnav (misma especificidad que la variante de escritorio) para
+     que gane sobre la regla base ".bottomnav { position: sticky }" que está más abajo. */
+  .app .bottomnav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 50;
+    justify-content: space-between;
+    padding-left: 2px; padding-right: 2px;
+    padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.12);
+  }
+  .bottomnav .nav-item { flex: 1 1 0; min-width: 0; padding: 0.25rem 0.1rem; }
+  .bottomnav .nav-item svg { width: 21px; height: 21px; }
+  .bottomnav .nav-item span { font-size: 8.5px; letter-spacing: 0.1px; line-height: 1.1; text-align: center; max-width: 100%; word-break: break-word; }
+  /* Espacio al final del contenido para que el menú flotante no tape lo último. */
+  .app .content { padding-bottom: 86px; }
 }
 
 /* Topbar */
 .topbar {
   background: var(--dark);
   padding: 0.875rem 1.5rem;
+  /* El azul del encabezado cubre el área superior (notch / isla / barra de estado)
+     para que el logo no quede tapado por la Isla Dinámica del iPhone. Requiere
+     viewport-fit=cover en public/index.html; sin notch, env() = 0 → sin cambio. */
+  padding-top: calc(0.875rem + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   justify-content: space-between;

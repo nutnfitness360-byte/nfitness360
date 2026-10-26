@@ -106,6 +106,17 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
   const [openImport, setOpenImport] = useState(false);
   const [menuId, setMenuId] = useState(null);
   const [menuReabrir, setMenuReabrir] = useState(null);
+  // En móvil las gráficas van plegadas por defecto para no tener que hacer scroll
+  // largo hasta la generación del plan; en escritorio se muestran abiertas.
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 640px)');
+    const fn = (e) => setIsMobile(e.matches);
+    mq.addEventListener ? mq.addEventListener('change', fn) : mq.addListener(fn);
+    return () => { mq.removeEventListener ? mq.removeEventListener('change', fn) : mq.removeListener(fn); };
+  }, []);
+  const [graficasAbiertas, setGraficasAbiertas] = useState(() => !(typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches));
   const [med, setMed] = useState({ fecha: hoyISO(), peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', apego: '' });
   const [editMed, setEditMed] = useState({ fecha: '', peso: '', grasa: '', musculo: '', grasaKg: '', visceral: '', agua: '', tmb: '' });
   const [editApego, setEditApego] = useState('');
@@ -1130,13 +1141,18 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
 
         <div className="card">
           <div style={S.titleRow}>
-            <div className="card-title" style={{ margin: 0 }}>Gráficas de avance</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {m && <button style={S.smallBtn} onClick={openEdit ? () => setOpenEdit(false) : abrirEditarUltima}>{openEdit ? 'Cancelar' : 'Editar última'}</button>}
-              <button style={S.smallBtn} onClick={() => { setOpenEdit(false); setOpenMed(v => !v); }}>{openMed ? 'Cancelar' : '+ Medición'}</button>
+            <div onClick={() => setGraficasAbiertas(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1, minWidth: 0 }} title={graficasAbiertas ? 'Ocultar gráficas' : 'Ver gráficas'}>
+              <div className="card-title" style={{ margin: 0 }}>Gráficas de avance</div>
+              <span style={graficasAbiertas ? S.chevOpen : S.chev}>⌄</span>
             </div>
+            {graficasAbiertas && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {m && <button style={S.smallBtn} onClick={openEdit ? () => setOpenEdit(false) : abrirEditarUltima}>{openEdit ? 'Cancelar' : 'Editar última'}</button>}
+                <button style={S.smallBtn} onClick={() => { setOpenEdit(false); setOpenMed(v => !v); }}>{openMed ? 'Cancelar' : '+ Medición'}</button>
+              </div>
+            )}
           </div>
-          {openMed && (
+          {graficasAbiertas && openMed && (
             <div style={S.formRow}>
               <Field l="Fecha"><input type="date" style={S.inp} value={med.fecha} onChange={e => setMed({ ...med, fecha: e.target.value })} /></Field>
               <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={med.peso} onChange={e => setMed({ ...med, peso: e.target.value })} /></Field>
@@ -1149,7 +1165,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
               <button style={S.saveBtn} onClick={addMedicion}>Guardar</button>
             </div>
           )}
-          {openEdit && (
+          {graficasAbiertas && openEdit && (
             <div style={S.formRow}>
               <Field l="Fecha"><input type="date" style={S.inp} value={editMed.fecha} onChange={e => setEditMed({ ...editMed, fecha: e.target.value })} /></Field>
               <Field l="Peso (kg)"><input style={S.inp} inputMode="decimal" value={editMed.peso} onChange={e => setEditMed({ ...editMed, peso: e.target.value })} /></Field>
@@ -1162,6 +1178,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
               <button style={S.saveBtn} onClick={guardarEditUltima}>Guardar cambios</button>
             </div>
           )}
+          {graficasAbiertas && (
           <div style={S.chartGrid}>
             <ChartCard title="Peso" unit=" kg" valor={m ? m.peso : null}><Linea data={sel.mediciones} field="peso" color="var(--gold)" unit="" /></ChartCard>
             <ChartCard title="% de grasa" unit="%" valor={m ? m.grasa : null}><Linea data={sel.mediciones} field="grasa" color="var(--stone)" unit="" /></ChartCard>
@@ -1171,15 +1188,19 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
             <ChartCard title="Agua corporal total" unit=" L" valor={m ? m.agua : null}><Linea data={sel.mediciones} field="agua" color="#5B7C99" unit="" /></ChartCard>
             <ChartCard title="Apego al plan" unit="%" valor={ultApego}><Linea data={apegoData} field="apego" color="#3E6B5B" unit="%" /></ChartCard>
           </div>
+          )}
         </div>
 
         {sel.medicionesManual && sel.medicionesManual.length > 0 && (
           <div className="card">
             <div style={S.titleRow}>
-              <div className="card-title" style={{ margin: 0 }}>Gráficas de pliegues y perímetros</div>
-              {mm && <button style={S.smallBtn} onClick={openEditMM ? () => setOpenEditMM(false) : abrirEditarUltimaMM}>{openEditMM ? 'Cancelar' : 'Editar última'}</button>}
+              <div onClick={() => setGraficasAbiertas(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1, minWidth: 0 }} title={graficasAbiertas ? 'Ocultar gráficas' : 'Ver gráficas'}>
+                <div className="card-title" style={{ margin: 0 }}>Gráficas de pliegues y perímetros</div>
+                <span style={graficasAbiertas ? S.chevOpen : S.chev}>⌄</span>
+              </div>
+              {graficasAbiertas && mm && <button style={S.smallBtn} onClick={openEditMM ? () => setOpenEditMM(false) : abrirEditarUltimaMM}>{openEditMM ? 'Cancelar' : 'Editar última'}</button>}
             </div>
-            {openEditMM && (
+            {graficasAbiertas && openEditMM && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ maxWidth: 200, marginBottom: 6 }}>
                   <Field l="Fecha de la medición"><input type="date" style={S.inp} value={editMM.fecha} onChange={e => setEditMM({ ...editMM, fecha: e.target.value })} /></Field>
@@ -1200,6 +1221,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                 {editMMMsg && <div style={{ ...S.note, marginTop: 10, marginBottom: 0, color: 'var(--dark)' }}>{editMMMsg}</div>}
               </div>
             )}
+            {graficasAbiertas && (<>
             <div style={S.subLbl}>Pliegues (mm)</div>
             <div style={S.chartGrid}>
               {PLIEGUES.map((p, i) => (
@@ -1219,6 +1241,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
                 </ChartCard>
               ))}
             </div>
+            </>)}
           </div>
         )}
 
@@ -2118,4 +2141,4 @@ const styles = {
   planIcon: { width: 36, height: 36, borderRadius: 8, background: 'var(--dark)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 },
   openBtn: { background: 'var(--gold)', color: '#fff', textDecoration: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' },
   rm: { background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 19, cursor: 'pointer', lineHeight: 1, padding: '0 4px' },
-};
+};
