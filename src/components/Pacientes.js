@@ -9,12 +9,16 @@ import Menus from './Menus';
 import HistoriaClinica from './HistoriaClinica';
 import NotasSeguimiento from './Notasseguimiento';
 import PlanDeportivo from './PlanDeportivo';
+import RutinaEntrenamiento from './RutinaEntrenamiento';
 import InBodyModal from './InBodyModal';
 import ImportarPacientes from './ImportarPacientes';
 import { buildRecomendacionesHTML } from '../report/recomendacionesHTML';
 import RichArea from './RichArea';
 import { renderRich } from '../utils/richText';
 import { apegoPorPeriodo } from '../utils/apego';
+
+// Función nueva oculta mientras se prueba: solo aparece donde REACT_APP_RUTINA_IA=true.
+const RUTINA_ON = String(process.env.REACT_APP_RUTINA_IA || '').toLowerCase() === 'true';
 
 /* ===== utilidades ===== */
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -990,6 +994,9 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     if (sub === 'deportivo') {
       return <PlanDeportivo patient={sel} onBack={volver} onGuardChange={registerGuard} />;
     }
+    if (sub === 'rutina' && RUTINA_ON) {
+      return <RutinaEntrenamiento patient={sel} onBack={volver} onGuardChange={registerGuard} />;
+    }
     return (
       <div>
         {err && <div style={S.err}>{err}</div>}
@@ -1574,6 +1581,22 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
             )}
           </div>
 
+          {/* Rutina de entrenamiento (gimnasio · IA) — oculto salvo REACT_APP_RUTINA_IA=true */}
+          {RUTINA_ON && (
+          <div className="card" style={panel === 'rutina' ? S.panelOpen : S.panel}>
+            <button style={S.panelHead} onClick={() => setPanel(p => p === 'rutina' ? null : 'rutina')}>
+              <span style={S.panelTitle}>Rutina de entrenamiento <span style={{ fontWeight: 400, color: 'var(--stone)', fontSize: 12 }}>(gimnasio · IA)</span></span>
+              <span style={panel === 'rutina' ? S.chevOpen : S.chev}>⌄</span>
+            </button>
+            {panel === 'rutina' && (
+              <div style={S.panelBody}>
+                <div style={S.note}>Genera una rutina de gimnasio con IA según el objetivo, el nivel y los días. Tú la revisas y apruebas; el paciente la ve con la animación de cada ejercicio.</div>
+                <button style={S.smallBtn} onClick={() => irSub('rutina')}>Abrir / generar rutina</button>
+              </div>
+            )}
+          </div>
+          )}
+
           {/* Menús */}
           <div className="card" style={panel === 'menus' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'menus' ? null : 'menus')}>
@@ -2141,4 +2164,4 @@ const styles = {
   planIcon: { width: 36, height: 36, borderRadius: 8, background: 'var(--dark)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 },
   openBtn: { background: 'var(--gold)', color: '#fff', textDecoration: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' },
   rm: { background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 19, cursor: 'pointer', lineHeight: 1, padding: '0 4px' },
-};
+};

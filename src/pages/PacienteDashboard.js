@@ -15,9 +15,30 @@ import { parseDriveLink } from '../utils/drive';
 import { resumenSaldo, venceDeLote, familiaLabel, nuevoLote, PAQUETES_DEFAULT } from '../utils/creditos';
 import { REGIMENES_FISCALES, USOS_CFDI, CFDI_DEFAULT } from '../data/catalogosCFDI';
 
+/* Animación de un ejercicio: alterna sus 2 fotos (1.8 s por imagen, fundido 0.5 s). */
+function AnimEj({ imgs, size, fill }) {
+  const [f, setF] = useState(0);
+  useEffect(() => {
+    if (!imgs || imgs.length < 2) return undefined;
+    const t = setInterval(() => setF(x => (x ? 0 : 1)), 1800);
+    return () => clearInterval(t);
+  }, [imgs]);
+  const a = imgs && imgs[0];
+  const b = imgs && (imgs[1] || imgs[0]);
+  const box = fill ? { width: '100%', aspectRatio: '1 / 1' } : { width: size || 52, height: size || 52 };
+  return (
+    <div style={{ position: 'relative', ...box, borderRadius: fill ? 14 : 9, overflow: 'hidden', background: '#f3ece3', flexShrink: 0 }}>
+      {b && <img src={b} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+      {a && <img src={a} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: f ? 0 : 1, transition: 'opacity 0.5s ease-in-out' }} />}
+    </div>
+  );
+}
+
 // Módulo de facturación (CFDI) en modo prueba: se OCULTA por completo salvo que la
 // instancia lo habilite con REACT_APP_FACTURACION=true. Así los clientes no lo ven.
 const FACTURACION_ON = String(process.env.REACT_APP_FACTURACION || '').toLowerCase() === 'true';
+// Rutina de entrenamiento: oculta salvo que la instancia la habilite con REACT_APP_RUTINA_IA=true.
+const RUTINA_ON = String(process.env.REACT_APP_RUTINA_IA || '').toLowerCase() === 'true';
 // Biblioteca de suplementos con imagen (solo instancias que la activan, ej. Majo Luna).
 const SUPLE_BIBLIOTECA = String(process.env.REACT_APP_SUPLE_BIBLIOTECA || '').toLowerCase() === 'true';
 const _esUrlSup = (s) => /^https?:\/\//i.test((s || '').toString().trim());
@@ -431,6 +452,10 @@ export default function PacienteDashboard() {
   const factOn = FACTURACION_ON || correoFacturaPrueba;
   const { colors } = useBranding();
   const [tab, setTab] = useState('inicio');
+  const [rutina, setRutina] = useState(null);     // rutina de entrenamiento aprobada
+  const [rutDia, setRutDia] = useState(0);         // día activo en "Mi rutina"
+  const [rutEj, setRutEj] = useState(null);        // ejercicio abierto en el modal
+  const [catRut, setCatRut] = useState(null);      // mapa id -> imágenes del catálogo
   const [citas, setCitas] = useState([]);
   const [expediente, setExpediente] = useState(null);
   const [creditos, setCreditos] = useState({ lotes: [], usos: [] });
@@ -704,6 +729,26 @@ export default function PacienteDashboard() {
     return new Date(+y, +m - 1, +d).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^\w/, c => c.toUpperCase());
   };
 
+  // Rutina de entrenamiento: solo se muestra cuando la nutrióloga la aprobó.
+  useEffect(() => {
+    if (!RUTINA_ON) return undefined;
+    if (!expediente || !expediente.id) { setRutina(null); return undefined; }
+    return onSnapshot(doc(db, 'rutinas', expediente.id), snap => {
+      const d = snap.exists() ? snap.data() : {};
+      setRutina((d.estado === 'aprobada' && d.rutina && Array.isArray(d.rutina.dias)) ? d.rutina : null);
+    }, () => setRutina(null));
+  }, [expediente]);
+  // Catálogo de imágenes (id -> imgs) para las animaciones de la rutina.
+  useEffect(() => {
+    if (!RUTINA_ON) return undefined;
+    let vivo = true;
+    fetch('/catalogo_ejercicios.json').then(r => r.json()).then(arr => {
+      if (!vivo) return;
+      const m = {}; arr.forEach(e => { m[e.id] = e.imgs; }); setCatRut(m);
+    }).catch(() => { if (vivo) setCatRut({}); });
+    return () => { vivo = false; };
+  }, []);
+
   const planes = expediente && Array.isArray(expediente.planes) ? [...expediente.planes].reverse() : [];
   const medics = expediente && Array.isArray(expediente.mediciones) ? expediente.mediciones : [];
   const ultMed = medics.length ? medics[medics.length - 1] : null;
@@ -726,8 +771,10 @@ export default function PacienteDashboard() {
     { id: 'planes', label: 'Mis archivos', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg> },
     { id: 'miDia', label: 'Contador de equivalencias', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> },
     { id: 'recomendaciones', label: 'Recomendaciones', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/></svg> },
+    { id: 'rutina', label: 'Mi rutina', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5v9M4.5 9.75v4.5M17.25 7.5v9M19.5 9.75v4.5M6.75 12h10.5"/></svg> },
     { id: 'facturacion', label: 'Facturación', icon: <svg viewBox="0 0 24 24" strokeWidth="1.5" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 3.75h9a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5h-9a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5z"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5v9"/><path strokeLinecap="round" strokeLinejoin="round" d="M14.1 9.4c0-.9-.94-1.5-2.1-1.5s-2.1.63-2.1 1.65c0 2.1 4.2 1.15 4.2 3.15 0 1.02-.94 1.65-2.1 1.65s-2.1-.6-2.1-1.5"/></svg> },
-  ].filter(t => t.id !== 'facturacion' || factOn); // oculta Facturación mientras esté en pruebas
+  ].filter(t => t.id !== 'facturacion' || factOn)   // oculta Facturación mientras esté en pruebas
+   .filter(t => t.id !== 'rutina' || RUTINA_ON);        // oculta Mi rutina salvo REACT_APP_RUTINA_IA=true
 
   // Opción A: en móvil la barra muestra los principales + "Más"; los secundarios
   // (y Mi perfil) viven dentro de "Más". En escritorio (barra lateral) se ven todos.
@@ -1311,6 +1358,62 @@ export default function PacienteDashboard() {
               })
             )}
           </div>
+        )}
+
+        {tab === 'rutina' && RUTINA_ON && (
+          <>
+            <button onClick={() => setTab('inicio')} style={{ background: '#fff', border: '0.5px solid var(--border)', color: 'var(--dark)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 14px', borderRadius: 8, marginBottom: 14 }}>← Atrás</button>
+            <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--dark)', margin: '2px 4px 14px', fontFamily: 'var(--font)' }}>Mi rutina</h1>
+            {!rutina ? (
+              <div className="card"><div className="empty-state"><div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>🏋️</div>Tu nutrióloga aún no te ha asignado una rutina de entrenamiento.</div></div>
+            ) : (() => {
+              const idx = Math.min(rutDia, rutina.dias.length - 1);
+              const dia = rutina.dias[idx] || rutina.dias[0];
+              return (
+                <>
+                  <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 2 }}>
+                    {rutina.dias.map((d, i) => (
+                      <button key={i} onClick={() => setRutDia(i)} style={{ whiteSpace: 'nowrap', padding: '8px 12px', border: '1px solid var(--border)', background: i === idx ? 'var(--dark)' : '#fff', color: i === idx ? '#fff' : 'var(--stone)', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>{d.dia || ('Día ' + (i + 1))}</button>
+                    ))}
+                  </div>
+                  <div className="card">
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)', marginBottom: 10 }}>{dia.foco || ''}</div>
+                    {(dia.ejercicios || []).map((e, i) => (
+                      <div key={i} onClick={() => setRutEj(e)} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)', cursor: 'pointer' }}>
+                        <AnimEj imgs={catRut && catRut[e.id]} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--dark)' }}>{e.nombre}</div>
+                          <div style={{ fontSize: 11.5, color: 'var(--stone)', marginTop: 2 }}>{e.series} × {e.reps}{e.descanso ? ' · ' + e.descanso : ''}</div>
+                        </div>
+                        <span style={{ color: 'var(--gold)', fontSize: 14 }}>▶</span>
+                      </div>
+                    ))}
+                    <div style={{ fontSize: 11, color: 'var(--stone)', textAlign: 'center', marginTop: 10 }}>Toca un ejercicio para ver cómo se hace</div>
+                  </div>
+                </>
+              );
+            })()}
+            {rutEj && (
+              <div onClick={ev => { if (ev.target === ev.currentTarget) setRutEj(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 2000 }}>
+                <div style={{ background: 'var(--cream, #EEE4DA)', borderRadius: '18px 18px 0 0', width: '100%', maxWidth: 460, maxHeight: '92vh', overflowY: 'auto', padding: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <b style={{ fontSize: 16, color: 'var(--dark)' }}>{rutEj.nombre}</b>
+                    <span onClick={() => setRutEj(null)} style={{ fontSize: 22, color: 'var(--stone)', cursor: 'pointer', lineHeight: 1 }}>✕</span>
+                  </div>
+                  <AnimEj imgs={catRut && catRut[rutEj.id]} fill />
+                  <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
+                    <div style={{ flex: 1, background: '#fff', border: '0.5px solid var(--border)', borderRadius: 11, padding: 9, textAlign: 'center' }}><b style={{ display: 'block', fontSize: 17, fontWeight: 800, color: 'var(--dark)' }}>{rutEj.series}</b><span style={{ fontSize: 9, color: 'var(--stone)', textTransform: 'uppercase' }}>Series</span></div>
+                    <div style={{ flex: 1, background: '#fff', border: '0.5px solid var(--border)', borderRadius: 11, padding: 9, textAlign: 'center' }}><b style={{ display: 'block', fontSize: 17, fontWeight: 800, color: 'var(--dark)' }}>{rutEj.reps}</b><span style={{ fontSize: 9, color: 'var(--stone)', textTransform: 'uppercase' }}>Reps</span></div>
+                    <div style={{ flex: 1, background: '#fff', border: '0.5px solid var(--border)', borderRadius: 11, padding: 9, textAlign: 'center' }}><b style={{ display: 'block', fontSize: 17, fontWeight: 800, color: 'var(--dark)' }}>{rutEj.descanso || '—'}</b><span style={{ fontSize: 9, color: 'var(--stone)', textTransform: 'uppercase' }}>Descanso</span></div>
+                  </div>
+                  {rutEj.cue && (<>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--stone)', textTransform: 'uppercase', marginBottom: 4 }}>Cómo hacerlo</div>
+                    <div style={{ background: '#fff', border: '0.5px solid var(--border)', borderRadius: 11, padding: '11px 13px', fontSize: 13, lineHeight: 1.5, color: 'var(--dark)' }}>{rutEj.cue}</div>
+                  </>)}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {tab === 'facturacion' && factOn && (
