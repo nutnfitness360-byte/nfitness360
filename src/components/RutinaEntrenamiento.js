@@ -41,6 +41,7 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
   const [form, setForm] = useState({ objetivo: '', nivel: 'Intermedio', dias: '4' });
   const [genBusy, setGenBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [confirmRegen, setConfirmRegen] = useState(false);  // ventana propia (no window.confirm) al regenerar
   const [cat, setCat] = useState(null);               // catálogo [{id,nombre,musculo,equipo,imgs}]
   const [picker, setPicker] = useState(null);         // { modo:'swap'|'add', di, ei?, musculo, q }
   const [editSheet, setEditSheet] = useState(null);   // { di, ei }
@@ -103,11 +104,15 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
   const imgsDe = (id) => (catById.current[id] ? catById.current[id].imgs : null);
 
   // ---- Generación con IA (motor: action generarRutina) ----
-  const generar = async () => {
+  const generar = () => {
     if (!form.objetivo) { setMsg('Elige un objetivo primero.'); return; }
+    if (!process.env.REACT_APP_APPSCRIPT_URL) { setMsg('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
+    if (rutina && estado) { setConfirmRegen(true); return; }  // confirma con ventana propia antes de reemplazar
+    ejecutarGeneracion();
+  };
+  const ejecutarGeneracion = async () => {
+    setConfirmRegen(false);
     const url = process.env.REACT_APP_APPSCRIPT_URL;
-    if (!url) { setMsg('Falta configurar REACT_APP_APPSCRIPT_URL en Vercel.'); return; }
-    if (rutina && estado && !window.confirm('Esto reemplazará la rutina actual por un borrador nuevo. ¿Continuar?')) return;
     setGenBusy(true); setMsg('Generando rutina con IA… (puede tardar unos segundos)');
     try {
       const res = await fetch(url, {
@@ -252,6 +257,7 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
                     <div style={S.ejSub}>{e.series} series × {e.reps}{e.descanso ? ' · ' + e.descanso + ' desc.' : ''}</div>
                   </div>
                   <button style={S.editBtn} title="Editar" onClick={() => setEditSheet({ di, ei })}>✏️</button>
+                  <button style={S.delX} title="Quitar ejercicio" onClick={() => quitarEj(di, ei)}>✕</button>
                 </div>
               ))}
               <button style={S.addChip} onClick={() => setPicker({ modo: 'add', di, musculo: (d.ejercicios && d.ejercicios[0] ? d.ejercicios[0].musculo : (catMusculos[0] || '')), q: '' })}>＋ Agregar ejercicio</button>
@@ -333,6 +339,20 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
           </div>
         </div>
       )}
+
+      {/* Confirmación de regenerar (ventana propia con el formato de la instancia, no window.confirm) */}
+      {confirmRegen && (
+        <div className="modal-overlay" style={{ zIndex: 2100 }} onClick={ev => { if (ev.target === ev.currentTarget) setConfirmRegen(false); }}>
+          <div className="modal" style={{ maxWidth: 400, textAlign: 'center' }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--dark)', marginBottom: 8 }}>Regenerar rutina</div>
+            <p style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--dark)', margin: '0 0 16px' }}>Esto reemplazará la rutina actual por un borrador nuevo. ¿Continuar?</p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button style={{ ...S.saveBtn, flex: 1 }} onClick={() => setConfirmRegen(false)}>Cancelar</button>
+              <button style={{ ...S.genBtn, flex: 1, marginTop: 0 }} onClick={ejecutarGeneracion}>Sí, regenerar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -370,6 +390,7 @@ const S = {
   ejName: { fontSize: 13, fontWeight: 700, color: 'var(--dark)', lineHeight: 1.2 },
   ejSub: { fontSize: 11.5, color: 'var(--stone)', marginTop: 2 },
   editBtn: { background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 17, cursor: 'pointer', padding: 6 },
+  delX: { background: 'transparent', border: 'none', color: 'var(--danger)', fontSize: 16, fontWeight: 700, cursor: 'pointer', padding: 6, lineHeight: 1 },
   addChip: { background: '#fff', border: '1px dashed var(--gold)', color: 'var(--gold)', borderRadius: 999, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', marginTop: 10 },
   okBtn: { background: 'var(--sage)', color: '#173b32', border: 'none', padding: '11px 20px', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font)' },
   saveBtn: { background: '#fff', color: 'var(--gold)', border: '1px solid var(--gold)', padding: '11px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' },
