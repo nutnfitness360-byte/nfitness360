@@ -15,6 +15,8 @@ import { selloDueno } from '../utils/multiTenant';
 const NIVELES = ['Principiante', 'Intermedio', 'Avanzado'];
 const OBJETIVOS = ['Ganancia muscular', 'Fuerza', 'Baja de grasa', 'Resistencia', 'Salud general'];
 const DIAS_OPC = ['2', '3', '4', '5', '6'];
+const ENFOQUES = [['completo', 'Cuerpo completo'], ['superior', 'Tren superior'], ['inferior', 'Tren inferior']];
+const enfoqueLabel = (v) => { const f = ENFOQUES.find(x => x[0] === v); return f ? f[1] : 'Cuerpo completo'; };
 
 /* Animación: alterna las 2 fotos del ejercicio (1.8 s por imagen, fundido 0.5 s). */
 function Anim({ imgs, size = 52 }) {
@@ -34,17 +36,51 @@ function Anim({ imgs, size = 52 }) {
   );
 }
 
+/* HTML de la rutina para el PDF que se envía por correo (texto claro, legible para todos). */
+function buildRutinaHTML(rutina, patient, form) {
+  const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const dias = (rutina && rutina.dias) ? rutina.dias : [];
+  const diasHTML = dias.map(d => (
+    '<div style="margin:0 0 18px;">'
+    + '<div style="background:#1a1612;color:#fff;padding:8px 12px;border-radius:8px 8px 0 0;font-weight:700;font-size:15px;">'
+    + esc(d.dia) + ' <span style="color:#CDA788;font-weight:600;font-size:13px;float:right;">' + esc(d.foco) + '</span></div>'
+    + '<table style="width:100%;border-collapse:collapse;border:1px solid #e8ddd4;border-top:none;">'
+    + (d.ejercicios || []).map((e, i) => (
+        '<tr style="background:' + (i % 2 ? '#faf6f1' : '#fff') + ';">'
+        + '<td style="padding:8px 12px;border-bottom:1px solid #eee;">'
+        + '<div style="font-weight:700;font-size:14px;color:#1a1612;">' + esc(e.nombre) + '</div>'
+        + '<div style="font-size:13px;color:#978C87;margin-top:2px;"><b>' + esc(e.series) + ' series × ' + esc(e.reps) + '</b>'
+        + (e.descanso ? ' · descanso ' + esc(e.descanso) : '') + '</div>'
+        + (e.cue ? '<div style="font-size:12px;color:#55504b;margin-top:3px;">' + esc(e.cue) + '</div>' : '')
+        + '</td></tr>'
+      )).join('')
+    + '</table></div>'
+  )).join('');
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
+    + '<body style="font-family:Arial,Helvetica,sans-serif;color:#1a1612;max-width:700px;margin:0 auto;padding:24px;">'
+    + '<h1 style="font-size:22px;margin:0 0 4px;">Rutina de entrenamiento</h1>'
+    + '<div style="color:#978C87;font-size:14px;margin-bottom:4px;">' + esc(patient && patient.nombre || '') + '</div>'
+    + '<div style="color:#978C87;font-size:13px;margin-bottom:18px;">'
+    + esc(form.objetivo) + ' · ' + esc(form.nivel) + ' · ' + esc(form.dias) + ' días/semana · ' + esc(enfoqueLabel(form.enfoque)) + '</div>'
+    + diasHTML
+    + '<div style="margin-top:18px;font-size:11px;color:#aaa;">Generada por tu nutrióloga. Ejecuta cada ejercicio con buena técnica; ante cualquier duda, consúltala.</div>'
+    + '</body></html>';
+}
+
 export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) {
   const [status, setStatus] = useState('cargando');  // cargando | listo
   const [rutina, setRutina] = useState(null);         // { dias:[...] }
   const [estado, setEstado] = useState('');           // '' | borrador | aprobada
-  const [form, setForm] = useState({ objetivo: '', nivel: 'Intermedio', dias: '4' });
+  const [form, setForm] = useState({ objetivo: '', nivel: 'Intermedio', dias: '4', enfoque: 'completo' });
   const [genBusy, setGenBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [confirmRegen, setConfirmRegen] = useState(false);  // ventana propia (no window.confirm) al regenerar
   const [cat, setCat] = useState(null);               // catálogo [{id,nombre,musculo,equipo,imgs}]
   const [picker, setPicker] = useState(null);         // { modo:'swap'|'add', di, ei?, musculo, q }
   const [editSheet, setEditSheet] = useState(null);   // { di, ei }
+  const [historial, setHistorial] = useState([]);     // rutinas aprobadas anteriores
+  const [verHist, setVerHist] = useState(null);       // snapshot de historial abierto (solo lectura)
+  const [registros, setRegistros] = useState({});     // registro del paciente (lo que levantó), solo lectura
   const cargadoRef = useRef(false);
   const dirtyRef = useRef(false);
 
@@ -79,12 +115,23 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
           objetivo: d.objetivo || (patient.objetivo || ''),
           nivel: d.nivel || 'Intermedio',
           dias: String(d.dias || '4'),
+          enfoque: d.enfoque || 'completo',
         });
+        setHistorial(Array.isArray(d.historial) ? d.historial : []);
         cargadoRef.current = true;
         setStatus('listo');
       }
     }, () => setStatus('listo'));
     return unsub;
+  }, [patient]);
+
+  // Registro del paciente (lo que ha levantado), para mostrarlo en la edición.
+  useEffect(() => {
+    if (!patient || !patient.id) return undefined;
+    return onSnapshot(doc(db, 'registrosRutina', patient.id), snap => {
+      const d = snap.exists() ? snap.data() : {};
+      setRegistros(d.porEjercicio || {});
+    }, () => setRegistros({}));
   }, [patient]);
 
   const marcarSucio = () => { dirtyRef.current = true; };
@@ -117,7 +164,7 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
     try {
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'generarRutina', objetivo: form.objetivo, nivel: form.nivel, dias: Number(form.dias) }),
+        body: JSON.stringify({ action: 'generarRutina', objetivo: form.objetivo, nivel: form.nivel, dias: Number(form.dias), enfoque: form.enfoque }),
         redirect: 'follow',
       });
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
@@ -180,18 +227,53 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
     setMsg(nuevoEstado === 'aprobada' ? 'Aprobando…' : 'Guardando…');
     try {
       const est = nuevoEstado || estado || 'borrador';
+      // Al APROBAR, se guarda una copia en el historial (lista de rutinas, como los menús).
+      let hist = historial;
+      if (est === 'aprobada') {
+        const snap = { rutina, objetivo: form.objetivo, nivel: form.nivel, dias: Number(form.dias), enfoque: form.enfoque, fecha: Date.now() };
+        hist = [snap, ...historial].slice(0, 12);
+      }
       await setDoc(doc(db, 'rutinas', patient.id), {
         rutina, estado: est,
-        objetivo: form.objetivo, nivel: form.nivel, dias: Number(form.dias),
+        objetivo: form.objetivo, nivel: form.nivel, dias: Number(form.dias), enfoque: form.enfoque,
+        historial: hist,
         correo: (patient.correo || ''),   // para la regla de Firestore (el paciente lee solo la suya)
         actualizado: Date.now(),
         ...selloDueno(patient && patient.nutriDueno),
       });
+      setHistorial(hist);
       setEstado(est);
       dirtyRef.current = false;
-      setMsg(est === 'aprobada' ? 'Rutina aprobada ✓ — ya es visible para el paciente.' : 'Cambios guardados.');
+      if (est === 'aprobada') {
+        setMsg('Rutina aprobada ✓ — visible para el paciente. Enviando por correo…');
+        enviarCorreoRutina();  // envío automático del PDF al aprobar
+      } else {
+        setMsg('Cambios guardados.');
+      }
     } catch (e) {
       setMsg('No se pudo guardar: ' + (e && e.message ? e.message : 'error'));
+    }
+  };
+
+  // ---- Envío automático de la rutina por correo (PDF), al aprobar ----
+  const enviarCorreoRutina = async () => {
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    const correo = (patient.correo || '').trim();
+    if (!url || !correo) { setMsg('Rutina aprobada ✓ — visible para el paciente. (Sin correo del paciente para enviar el PDF.)'); return; }
+    try {
+      const html = buildRutinaHTML(rutina, patient, form, catById.current);
+      const filename = 'Rutina de entrenamiento ' + String(patient.nombre || 'paciente').trim() + '.pdf';
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'enviarRutina', patient: patient.nombre, correo, filename, html }),
+        redirect: 'follow',
+      });
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false }; }
+      setMsg(data.ok && data.enviado
+        ? 'Rutina aprobada ✓ y enviada por correo al paciente.'
+        : 'Rutina aprobada ✓ (el correo no se pudo enviar; revisa el correo del paciente).');
+    } catch (e) {
+      setMsg('Rutina aprobada ✓ (el correo no se pudo enviar).');
     }
   };
 
@@ -228,9 +310,14 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
               {DIAS_OPC.map(d => <option key={d} value={d}>{d} días</option>)}
             </select>
           </Field>
+          <Field label="Enfoque">
+            <select style={S.input} value={form.enfoque} onChange={e => setForm(f => ({ ...f, enfoque: e.target.value }))}>
+              {ENFOQUES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </Field>
         </div>
         <button style={S.genBtn} onClick={generar} disabled={genBusy}>
-          {genBusy ? 'Generando…' : (rutina ? '↻ Regenerar con IA' : '⚡ Generar rutina con IA')}
+          {genBusy ? 'Generando…' : (rutina ? '↻ Nueva rutina con IA' : '⚡ Generar rutina con IA')}
         </button>
       </div>
 
@@ -271,6 +358,22 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
         </>
       )}
 
+      {/* Historial de rutinas (como la lista de menús) */}
+      {historial.length > 0 && (
+        <div style={{ ...S.card, marginTop: 14 }}>
+          <div style={S.secTitle}>Historial de rutinas</div>
+          {historial.map((h, i) => (
+            <div key={i} style={S.histRow} onClick={() => setVerHist(h)}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={S.ejName}>{(h.objetivo || 'Rutina')} · {enfoqueLabel(h.enfoque)}</div>
+                <div style={S.ejSub}>{h.nivel} · {h.dias} días · {h.fecha ? new Date(h.fecha).toLocaleDateString('es-MX') : ''}</div>
+              </div>
+              <span style={{ color: 'var(--gold)', fontSize: 13, fontWeight: 700 }}>Ver ▸</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {msg && <div style={{ fontSize: 12.5, color: 'var(--stone)', marginTop: 12 }}>{msg}</div>}
       <button style={{ ...S.back, marginTop: 18 }} onClick={() => requestExit(onBack)}>← Atrás</button>
 
@@ -294,6 +397,16 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
               <Field label="Indicación (cómo hacerlo)" full><textarea style={S.area} rows={2} value={e.cue || ''} onChange={ev => setEj(editSheet.di, editSheet.ei, { cue: ev.target.value })} /></Field>
               <button style={S.swapBtn} onClick={() => { setPicker({ modo: 'swap', di: editSheet.di, ei: editSheet.ei, musculo: e.musculo || (catMusculos[0] || ''), q: '' }); }}>🔁 Cambiar ejercicio</button>
               <button style={S.delBtn} onClick={() => quitarEj(editSheet.di, editSheet.ei)}>🗑️ Quitar ejercicio</button>
+              {registros[e.id] && registros[e.id].length > 0 && (
+                <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                  <div style={S.label}>Registro del paciente (lo que ha levantado)</div>
+                  {registros[e.id].slice(0, 6).map((ses, i) => (
+                    <div key={i} style={{ fontSize: 12, color: 'var(--dark)', padding: '4px 0', borderBottom: '0.5px solid var(--border)' }}>
+                      <b>{ses.fecha}</b> — {(ses.series || []).map(x => (x.peso || '–') + ' kg × ' + (x.reps || '–')).join('  ·  ')}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -340,12 +453,35 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
         </div>
       )}
 
+      {/* Ver una rutina del historial (solo lectura) */}
+      {verHist && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={ev => { if (ev.target === ev.currentTarget) setVerHist(null); }}>
+          <div className="modal" style={{ maxWidth: 520 }}>
+            <div style={S.sheetTop}>
+              <b style={{ fontSize: 15 }}>{(verHist.objetivo || 'Rutina')} · {enfoqueLabel(verHist.enfoque)}</b>
+              <span style={S.close} onClick={() => setVerHist(null)}>✕</span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--stone)', marginBottom: 10 }}>{verHist.nivel} · {verHist.dias} días · {verHist.fecha ? new Date(verHist.fecha).toLocaleDateString('es-MX') : ''}</div>
+            {((verHist.rutina && verHist.rutina.dias) ? verHist.rutina.dias : []).map((d, di) => (
+              <div key={di} style={{ marginBottom: 12 }}>
+                <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 4 }}>{d.dia} <span style={{ color: 'var(--gold)', fontWeight: 600, fontSize: 12 }}>{d.foco}</span></div>
+                {(d.ejercicios || []).map((e, ei) => (
+                  <div key={ei} style={{ fontSize: 12.5, color: 'var(--dark)', padding: '4px 0', borderBottom: '0.5px solid var(--border)' }}>
+                    {e.nombre} — {e.series} × {e.reps}{e.descanso ? ' · ' + e.descanso : ''}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Confirmación de regenerar (ventana propia con el formato de la instancia, no window.confirm) */}
       {confirmRegen && (
         <div className="modal-overlay" style={{ zIndex: 2100 }} onClick={ev => { if (ev.target === ev.currentTarget) setConfirmRegen(false); }}>
           <div className="modal" style={{ maxWidth: 400, textAlign: 'center' }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--dark)', marginBottom: 8 }}>Regenerar rutina</div>
-            <p style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--dark)', margin: '0 0 16px' }}>Esto reemplazará la rutina actual por un borrador nuevo. ¿Continuar?</p>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--dark)', marginBottom: 8 }}>Nueva rutina</div>
+            <p style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--dark)', margin: '0 0 16px' }}>Se generará una rutina nueva en lugar de la actual. Las rutinas aprobadas anteriores se conservan en el historial. ¿Continuar?</p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={{ ...S.saveBtn, flex: 1 }} onClick={() => setConfirmRegen(false)}>Cancelar</button>
               <button style={{ ...S.genBtn, flex: 1, marginTop: 0 }} onClick={ejecutarGeneracion}>Sí, regenerar</button>
@@ -401,4 +537,5 @@ const S = {
   swapBtn: { width: '100%', background: '#fff', color: 'var(--gold)', border: '1px solid var(--gold)', padding: '11px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', marginTop: 10 },
   delBtn: { width: '100%', background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', padding: '11px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', marginTop: 8 },
   pickRow: { display: 'flex', gap: 10, alignItems: 'center', padding: '8px', border: '0.5px solid var(--border)', borderRadius: 11, marginBottom: 7, cursor: 'pointer', background: '#fff' },
+  histRow: { display: 'flex', gap: 10, alignItems: 'center', padding: '10px 2px', borderBottom: '0.5px solid var(--border)', cursor: 'pointer' },
 };

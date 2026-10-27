@@ -456,6 +456,8 @@ export default function PacienteDashboard() {
   const [rutDia, setRutDia] = useState(0);         // día activo en "Mi rutina"
   const [rutEj, setRutEj] = useState(null);        // ejercicio abierto en el modal
   const [catRut, setCatRut] = useState(null);      // mapa id -> imágenes del catálogo
+  const [registros, setRegistros] = useState({});  // porEjercicio: { id: [{fecha, series:[{peso,reps}]}] }
+  const [nuevoReg, setNuevoReg] = useState([{ peso: '', reps: '' }]);  // captura de hoy
   const [citas, setCitas] = useState([]);
   const [expediente, setExpediente] = useState(null);
   const [creditos, setCreditos] = useState({ lotes: [], usos: [] });
@@ -738,6 +740,32 @@ export default function PacienteDashboard() {
       setRutina((d.estado === 'aprobada' && d.rutina && Array.isArray(d.rutina.dias)) ? d.rutina : null);
     }, () => setRutina(null));
   }, [expediente]);
+  // Mi registro de entrenamiento (lo que levanté): un solo doc propio (por id de paciente).
+  useEffect(() => {
+    if (!RUTINA_ON) return undefined;
+    if (!expediente || !expediente.id) { setRegistros({}); return undefined; }
+    return onSnapshot(doc(db, 'registrosRutina', expediente.id), snap => {
+      const d = snap.exists() ? snap.data() : {};
+      setRegistros(d.porEjercicio || {});
+    }, () => setRegistros({}));
+  }, [expediente]);
+  const guardarRegistro = async () => {
+    if (!RUTINA_ON || !expediente || !expediente.id || !rutEj) return;
+    const limpio = nuevoReg.filter(s => (s.peso || s.reps));
+    if (!limpio.length) return;
+    const hoy = new Date().toISOString().slice(0, 10);
+    const prev = (registros[rutEj.id] || []);
+    const arr = [{ fecha: hoy, series: limpio }, ...prev].slice(0, 30);
+    try {
+      await setDoc(doc(db, 'registrosRutina', expediente.id), {
+        correo: (user.email || '').toLowerCase(),
+        pacienteId: expediente.id,
+        porEjercicio: { ...registros, [rutEj.id]: arr },
+        actualizado: Date.now(),
+      }, { merge: true });
+      setNuevoReg([{ peso: '', reps: '' }]);
+    } catch (e) { /* silencioso */ }
+  };
   // Catálogo de imágenes (id -> imgs) para las animaciones de la rutina.
   useEffect(() => {
     if (!RUTINA_ON) return undefined;
@@ -1379,7 +1407,7 @@ export default function PacienteDashboard() {
                   <div className="card">
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)', marginBottom: 10 }}>{dia.foco || ''}</div>
                     {(dia.ejercicios || []).map((e, i) => (
-                      <div key={i} onClick={() => setRutEj(e)} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)', cursor: 'pointer' }}>
+                      <div key={i} onClick={() => { setRutEj(e); setNuevoReg([{ peso: '', reps: '' }]); }} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)', cursor: 'pointer' }}>
                         <AnimEj imgs={catRut && catRut[e.id]} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--dark)' }}>{e.nombre}</div>
@@ -1410,6 +1438,31 @@ export default function PacienteDashboard() {
                     <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--stone)', textTransform: 'uppercase', marginBottom: 4 }}>Cómo hacerlo</div>
                     <div style={{ background: '#fff', border: '0.5px solid var(--border)', borderRadius: 11, padding: '11px 13px', fontSize: 13, lineHeight: 1.5, color: 'var(--dark)' }}>{rutEj.cue}</div>
                   </>)}
+                  <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--stone)', textTransform: 'uppercase', marginBottom: 6 }}>Registra lo que hiciste hoy</div>
+                    {nuevoReg.map((sx, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, color: 'var(--stone)', width: 52 }}>Serie {i + 1}</span>
+                        <input placeholder="Peso (kg)" inputMode="decimal" value={sx.peso} onChange={e => { const v = e.target.value; setNuevoReg(a => a.map((x, k) => k === i ? { ...x, peso: v } : x)); }} style={{ flex: 1, minWidth: 0, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 9, fontSize: 13 }} />
+                        <input placeholder="Reps" inputMode="numeric" value={sx.reps} onChange={e => { const v = e.target.value; setNuevoReg(a => a.map((x, k) => k === i ? { ...x, reps: v } : x)); }} style={{ flex: 1, minWidth: 0, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 9, fontSize: 13 }} />
+                        {nuevoReg.length > 1 && <span onClick={() => setNuevoReg(a => a.filter((_, k) => k !== i))} style={{ color: 'var(--danger)', cursor: 'pointer', fontSize: 16 }}>✕</span>}
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                      <button onClick={() => setNuevoReg(a => [...a, { peso: '', reps: '' }])} style={{ flex: 1, background: '#fff', border: '1px dashed var(--gold)', color: 'var(--gold)', borderRadius: 9, padding: '9px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>+ Serie</button>
+                      <button onClick={guardarRegistro} style={{ flex: 2, background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 9, padding: '9px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font)' }}>Guardar lo de hoy</button>
+                    </div>
+                  </div>
+                  {registros[rutEj.id] && registros[rutEj.id].length > 0 && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--stone)', textTransform: 'uppercase', marginBottom: 6 }}>Mis registros anteriores</div>
+                      {registros[rutEj.id].map((ses, i) => (
+                        <div key={i} style={{ fontSize: 12.5, color: 'var(--dark)', padding: '5px 0', borderBottom: '0.5px solid var(--border)' }}>
+                          <b>{ses.fecha}</b> — {(ses.series || []).map(x => (x.peso || '–') + ' kg × ' + (x.reps || '–')).join('  ·  ')}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
