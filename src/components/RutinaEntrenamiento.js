@@ -71,7 +71,7 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
   const [status, setStatus] = useState('cargando');  // cargando | listo
   const [rutina, setRutina] = useState(null);         // { dias:[...] }
   const [estado, setEstado] = useState('');           // '' | borrador | aprobada
-  const [form, setForm] = useState({ objetivo: '', nivel: 'Intermedio', dias: '4', enfoque: 'completo' });
+  const [form, setForm] = useState({ objetivo: '', nivel: 'Intermedio', dias: '4', enfoque: 'completo', consideraciones: '' });
   const [genBusy, setGenBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [confirmRegen, setConfirmRegen] = useState(false);  // ventana propia (no window.confirm) al regenerar
@@ -116,6 +116,7 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
           nivel: d.nivel || 'Intermedio',
           dias: String(d.dias || '4'),
           enfoque: d.enfoque || 'completo',
+          consideraciones: d.consideraciones || '',
         });
         setHistorial(Array.isArray(d.historial) ? d.historial : []);
         cargadoRef.current = true;
@@ -164,7 +165,7 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
     try {
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'generarRutina', objetivo: form.objetivo, nivel: form.nivel, dias: Number(form.dias), enfoque: form.enfoque }),
+        body: JSON.stringify({ action: 'generarRutina', objetivo: form.objetivo, nivel: form.nivel, dias: Number(form.dias), enfoque: form.enfoque, consideraciones: form.consideraciones }),
         redirect: 'follow',
       });
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
@@ -236,6 +237,7 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
       await setDoc(doc(db, 'rutinas', patient.id), {
         rutina, estado: est,
         objetivo: form.objetivo, nivel: form.nivel, dias: Number(form.dias), enfoque: form.enfoque,
+        consideraciones: form.consideraciones || '',
         historial: hist,
         correo: (patient.correo || ''),   // para la regla de Firestore (el paciente lee solo la suya)
         actualizado: Date.now(),
@@ -315,6 +317,10 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
               {ENFOQUES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </Field>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <div style={S.label}>Consideraciones para la IA <span style={{ fontWeight: 400 }}>(opcional)</span></div>
+          <textarea style={S.area} rows={2} value={form.consideraciones} onChange={e => setForm(f => ({ ...f, consideraciones: e.target.value }))} placeholder="Ej.: evitar sentadilla por lesión de rodilla, incluir core cada día, prefiere mancuernas, 3 ejercicios por día…" />
         </div>
         <button style={S.genBtn} onClick={generar} disabled={genBusy}>
           {genBusy ? 'Generando…' : (rutina ? '↻ Nueva rutina con IA' : '⚡ Generar rutina con IA')}
