@@ -1394,8 +1394,8 @@ export default function PacienteDashboard() {
               );
             })()}
             {rutEj && (
-              <div onClick={ev => { if (ev.target === ev.currentTarget) setRutEj(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(20,16,12,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 2000 }}>
-                <div style={{ background: 'var(--cream, #EEE4DA)', borderRadius: '18px 18px 0 0', width: '100%', maxWidth: 460, maxHeight: '92vh', overflowY: 'auto', padding: 16 }}>
+              <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={ev => { if (ev.target === ev.currentTarget) setRutEj(null); }}>
+                <div className="modal" style={{ maxWidth: 460 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <b style={{ fontSize: 16, color: 'var(--dark)' }}>{rutEj.nombre}</b>
                     <span onClick={() => setRutEj(null)} style={{ fontSize: 22, color: 'var(--stone)', cursor: 'pointer', lineHeight: 1 }}>✕</span>

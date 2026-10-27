@@ -178,6 +178,7 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
       await setDoc(doc(db, 'rutinas', patient.id), {
         rutina, estado: est,
         objetivo: form.objetivo, nivel: form.nivel, dias: Number(form.dias),
+        correo: (patient.correo || ''),   // para la regla de Firestore (el paciente lee solo la suya)
         actualizado: Date.now(),
         ...selloDueno(patient && patient.nutriDueno),
       });
@@ -272,8 +273,8 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
         const e = rutina.dias[editSheet.di].ejercicios[editSheet.ei];
         if (!e) return null;
         return (
-          <div style={S.overlay} onClick={ev => { if (ev.target === ev.currentTarget) setEditSheet(null); }}>
-            <div style={S.sheet}>
+          <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={ev => { if (ev.target === ev.currentTarget) setEditSheet(null); }}>
+            <div className="modal" style={{ maxWidth: 520 }}>
               <div style={S.sheetTop}>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Anim imgs={imgsDe(e.id)} size={46} /><b style={{ fontSize: 15 }}>{e.nombre}</b></div>
                 <span style={S.close} onClick={() => setEditSheet(null)}>✕</span>
@@ -294,8 +295,8 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
 
       {/* Buscador del catálogo (cambiar / agregar) */}
       {picker && (
-        <div style={S.overlay} onClick={ev => { if (ev.target === ev.currentTarget) setPicker(null); }}>
-          <div style={S.sheet}>
+        <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={ev => { if (ev.target === ev.currentTarget) setPicker(null); }}>
+          <div className="modal" style={{ maxWidth: 520 }}>
             <div style={S.sheetTop}>
               <b style={{ fontSize: 15 }}>{picker.modo === 'swap' ? 'Cambiar ejercicio' : 'Agregar ejercicio'}</b>
               <span style={S.close} onClick={() => setPicker(null)}>✕</span>
