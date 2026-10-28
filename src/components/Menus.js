@@ -1116,12 +1116,11 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
         <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--pine)', marginBottom: 5 }}>
           Consideraciones generales para la IA <span style={{ fontWeight: 500, color: 'var(--stone)' }}>(opcional · aplican a todo el plan)</span>
         </div>
-        <textarea
+        <AutoGrow
           value={consideracionGral}
           onChange={e => setConsideracionGral(e.target.value)}
           placeholder="Ej.: dieta baja en FODMAPs en todo el plan · evitar lácteos y fritura · preparaciones económicas y fáciles · máximo 20 min de cocción…"
-          rows={2}
-          style={{ width: '100%', boxSizing: 'border-box', border: '1px solid var(--line)', borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--ink)', background: '#fff', resize: 'vertical' }}
+          style={{ width: '100%', boxSizing: 'border-box', border: '1px solid var(--line)', borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--ink)', background: '#fff', minHeight: 54 }}
         />
         <div style={{ fontSize: 11.5, color: 'var(--stone)', marginTop: 4 }}>Se toma en cuenta al <b>generar todos con IA</b> y al <b>regenerar una opción</b>, además de las indicaciones de cada tiempo.</div>
       </div>
@@ -1229,8 +1228,8 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
             {!esPorciones(t) && (
               <div style={{ border: `1px solid #C2A24E`, borderRadius: 10, padding: '11px 13px', background: 'rgba(194,162,78,0.06)', margin: '0 0 14px' }}>
                 <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: '#9A7B2E', marginBottom: 7 }}>✦ Indicaciones para la IA (opcional)</div>
-                <textarea
-                  style={{ width: '100%', minHeight: 54, padding: '9px 11px', border: `1px solid ${T.line}`, borderRadius: 8, fontSize: 13, lineHeight: 1.5, fontFamily: mono, color: T.ink, resize: 'vertical', boxSizing: 'border-box' }}
+                <AutoGrow
+                  style={{ width: '100%', minHeight: 54, padding: '9px 11px', border: `1px solid ${T.line}`, borderRadius: 8, fontSize: 13, lineHeight: 1.5, fontFamily: mono, color: T.ink, boxSizing: 'border-box' }}
                   placeholder="Ej.: Cena ligera, proteína magra + verdura, sin cereales ni frituras."
                   value={t.indicacion || ''}
                   onChange={e => setT(idx, { indicacion: e.target.value })}
