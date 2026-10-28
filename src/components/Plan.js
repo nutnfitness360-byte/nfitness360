@@ -821,7 +821,7 @@ const styles = {
   patientLine: { margin: 0, color: T.inkSoft, fontSize: 14 },
   saveBadge: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, background: T.surface, border: `1px solid ${T.line}`, padding: '6px 12px', borderRadius: 999, whiteSpace: 'nowrap' },
   saveDot: { width: 8, height: 8, borderRadius: 999, display: 'inline-block' },
-  main: { display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 },
+  main: { display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8, paddingBottom: 'calc(92px + env(safe-area-inset-bottom, 0px))' },
   card: { background: T.surface, border: `1px solid ${T.line}`, borderRadius: 16, padding: '20px 20px 22px', boxShadow: '0 1px 2px rgba(22,34,30,0.03)' },
   cardHead: { display: 'flex', gap: 13, marginBottom: 18, alignItems: 'flex-start' },
   cardNum: { minWidth: 30, height: 30, borderRadius: 9, background: T.amber, color: '#211C17', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14 },
