@@ -19,6 +19,9 @@ const _HOST = (typeof window !== 'undefined' && window.location && window.locati
 // Instancia GENÉRICA (nueva, SIN código): paleta desde REACT_APP_BRAND_COLORS y logo incrustado.
 // Ninguna instancia actual usa REACT_APP_MARCA='generica', así que esto NO afecta a Natalia/Aretia/Fitmeal/Nutri Ale Go.
 const ES_GENERICA = _MARCA === 'generica';
+// OCULTAR macros/calorías en la IMPRESIÓN del plan (solo instancias con
+// REACT_APP_OCULTAR_MACROS_PLAN=true, p. ej. Majo). Las equivalencias NO se tocan.
+const OCULTAR_MACROS = String(process.env.REACT_APP_OCULTAR_MACROS_PLAN || '').toLowerCase() === 'true';
 function _gcols() { try { const r = process.env.REACT_APP_BRAND_COLORS; if (!r) return null; const c = JSON.parse(r); const g = k => String(c[k] || '').replace(/%23/g, '#'); return { dark: g('--dark') || '#263C2D', gold: g('--gold') || '#B08D57', cream: g('--cream') || '#F7F5EF', ink: g('--ink') || '#23301F', line: g('--line') || '#E3DDCE', stone: g('--stone') || '#6F7A66', mint: g('--mint') || g('--cream') || '#ECEFE7' }; } catch (e) { return null; } }
 const GEN = _gcols();
 const ES_ARETIA = !ES_GENERICA && (_MARCA ? (_MARCA !== 'natalia') : (_HOST.indexOf('sistemanutricio') !== -1 || _HOST.indexOf('aretia') !== -1));
@@ -194,6 +197,10 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
   const usados = planEq.map((v, i) => (v > 0 ? i : -1)).filter(i => i >= 0);
   const kcal = plan.totales ? r0(plan.totales.kcal) : '';
   const distrib = plan.totales ? `(${r0(plan.totales.distC)}, ${r0(plan.totales.distP)}, ${r0(plan.totales.distL)})` : '';
+  // Línea de objetivo: con OCULTAR_MACROS se quita el '· N kcal (C, P, L)'; sin flag queda idéntico.
+  const _objLine = OCULTAR_MACROS
+    ? `Objetivo: ${esc(objetivo || '—')}`
+    : `Objetivo: ${esc(objetivo || '—')} · ${kcal} kcal ${distrib}`;
   const nom = (nombre || 'Paciente').toUpperCase();
 
   // Columnas de opción: se ajustan al número real de opciones del menú (igual en toda la hoja).
@@ -210,21 +217,21 @@ export function buildReportHTML({ nombre, objetivo, plan, tiempos, incluirMenus 
   // Encabezado de cada página de menú. Aretia: membrete azul marino con el logo
   // y la promesa de marca. Natalia: el encabezado clásico (idéntico al de siempre).
   const headerHTML = (ES_GENERICA && LOGO_INSTANCIA_CLARO)
-    ? `<div class="lead"><div class="leadbrand"><img class="leadlogo-img" src="${LOGO_INSTANCIA_CLARO}" alt="${esc(MARCA_NOMBRE)}"/></div><div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">Objetivo: ${esc(objetivo || '—')} · ${kcal} kcal ${distrib}</div></div></div>`
+    ? `<div class="lead"><div class="leadbrand"><img class="leadlogo-img" src="${LOGO_INSTANCIA_CLARO}" alt="${esc(MARCA_NOMBRE)}"/></div><div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">${_objLine}</div></div></div>`
     : ES_FITMEAL
-    ? `<div class="lead"><div class="leadbrand"><img class="leadlogo-img" src="${LOGO_FITMEAL_BLANCO}" alt="Fitmeal"/></div><div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">Objetivo: ${esc(objetivo || '—')} · ${kcal} kcal ${distrib}</div></div></div>`
+    ? `<div class="lead"><div class="leadbrand"><img class="leadlogo-img" src="${LOGO_FITMEAL_BLANCO}" alt="Fitmeal"/></div><div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">${_objLine}</div></div></div>`
     : ES_NUTRIALEGO
-    ? `<div class="lead"><div class="leadbrand"><img class="leadlogo-img" src="${LOGO_NUTRIALEGO_BLANCO}" alt="Nutri Ale Go"/></div><div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">Objetivo: ${esc(objetivo || '—')} · ${kcal} kcal ${distrib}</div></div></div>`
+    ? `<div class="lead"><div class="leadbrand"><img class="leadlogo-img" src="${LOGO_NUTRIALEGO_BLANCO}" alt="Nutri Ale Go"/></div><div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">${_objLine}</div></div></div>`
     : ES_ARETIA
     ? `<div class="lead">
         <div class="leadbrand"><svg class="leadlogo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M29 74 L50 30 L71 74" fill="none" stroke="#F4F1EA" stroke-width="9" stroke-linejoin="miter"/><path d="M40.5 50 L50 30 L59.5 50" fill="none" stroke="#E0913F" stroke-width="9" stroke-linejoin="miter"/></svg><div class="leadtxt"><div class="leadname">${esc(MARCA_NOMBRE)}</div><div class="leadtag">${esc(MARCA_TAG)}</div></div></div>
-        <div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">Objetivo: ${esc(objetivo || '—')} · ${kcal} kcal ${distrib}</div></div>
+        <div class="leadmeta"><div class="leaddoc">Menú semanal</div><div class="leadsub">${esc(nombre || '')} · ${esc(fechaLarga())}</div><div class="leadkcal">${_objLine}</div></div>
       </div>`
     : `<div class="hdr">
         <div class="htitle">MENÚ SEMANAL<div class="hsub">${esc(nombre || '')}</div></div>
         <div class="hmeta">
           <div class="hrow"><span class="hlbl">OBJETIVO</span><span class="hval">${esc(objetivo || '—')}</span></div>
-          <div class="hrow"><span class="hlbl">FECHA</span><span class="hval">${esc(fechaLarga())}</span><span class="hlbl">KCAL</span><span class="hval">${kcal} ${distrib}</span></div>
+          <div class="hrow"><span class="hlbl">FECHA</span><span class="hval">${esc(fechaLarga())}</span>${OCULTAR_MACROS ? '' : `<span class="hlbl">KCAL</span><span class="hval">${kcal} ${distrib}</span>`}</div>
         </div>
       </div>`;
 
