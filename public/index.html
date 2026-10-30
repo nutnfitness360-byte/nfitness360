@@ -3,15 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#211C17" />
-    <meta name="description" content="Nfitness 360 — Nutrición y bienestar" />
+    <meta name="theme-color" content="%REACT_APP_THEME_COLOR%" />
+    <meta name="description" content="%REACT_APP_SITE_DESC%" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Nfitness 360" />
-    <title>Nfitness 360®</title>
-    <!-- Vista previa al compartir el enlace (Open Graph / Twitter). Se resuelve POR INSTANCIA
-         al compilar: Aretia/Fitmeal definen sus variables en Vercel; si no hay nada definido
-         (Natalia) se usan los valores por defecto de .env.production (Nfitness). -->
+    <meta name="apple-mobile-web-app-title" content="%REACT_APP_APP_NAME%" />
+    <title>%REACT_APP_PAGE_TITLE%</title>
+    <!-- Identidad de la app (ícono, nombre, tema, manifest) + vista previa al compartir
+         (Open Graph / Twitter). TODO se resuelve POR INSTANCIA al compilar: cada proyecto
+         de Vercel define sus REACT_APP_* ; si no hay nada definido (Natalia) se usan los
+         valores por defecto de .env.production (Nfitness). Esto hace que iOS/Android lean
+         el ícono y el nombre correctos de la pantalla de inicio desde el HTML estático. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="%REACT_APP_SITE_TITLE%" />
     <meta property="og:title" content="%REACT_APP_SITE_TITLE%" />
@@ -21,21 +23,18 @@
     <meta name="twitter:title" content="%REACT_APP_SITE_TITLE%" />
     <meta name="twitter:description" content="%REACT_APP_SITE_DESC%" />
     <meta name="twitter:image" content="%REACT_APP_OG_IMAGE%" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" sizes="any" />
-    <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon-32.png" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <link rel="icon" href="%REACT_APP_FAVICON_ICO%" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="%REACT_APP_FAVICON_32%" />
+    <link rel="apple-touch-icon" href="%REACT_APP_APPLE_ICON%" />
+    <link rel="manifest" href="%REACT_APP_MANIFEST%" />
     <script>
-      /* Ícono/manifest por instancia: SOLO en el dominio de Aretia (sistemanutricio) se
-         cambian el manifest, el apple-touch-icon, el favicon, el theme-color y el título.
-         En el dominio de Natalia este bloque NO hace nada → su ícono e identidad quedan
-         EXACTAMENTE igual. */
+      /* Refuerzo SOLO para los dominios REALES de Aretia / demo: ajusta en caliente el
+         título/tema/ícono por si el build no trae definidas las variables de Aretia.
+         Cualquier subdominio nuevo bajo aretia.mx (nutrialego., majoluna., etc.) NO es
+         Aretia: su identidad la definen las variables de entorno de su propio proyecto. */
       (function () {
         try {
           var h = location.hostname;
-          /* Solo los dominios REALES de Aretia / demo reciben su piel (favicon/manifest/título).
-             Cualquier subdominio nuevo bajo aretia.mx (nutrialego., majoluna., etc.) NO es Aretia:
-             su identidad la define App.js por variables de entorno. */
           var esAretiaReal = (h === 'aretia.mx' || h === 'www.aretia.mx' || h === 'app.aretia.mx');
           if (h.indexOf('sistemanutricio') === -1 && !esAretiaReal) return;
           function setLink(rel, href, type, sizes) {
