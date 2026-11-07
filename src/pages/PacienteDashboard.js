@@ -445,6 +445,72 @@ function FacturacionView({ email, citas, creditos }) {
     </>
   );
 }
+/* ===== Registro de gimnasio: utilidades + tarjetas por sesión ===== */
+const MESES_REG = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const DIAS_REG = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+function fmtFechaReg(f) {
+  const d = new Date(String(f) + 'T00:00:00');
+  if (isNaN(d.getTime())) return String(f || '');
+  return DIAS_REG[d.getDay()] + ' ' + d.getDate() + ' ' + MESES_REG[d.getMonth()];
+}
+function volSesion(ses) {
+  return (ses && ses.series ? ses.series : []).reduce((t, s) => {
+    const p = parseFloat(s.peso), r = parseFloat(s.reps);
+    return t + ((isFinite(p) && isFinite(r)) ? p * r : 0);
+  }, 0);
+}
+// Cuántos renglones de serie pre-cargar a partir del campo "series" del ejercicio.
+const nFilasSerie = (v) => {
+  const m = String(v == null ? '' : v).match(/\d+/);
+  const n = m ? parseInt(m[0], 10) : 1;
+  return Math.min(10, Math.max(1, n || 1));
+};
+const filasVacias = (n) => Array.from({ length: n }, () => ({ peso: '', reps: '' }));
+
+// Tarjetas del registro guardado (una por sesión): tabla de series, volumen y progreso vs. la sesión anterior.
+function TarjetasRegistro({ sesiones, titulo }) {
+  if (!sesiones || !sesiones.length) return null;
+  const hdr = { fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--stone)', fontWeight: 700 };
+  return (
+    <div style={{ marginTop: 12 }}>
+      {titulo ? <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--stone)', textTransform: 'uppercase', marginBottom: 8 }}>{titulo}</div> : null}
+      {sesiones.map((ses, i) => {
+        const vol = volSesion(ses);
+        const volPrev = i < sesiones.length - 1 ? volSesion(sesiones[i + 1]) : null;
+        let badge = null;
+        if (volPrev != null && vol > 0 && volPrev > 0) {
+          if (vol > volPrev) badge = { t: '▲ Progreso', c: '#2d6b5e', bg: 'rgba(154,185,173,0.22)', bd: 'var(--sage)' };
+          else if (vol < volPrev) badge = { t: '▼ Menos', c: 'var(--stone)', bg: '#fff', bd: 'var(--border)' };
+          else badge = { t: '= Igual', c: 'var(--stone)', bg: '#fff', bd: 'var(--border)' };
+        }
+        return (
+          <div key={i} style={{ background: '#fff', border: '0.5px solid var(--border)', borderRadius: 12, padding: '11px 12px', marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--dark)', textTransform: 'capitalize' }}>{fmtFechaReg(ses.fecha)}</span>
+              {badge && <span style={{ fontSize: 10, fontWeight: 700, color: badge.c, background: badge.bg, border: '1px solid ' + badge.bd, borderRadius: 20, padding: '3px 9px' }}>{badge.t}</span>}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', rowGap: 4, columnGap: 10, fontSize: 12.5 }}>
+              <div style={hdr}>Serie</div><div style={hdr}>Peso</div><div style={hdr}>Reps</div>
+              {(ses.series || []).map((s, k) => (
+                <React.Fragment key={k}>
+                  <div style={{ color: 'var(--stone)' }}>{k + 1}</div>
+                  <div style={{ fontWeight: 700, color: 'var(--dark)' }}>{s.peso ? s.peso + ' kg' : '–'}</div>
+                  <div style={{ fontWeight: 700, color: 'var(--dark)' }}>{s.reps || '–'}</div>
+                </React.Fragment>
+              ))}
+            </div>
+            {vol > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 7, borderTop: '1px solid var(--border)', fontSize: 11.5, color: 'var(--stone)' }}>
+                <span>Volumen total</span><b style={{ color: 'var(--dark)' }}>{vol.toLocaleString('es-MX')} kg</b>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function PacienteDashboard() {
   const { user } = useAuth();
   // Facturación visible también para la cuenta de pruebas (demos/presentación).
@@ -763,7 +829,7 @@ export default function PacienteDashboard() {
         porEjercicio: { ...registros, [rutEj.id]: arr },
         actualizado: Date.now(),
       }, { merge: true });
-      setNuevoReg([{ peso: '', reps: '' }]);
+      setNuevoReg(filasVacias(nFilasSerie(rutEj.series)));
     } catch (e) { /* silencioso */ }
   };
   // Catálogo de imágenes (id -> imgs) para las animaciones de la rutina.
@@ -1407,7 +1473,7 @@ export default function PacienteDashboard() {
                   <div className="card">
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)', marginBottom: 10 }}>{dia.foco || ''}</div>
                     {(dia.ejercicios || []).map((e, i) => (
-                      <div key={i} onClick={() => { setRutEj(e); setNuevoReg([{ peso: '', reps: '' }]); }} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)', cursor: 'pointer' }}>
+                      <div key={i} onClick={() => { setRutEj(e); setNuevoReg(filasVacias(nFilasSerie(e.series))); }} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)', cursor: 'pointer' }}>
                         <AnimEj imgs={catRut && catRut[e.id]} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--dark)' }}>{e.nombre}</div>
@@ -1440,28 +1506,33 @@ export default function PacienteDashboard() {
                   </>)}
                   <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                     <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--stone)', textTransform: 'uppercase', marginBottom: 6 }}>Registra lo que hiciste hoy</div>
-                    {nuevoReg.map((sx, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
-                        <span style={{ fontSize: 11, color: 'var(--stone)', width: 52 }}>Serie {i + 1}</span>
-                        <input placeholder="Peso (kg)" inputMode="decimal" value={sx.peso} onChange={e => { const v = e.target.value; setNuevoReg(a => a.map((x, k) => k === i ? { ...x, peso: v } : x)); }} style={{ flex: 1, minWidth: 0, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 9, fontSize: 13 }} />
-                        <input placeholder="Reps" inputMode="numeric" value={sx.reps} onChange={e => { const v = e.target.value; setNuevoReg(a => a.map((x, k) => k === i ? { ...x, reps: v } : x)); }} style={{ flex: 1, minWidth: 0, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 9, fontSize: 13 }} />
-                        {nuevoReg.length > 1 && <span onClick={() => setNuevoReg(a => a.filter((_, k) => k !== i))} style={{ color: 'var(--danger)', cursor: 'pointer', fontSize: 16 }}>✕</span>}
-                      </div>
-                    ))}
+                    {nuevoReg.map((sx, i) => {
+                      // Serie anterior: su valor aparece en gris (placeholder) y se autocompleta al enfocar el renglón vacío.
+                      const pesoPrev = i > 0 ? nuevoReg[i - 1].peso : '';
+                      const repsPrev = i > 0 ? nuevoReg[i - 1].reps : '';
+                      const phReps = repsPrev || (i === 0 && rutEj.reps ? String(rutEj.reps) : 'Reps');
+                      return (
+                        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, color: 'var(--stone)', width: 52 }}>Serie {i + 1}</span>
+                          <input placeholder={pesoPrev || 'Peso (kg)'} inputMode="decimal" value={sx.peso}
+                            onFocus={() => { if (!sx.peso && pesoPrev) setNuevoReg(a => a.map((x, k) => k === i ? { ...x, peso: pesoPrev } : x)); }}
+                            onChange={e => { const v = e.target.value; setNuevoReg(a => a.map((x, k) => k === i ? { ...x, peso: v } : x)); }}
+                            style={{ flex: 1, minWidth: 0, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 9, fontSize: 13 }} />
+                          <input placeholder={phReps} inputMode="numeric" value={sx.reps}
+                            onFocus={() => { if (!sx.reps && repsPrev) setNuevoReg(a => a.map((x, k) => k === i ? { ...x, reps: repsPrev } : x)); }}
+                            onChange={e => { const v = e.target.value; setNuevoReg(a => a.map((x, k) => k === i ? { ...x, reps: v } : x)); }}
+                            style={{ flex: 1, minWidth: 0, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 9, fontSize: 13 }} />
+                          {nuevoReg.length > 1 && <span onClick={() => setNuevoReg(a => a.filter((_, k) => k !== i))} style={{ color: 'var(--danger)', cursor: 'pointer', fontSize: 16 }}>✕</span>}
+                        </div>
+                      );
+                    })}
                     <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                      <button onClick={() => setNuevoReg(a => [...a, { peso: '', reps: '' }])} style={{ flex: 1, background: '#fff', border: '1px dashed var(--gold)', color: 'var(--gold)', borderRadius: 9, padding: '9px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>+ Serie</button>
+                      <button onClick={() => setNuevoReg(a => [...a, { peso: '', reps: '' }])} style={{ flex: 1, background: '#fff', border: '1px dashed var(--gold)', color: 'var(--gold)', borderRadius: 9, padding: '9px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>+ Serie extra</button>
                       <button onClick={guardarRegistro} style={{ flex: 2, background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 9, padding: '9px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font)' }}>Guardar lo de hoy</button>
                     </div>
                   </div>
                   {registros[rutEj.id] && registros[rutEj.id].length > 0 && (
-                    <div style={{ marginTop: 12 }}>
-                      <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--stone)', textTransform: 'uppercase', marginBottom: 6 }}>Mis registros anteriores</div>
-                      {registros[rutEj.id].map((ses, i) => (
-                        <div key={i} style={{ fontSize: 12.5, color: 'var(--dark)', padding: '5px 0', borderBottom: '0.5px solid var(--border)' }}>
-                          <b>{ses.fecha}</b> — {(ses.series || []).map(x => (x.peso || '–') + ' kg × ' + (x.reps || '–')).join('  ·  ')}
-                        </div>
-                      ))}
-                    </div>
+                    <TarjetasRegistro sesiones={registros[rutEj.id]} titulo="Mis registros anteriores" />
                   )}
                 </div>
               </div>
