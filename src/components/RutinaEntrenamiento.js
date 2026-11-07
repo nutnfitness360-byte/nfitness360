@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase/config';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { selloDueno } from '../utils/multiTenant';
+import Somatocarta from './Somatocarta';
 
 /* ============================================================
    NFITNESS 360 — Rutina de entrenamiento (gimnasio) con IA
@@ -349,6 +350,11 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
       <div style={S.eyebrow}>RUTINA DE ENTRENAMIENTO</div>
       <h2 style={S.h2}>Gimnasio · generada con IA</h2>
       <div style={S.note}>La IA arma un borrador según el objetivo, el nivel y los días. Revísalo, ajústalo y apruébalo: el paciente solo ve la rutina una vez aprobada.</div>
+
+      {/* Somatocarta del paciente (solo lectura) — aparece cuando ya hay registros */}
+      {registros && Object.keys(registros).length > 0 && (
+        <Somatocarta porEjercicio={registros} rutina={rutina} nombre={patient.nombre} titulo="Somatocarta del paciente" />
+      )}
 
       {/* 1 · Parámetros + generar */}
       <div style={S.card}>
