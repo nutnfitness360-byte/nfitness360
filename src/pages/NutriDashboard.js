@@ -35,6 +35,23 @@ function diasDesde(fechaStr, hoy) {
   return Math.floor((hoy.getTime() - d.getTime()) / 86400000);
 }
 
+// ===== Cumpleaños: a partir de la fecha de nacimiento (ISO) calcula el próximo cumpleaños =====
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+function cumpleInfo(fnISO, hoy) {
+  if (!fnISO) return null;
+  const d = new Date(String(fnISO) + 'T00:00:00');
+  if (isNaN(d.getTime())) return null;
+  const bm = d.getMonth(), bd = d.getDate(), by = d.getFullYear();
+  const h0 = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  let next = new Date(h0.getFullYear(), bm, bd);
+  if (next < h0) next = new Date(h0.getFullYear() + 1, bm, bd);
+  const dias = Math.round((next.getTime() - h0.getTime()) / 86400000);
+  const edadCumple = next.getFullYear() - by;
+  return { dias, esHoy: dias === 0, fechaTxt: bd + ' ' + MESES_CORTOS[bm], edadCumple: (by && edadCumple > 0 && edadCumple < 130) ? edadCumple : null };
+}
+// Ventana de "próximos" cumpleaños que se listan (días). Fácil de ajustar.
+const VENTANA_CUMPLE = 30;
+
 export default function NutriDashboard() {
   const { user, nutriDueno } = useAuth();
   const [tab, setTab] = useState('inicio');
@@ -61,6 +78,7 @@ export default function NutriDashboard() {
   }, []);
   const [citas, setCitas] = useState([]);
   const [pacientes, setPacientes] = useState([]);
+  const [historias, setHistorias] = useState({}); // { [pacienteId]: historiaClinica } — solo para cumpleaños
   const [suscriptores, setSuscriptores] = useState([]);
   const [creditos, setCreditos] = useState([]); // saldos/compras de paquetes (creditosConsultas)
   const [cfg, setCfg] = useState({ pendientes: [], pendientesPago: [], pendientesPlan: [], precios: {}, servicios: [] });
@@ -83,6 +101,14 @@ export default function NutriDashboard() {
 
   useEffect(() => {
     return onSnapshot(query(collection(db, 'pacientes'), ...filtroDueno(nutriDueno)), snap => setPacientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }, [nutriDueno]);
+
+  // Historias clínicas (solo-nutrióloga): se usan ÚNICAMENTE para los cumpleaños
+  // (la fecha de nacimiento vive en historias/{id}.datos.fechaNacimiento, no en el doc del paciente).
+  useEffect(() => {
+    return onSnapshot(query(collection(db, 'historias'), ...filtroDueno(nutriDueno)),
+      snap => { const m = {}; snap.docs.forEach(d => { m[d.id] = d.data(); }); setHistorias(m); },
+      () => setHistorias({}));
   }, [nutriDueno]);
 
   // Usuarios de la app (colección `suscriptores`): trae correo, creado y ultimoAcceso.
@@ -115,6 +141,22 @@ export default function NutriDashboard() {
   // ---- Citas ----
   const citasHoy = citas.filter(c => c.fecha === hoyKey && c.estado !== 'cancelada').sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
   const proximas = citas.filter(c => c.fecha >= hoyKey && c.estado !== 'cancelada').length;
+
+  // ---- Cumpleaños (solo-nutrióloga): cruza pacientes con su fecha de nacimiento ----
+  const cumples = pacientes.map(p => {
+    const h = historias[p.id];
+    const fn = h && h.datos ? h.datos.fechaNacimiento : '';
+    const info = cumpleInfo(fn, hoy);
+    if (!info || info.dias > VENTANA_CUMPLE) return null;
+    return {
+      id: p.id,
+      nombre: p.nombre || (h && h.datos && h.datos.nombre) || '—',
+      codigo: p.codigo || p.pacienteNo || (h && h.datos && h.datos.pacienteNo) || '',
+      ...info,
+    };
+  }).filter(Boolean).sort((a, b) => a.dias - b.dias);
+  const cumpleHoy = cumples.filter(c => c.esHoy);
+  const cumpleProx = cumples.filter(c => !c.esHoy);
 
   // ---- Usuarios activos (los que realmente usan la app, por último acceso) ----
   const ahoraMs = Date.now();
@@ -264,6 +306,24 @@ export default function NutriDashboard() {
     </div>
   );
 
+  // Fila de un cumpleaños (avatar + nombre + edad + cuándo).
+  const cumpleRow = (c, destacado) => (
+    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: destacado ? '5px 0' : '9px 0', borderBottom: destacado ? 'none' : '0.5px solid var(--border)' }}>
+      <div style={{ ...D.cumpleAv, ...(destacado ? D.cumpleAvHoy : {}) }}>{initials(c.nombre)}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--dark)', lineHeight: 1.2 }}>{c.nombre}</div>
+        <div style={{ fontSize: 11.5, color: 'var(--stone)' }}>
+          {c.edadCumple ? 'Cumple ' + c.edadCumple + ' años' : 'Cumpleaños'}{c.codigo ? ' · ' + c.codigo : ''}
+        </div>
+      </div>
+      {!destacado && (
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--stone)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+          {c.fechaTxt}<br />{c.dias === 1 ? 'mañana' : 'en ' + c.dias + ' días'}
+        </div>
+      )}
+    </div>
+  );
+
   const CitaItem = ({ c }) => (
     <div style={{ borderBottom: '0.5px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
       <div className="cita-item" style={{ paddingBottom: 0, marginBottom: 0, borderBottom: 'none' }}>
@@ -322,6 +382,32 @@ export default function NutriDashboard() {
               <div className="stat"><div className="stat-num">{proximas}</div><div className="stat-lbl">Próximas</div></div>
               <div className="stat"><div className="stat-num">{citas.filter(c => c.estado !== 'cancelada').length}</div><div className="stat-lbl">Total citas</div></div>
             </div>
+
+            {/* Cumpleaños de pacientes (solo-nutrióloga) */}
+            {(cumpleHoy.length > 0 || cumpleProx.length > 0) && (
+              <div className="card">
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span aria-hidden>🎂</span> Cumpleaños</div>
+                {cumpleHoy.length > 0 && (
+                  <div style={D.cumpleHoyBox}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--gold)' }}>Hoy</span>
+                      <span style={D.cumpleBadge}>🎉 ¡Hoy!</span>
+                    </div>
+                    {cumpleHoy.map(c => cumpleRow(c, true))}
+                  </div>
+                )}
+                {cumpleHoy.length === 0 && (
+                  <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: cumpleProx.length > 0 ? 8 : 0 }}>Nadie cumple hoy 🎈</div>
+                )}
+                {cumpleProx.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--gold)', margin: '4px 0 2px' }}>Próximos</div>
+                    {cumpleProx.map(c => cumpleRow(c, false))}
+                  </>
+                )}
+                <div style={{ fontSize: 10.5, color: 'var(--stone)', marginTop: 10 }}>Próximos {VENTANA_CUMPLE} días · solo pacientes con fecha de nacimiento registrada.</div>
+              </div>
+            )}
 
             <div className="card">
               <div className="card-title">Usuarios de la app</div>
@@ -567,4 +653,8 @@ const D = {
   retRow: { display: 'flex', alignItems: 'center', gap: 9, padding: '6px 0', borderBottom: '0.5px solid var(--border)' },
   barTrack: { height: 8, background: 'var(--cream)', borderRadius: 999, overflow: 'hidden' },
   barFill: { height: '100%', background: 'var(--gold)', borderRadius: 999 },
+  cumpleAv: { width: 38, height: 38, borderRadius: '50%', background: 'var(--cream)', border: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--stone)', flexShrink: 0 },
+  cumpleAvHoy: { background: 'var(--gold)', color: '#fff', borderColor: 'var(--gold)' },
+  cumpleHoyBox: { background: 'rgba(205,167,136,0.12)', border: '1px solid var(--gold)', borderRadius: 12, padding: '10px 12px', marginBottom: 12 },
+  cumpleBadge: { display: 'inline-block', fontSize: 10, fontWeight: 800, color: '#fff', background: 'var(--gold)', borderRadius: 20, padding: '3px 10px' },
 };
