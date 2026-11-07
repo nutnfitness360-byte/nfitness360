@@ -11,6 +11,17 @@
 
 export const NOVEDADES = [
   {
+    id: '2026-11-07',
+    fecha: 'Noviembre 2026',
+    puntos: [
+      { t: 'IA más precisa en platillos y recetas', d: 'La preparación usa solo los alimentos indicados en cada tiempo (ya no agrega ingredientes que no van, como yogurt o chía) y respeta tus restricciones, por ejemplo "sin lácteos" (usa bebida vegetal).' },
+      { t: 'Regenerar y ajustar platillos con IA', d: 'Pedir de nuevo un platillo ya no falla por un error de formato, y "Ajustar gramajes" ahora también funciona en los platillos hechos con IA.' },
+      { t: 'Rutina de gimnasio renovada', d: 'Registro más rápido (las series vienen precargadas, el peso y las reps se arrastran de una serie a la siguiente) e historial en tarjetas. Además, la somatocarta del paciente: ficha tipo videojuego con nivel, radar y logros.' },
+      { t: 'Recordatorio de cumpleaños', d: 'En tu panel de inicio ves quién cumple hoy y los próximos, para felicitarlos a tiempo.' },
+      { t: 'Mejoras en la vista móvil', d: 'Ajustes para que la app se vea y se use mejor desde el celular, y captura de fechas en formato día/mes/año.' },
+    ],
+  },
+  {
     id: '2026-10-16',
     fecha: '16 de octubre de 2026',
     puntos: [
