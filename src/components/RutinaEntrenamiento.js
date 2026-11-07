@@ -67,6 +67,64 @@ function buildRutinaHTML(rutina, patient, form) {
     + '</body></html>';
 }
 
+/* ===== Registro del paciente: utilidades + tarjetas por sesión (solo lectura aquí) ===== */
+const MESES_REG = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const DIAS_REG = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+function fmtFechaReg(f) {
+  const d = new Date(String(f) + 'T00:00:00');
+  if (isNaN(d.getTime())) return String(f || '');
+  return DIAS_REG[d.getDay()] + ' ' + d.getDate() + ' ' + MESES_REG[d.getMonth()];
+}
+function volSesion(ses) {
+  return (ses && ses.series ? ses.series : []).reduce((t, s) => {
+    const p = parseFloat(s.peso), r = parseFloat(s.reps);
+    return t + ((isFinite(p) && isFinite(r)) ? p * r : 0);
+  }, 0);
+}
+// Tarjetas del registro guardado (una por sesión): tabla de series, volumen y progreso vs. la sesión anterior.
+function TarjetasRegistro({ sesiones, titulo }) {
+  if (!sesiones || !sesiones.length) return null;
+  const hdr = { fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--stone)', fontWeight: 700 };
+  return (
+    <div style={{ marginTop: 10 }}>
+      {titulo ? <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--stone)', textTransform: 'uppercase', marginBottom: 8 }}>{titulo}</div> : null}
+      {sesiones.map((ses, i) => {
+        const vol = volSesion(ses);
+        const volPrev = i < sesiones.length - 1 ? volSesion(sesiones[i + 1]) : null;
+        let badge = null;
+        if (volPrev != null && vol > 0 && volPrev > 0) {
+          if (vol > volPrev) badge = { t: '▲ Progreso', c: '#2d6b5e', bg: 'rgba(154,185,173,0.22)', bd: 'var(--sage)' };
+          else if (vol < volPrev) badge = { t: '▼ Menos', c: 'var(--stone)', bg: '#fff', bd: 'var(--border)' };
+          else badge = { t: '= Igual', c: 'var(--stone)', bg: '#fff', bd: 'var(--border)' };
+        }
+        return (
+          <div key={i} style={{ background: '#fff', border: '0.5px solid var(--border)', borderRadius: 12, padding: '11px 12px', marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--dark)', textTransform: 'capitalize' }}>{fmtFechaReg(ses.fecha)}</span>
+              {badge && <span style={{ fontSize: 10, fontWeight: 700, color: badge.c, background: badge.bg, border: '1px solid ' + badge.bd, borderRadius: 20, padding: '3px 9px' }}>{badge.t}</span>}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', rowGap: 4, columnGap: 10, fontSize: 12.5 }}>
+              <div style={hdr}>Serie</div><div style={hdr}>Peso</div><div style={hdr}>Reps</div>
+              {(ses.series || []).map((s, k) => (
+                <React.Fragment key={k}>
+                  <div style={{ color: 'var(--stone)' }}>{k + 1}</div>
+                  <div style={{ fontWeight: 700, color: 'var(--dark)' }}>{s.peso ? s.peso + ' kg' : '–'}</div>
+                  <div style={{ fontWeight: 700, color: 'var(--dark)' }}>{s.reps || '–'}</div>
+                </React.Fragment>
+              ))}
+            </div>
+            {vol > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 7, borderTop: '1px solid var(--border)', fontSize: 11.5, color: 'var(--stone)' }}>
+                <span>Volumen total</span><b style={{ color: 'var(--dark)' }}>{vol.toLocaleString('es-MX')} kg</b>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) {
   const [status, setStatus] = useState('cargando');  // cargando | listo
   const [rutina, setRutina] = useState(null);         // { dias:[...] }
@@ -406,11 +464,7 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
               {registros[e.id] && registros[e.id].length > 0 && (
                 <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
                   <div style={S.label}>Registro del paciente (lo que ha levantado)</div>
-                  {registros[e.id].slice(0, 6).map((ses, i) => (
-                    <div key={i} style={{ fontSize: 12, color: 'var(--dark)', padding: '4px 0', borderBottom: '0.5px solid var(--border)' }}>
-                      <b>{ses.fecha}</b> — {(ses.series || []).map(x => (x.peso || '–') + ' kg × ' + (x.reps || '–')).join('  ·  ')}
-                    </div>
-                  ))}
+                  <TarjetasRegistro sesiones={registros[e.id].slice(0, 6)} />
                 </div>
               )}
             </div>
