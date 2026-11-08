@@ -2,16 +2,15 @@ import React from 'react';
 
 /* ============================================================
    NFITNESS 360 — Somatocarta del paciente (ficha tipo videojuego)
-   Fase 4 de la rutina de gimnasio. TODO se calcula con lo que ya se
-   registra (peso, reps, fecha) en registrosRutina.porEjercicio +
-   la rutina aprobada (para músculo y días planeados). No pide datos nuevos.
+   Fase 4 de la rutina de gimnasio. Todo se calcula con lo que ya se
+   registra (peso, reps, fecha) en registrosRutina.porEjercicio + la
+   rutina aprobada (para músculo y días planeados). No pide datos nuevos.
 
-   Se usa igual en la app del paciente (su progreso) y en el panel de la
-   nutrióloga (solo lectura, dentro de la ficha del paciente).
+   NOTA Safari/WebKit: se evita SVG y se evita var(--x) dentro de estilos
+   (Safari lanzaba "The string contains invalid characters"). Los colores
+   se resuelven a HEX con getComputedStyle y el radar se dibuja con barras.
    ============================================================ */
 
-// Referencias para normalizar los ejes a 0–100 (tunables; son referencias de
-// entrenamiento, no un juicio clínico). La nutrióloga puede ajustarlas.
 const REF_FUERZA_1RM = 140;        // kg de 1RM estimado que marca 100 en "Fuerza"
 const REF_VOLUMEN_SEMANA = 12000;  // kg/semana que marca 100 en "Volumen"
 const REF_RESISTENCIA_REPS = 20;   // reps/serie que marca 100 en "Resistencia"
@@ -22,7 +21,6 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const num = (x) => { const n = parseFloat(x); return isFinite(n) ? n : null; };
 const epley = (peso, reps) => { const p = num(peso), r = num(reps); if (p == null || r == null) return null; return p * (1 + r / 30); };
 
-// Clave de semana ISO (YYYY-Www) para agrupar volumen por semana.
 function isoWeekKey(fecha) {
   const d = new Date(String(fecha) + 'T00:00:00');
   if (isNaN(d.getTime())) return null;
@@ -33,7 +31,6 @@ function isoWeekKey(fecha) {
   const week = Math.ceil((((t - yearStart) / 86400000) + 1) / 7);
   return t.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
 }
-// Lunes (00:00) de la semana de una fecha, en ms. Para la racha.
 function mondayMs(fecha) {
   const d = new Date(String(fecha) + 'T00:00:00');
   if (isNaN(d.getTime())) return null;
@@ -42,7 +39,6 @@ function mondayMs(fecha) {
   d.setHours(0, 0, 0, 0);
   return d.getTime();
 }
-// Racha = semanas consecutivas (hasta la más reciente con actividad).
 function calcRacha(fechas) {
   const set = new Set();
   fechas.forEach(f => { const m = mondayMs(f); if (m != null) set.add(m); });
@@ -56,9 +52,8 @@ function calcRacha(fechas) {
   }
   return racha;
 }
-// % de cambio de volumen: promedio de las últimas N semanas vs las N previas.
 function calcProgPct(volPorSemana) {
-  const keys = Object.keys(volPorSemana).sort(); // 'YYYY-Www' ordena cronológico
+  const keys = Object.keys(volPorSemana).sort();
   if (keys.length < 2) return 0;
   const n = Math.min(4, Math.floor(keys.length / 2));
   if (n < 1) return 0;
@@ -68,7 +63,6 @@ function calcProgPct(volPorSemana) {
   if (!p) return 0;
   return ((r - p) / p) * 100;
 }
-// XP → nivel (curva creciente: cada nivel cuesta 50 XP más que el anterior).
 function nivelDeXP(xp) {
   let nivel = 1, costo = 100, acum = 0;
   while (xp >= acum + costo) { acum += costo; nivel++; costo += 50; }
@@ -81,12 +75,11 @@ function tituloNivel(n) {
   return 'Principiante';
 }
 
-// ===== Cálculo principal: de los registros crudos a la ficha =====
+// ===== Cálculo principal (igual que antes; es JS puro, no toca el DOM) =====
 export function calcSomatocarta(porEjercicio, rutina) {
   const ejs = porEjercicio || {};
   const ids = Object.keys(ejs);
 
-  // Mapa id -> {musculo, nombre} desde la rutina aprobada (para favorito y etiquetas).
   const meta = {};
   const diasRutina = (rutina && Array.isArray(rutina.dias)) ? rutina.dias : [];
   diasRutina.forEach(d => (d.ejercicios || []).forEach(e => { if (e && e.id) meta[e.id] = { musculo: e.musculo || '', nombre: e.nombre || '' }; }));
@@ -104,7 +97,7 @@ export function calcSomatocarta(porEjercicio, rutina) {
 
   ids.forEach(id => {
     const sesiones = Array.isArray(ejs[id]) ? ejs[id] : [];
-    const asc = sesiones.slice().reverse(); // cronológico ascendente
+    const asc = sesiones.slice().reverse();
     const musc = (meta[id] && meta[id].musculo) || 'Otro';
     let maxPesoPrev = 0;
     let primer1RM = null, ultimo1RM = null, max1RM30 = 0, max1RMprev = 0;
@@ -125,9 +118,9 @@ export function calcSomatocarta(porEjercicio, rutina) {
       if (maxPesoPrev > 0 && sesMaxPeso > maxPesoPrev) prs++;
       if (sesMaxPeso > maxPesoPrev) maxPesoPrev = sesMaxPeso;
       musculoCount[musc] = (musculoCount[musc] || 0) + 1;
-      const d = new Date(String(fecha) + 'T00:00:00').getTime();
-      if (!isNaN(d)) {
-        const age = hoy - d;
+      const dd = new Date(String(fecha) + 'T00:00:00').getTime();
+      if (!isNaN(dd)) {
+        const age = hoy - dd;
         if (age <= MS30) { if (ses1RM > max1RM30) max1RM30 = ses1RM; }
         else if (age <= 2 * MS30) { if (ses1RM > max1RMprev) max1RMprev = ses1RM; }
       }
@@ -135,7 +128,6 @@ export function calcSomatocarta(porEjercicio, rutina) {
       if (ses1RM > 0) ultimo1RM = ses1RM;
     });
 
-    // Progresión por ejercicio: Δ de 1RM a 30 días (fallback: primer vs último).
     let deltaKg = 0;
     if (max1RM30 > 0 && max1RMprev > 0) deltaKg = max1RM30 - max1RMprev;
     else if (ultimo1RM && primer1RM) deltaKg = ultimo1RM - primer1RM;
@@ -146,7 +138,6 @@ export function calcSomatocarta(porEjercicio, rutina) {
   const volSemanaProm = semanas.length ? semanas.reduce((t, w) => t + volPorSemana[w], 0) / semanas.length : 0;
   const racha = calcRacha(fechas);
 
-  // Días planeados por semana: top-level dias (número) o cantidad de bloques-día.
   let diasPlan = 3;
   if (rutina && Number(rutina.dias)) diasPlan = Number(rutina.dias);
   else if (diasRutina.length) diasPlan = diasRutina.length;
@@ -177,63 +168,17 @@ export function calcSomatocarta(porEjercicio, rutina) {
   };
 }
 
-// ===== Dibujo del radar (pentágono 5 ejes) =====
-function puntoRadar(cx, cy, R, pct, i) {
-  const rad = (-90 + i * 72) * Math.PI / 180;
-  const r = (clamp(pct, 0, 100) / 100) * R;
-  return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
-}
-function poligono(cx, cy, R, pct) {
-  return EJES.map((_, i) => puntoRadar(cx, cy, R, pct, i).map(n => n.toFixed(1)).join(',')).join(' ');
-}
-
-// Resuelve una variable CSS a su valor fijo (hex). WebTab/Safari no parsea bien var()
-// DENTRO de los atributos de un SVG; por eso los colores del radar se pasan ya resueltos.
-function cssVar(name, fallback) {
+// Resuelve la paleta de la marca a HEX (sin var() en estilos; Safari lo rechazaba).
+function palette() {
+  const def = { gold: '#c69a6d', stone: '#8a7f77', border: '#e8ddd4', cream: '#f6f1e8', card: '#ffffff', dark: '#1a1612', sage: '#9ab9ad' };
   try {
-    var v = getComputedStyle(document.documentElement).getPropertyValue(name);
-    v = (v || '').trim();
-    return v || fallback;
-  } catch (e) { return fallback; }
-}
-
-function Radar({ valores, col }) {
-  const C = col || {};
-  const border = C.border || '#e8ddd4', gold = C.gold || '#c69a6d', stone = C.stone || '#8a7f77';
-  const cx = 110, cy = 104, R = 74;
-  const grid = [25, 50, 75, 100];
-  const dataPoly = EJES.map((e, i) => puntoRadar(cx, cy, R, valores[e] || 0, i).map(n => n.toFixed(1)).join(',')).join(' ');
-  const labelPos = EJES.map((e, i) => puntoRadar(cx, cy, R + 16, 100, i));
-  return (
-    <svg viewBox="0 0 220 208" style={{ width: '100%', maxWidth: 260, margin: '6px auto 0', display: 'block' }}>
-      <g fill="none" stroke={border} strokeWidth="1">
-        {grid.map((g, k) => <polygon key={k} points={poligono(cx, cy, R, g)} />)}
-      </g>
-      <g stroke={border} strokeWidth="1">
-        {EJES.map((e, i) => { const [x, y] = puntoRadar(cx, cy, R, 100, i); return <line key={i} x1={cx} y1={cy} x2={x} y2={y} />; })}
-      </g>
-      <polygon points={dataPoly} fill={gold} fillOpacity="0.24" stroke={gold} strokeWidth="2" />
-      {EJES.map((e, i) => { const [x, y] = puntoRadar(cx, cy, R, valores[e] || 0, i); return <circle key={i} cx={x} cy={y} r="2.6" fill={gold} />; })}
-      <g fontSize="9" fontWeight="700" fill={stone} textAnchor="middle" style={{ fontFamily: 'inherit' }}>
-        {EJES.map((e, i) => {
-          const [x, y] = labelPos[i];
-          return <text key={i} x={x} y={y + (i === 0 ? -1 : 3)}>{e}</text>;
-        })}
-      </g>
-    </svg>
-  );
-}
-
-// Blindaje por sección: si una parte truena (p. ej. en Safari), muestra un marcador chiquito
-// con su etiqueta en vez de tumbar toda la somatocarta. Sirve para diagnosticar cuál falla.
-class SafeSvg extends React.Component {
-  constructor(props) { super(props); this.state = { err: false }; }
-  static getDerivedStateFromError() { return { err: true }; }
-  componentDidCatch(e) { try { console.error('Somatocarta sección:', e); } catch (x) {} }
-  render() {
-    if (this.state.err) return <div style={{ fontSize: 9, color: '#bbb', padding: '2px 0' }}>· {this.props.lbl || ''} ·</div>;
-    return this.props.children;
-  }
+    const cs = getComputedStyle(document.documentElement);
+    const g = (n, d) => { const v = (cs.getPropertyValue(n) || '').trim(); return v || d; };
+    return {
+      gold: g('--gold', def.gold), stone: g('--stone', def.stone), border: g('--border', def.border),
+      cream: g('--cream', def.cream), card: g('--card', def.card), dark: g('--dark', def.dark), sage: g('--sage', def.sage),
+    };
+  } catch (e) { return def; }
 }
 
 // ===== Componente principal =====
@@ -241,18 +186,17 @@ export default function Somatocarta({ porEjercicio, rutina, nombre, titulo }) {
   let d;
   try { d = calcSomatocarta(porEjercicio, rutina); }
   catch (e) { try { console.error('Somatocarta calc error:', e); } catch (_) {} d = { hayDatos: false }; }
-  const root = {
-    background: 'var(--card, #fff)', border: '0.5px solid var(--border, #e8ddd4)',
-    borderRadius: 16, padding: '16px 16px 18px', marginBottom: 14,
-  };
-  const head = { fontSize: 11, letterSpacing: 1, color: 'var(--gold, #c69a6d)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 };
+
+  const P = palette();
+  const root = { background: P.card, border: '0.5px solid ' + P.border, borderRadius: 16, padding: '16px 16px 18px', marginBottom: 14 };
+  const head = { fontSize: 11, letterSpacing: '0.08em', color: P.gold, fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 };
 
   if (!d.hayDatos) {
     return (
       <div style={root}>
         <div style={head}>{titulo || 'Somatocarta'}</div>
-        <div style={{ fontSize: 12.5, color: 'var(--stone, #8a7f77)', lineHeight: 1.5, marginTop: 6 }}>
-          Aún no hay registros de entrenamiento para construir la somatocarta. Aparecerá en cuanto {nombre ? 'el paciente registre' : 'registres'} tus primeras series.
+        <div style={{ fontSize: 12.5, color: P.stone, lineHeight: 1.5, marginTop: 6 }}>
+          Aún no hay registros de entrenamiento para construir la somatocarta. Aparecerá en cuanto {nombre ? 'el paciente registre' : 'registres'} las primeras series.
         </div>
       </div>
     );
@@ -262,44 +206,52 @@ export default function Somatocarta({ porEjercicio, rutina, nombre, titulo }) {
   const prog = d.pills.progreso || { nombre: '', delta: 0 };
   const progTxt = prog.delta ? (prog.delta > 0 ? '+' : '') + (Math.round(prog.delta * 10) / 10) + ' kg' : '—';
   const progSub = prog.nombre ? String(prog.nombre).split(' ')[0] : 'fuerza 30 d';
-  const pill = { background: 'var(--cream, #f6f1e8)', border: '0.5px solid var(--border, #e8ddd4)', borderRadius: 10, padding: '7px 10px', fontSize: 10.5, color: 'var(--stone, #8a7f77)', textAlign: 'center', flex: '1 1 72px' };
-  const pillB = { display: 'block', color: 'var(--dark, #1a1612)', fontSize: 14, fontWeight: 800, lineHeight: 1.15 };
+  const pill = { background: P.cream, border: '0.5px solid ' + P.border, borderRadius: 10, padding: '7px 10px', fontSize: 10.5, color: P.stone, textAlign: 'center', flex: '1 1 72px' };
+  const pillB = { display: 'block', color: P.dark, fontSize: 14, fontWeight: 800, lineHeight: 1.15 };
 
   return (
     <div style={root}>
-      <SafeSvg lbl="nivel">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-          <div>
-            <div style={head}>{titulo || 'Somatocarta'}</div>
-            {nombre ? <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--dark, #1a1612)' }}>{nombre}</div> : null}
-          </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--cream, #f6f1e8)', border: '0.5px solid var(--border, #e8ddd4)', borderRadius: 20, padding: '4px 11px', fontSize: 12, color: 'var(--dark, #1a1612)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-            🏋️ Nivel <b style={{ color: 'var(--gold, #c69a6d)' }}>{d.nivel}</b> · {d.titulo}
-          </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+        <div>
+          <div style={head}>{titulo || 'Somatocarta'}</div>
+          {nombre ? <div style={{ fontSize: 13, fontWeight: 700, color: P.dark }}>{nombre}</div> : null}
         </div>
-      </SafeSvg>
-
-      <SafeSvg lbl="xp">
-        <div style={{ marginTop: 10 }}>
-          <div style={{ height: 7, background: 'var(--cream, #f1e9df)', borderRadius: 5, overflow: 'hidden', border: '0.5px solid var(--border, #e8ddd4)' }}>
-            <div style={{ height: '100%', width: clamp(pct, 2, 100) + '%', background: 'linear-gradient(90deg, var(--gold, #c69a6d), var(--sage, #9ab9ad))' }} />
-          </div>
-          <div style={{ fontSize: 10.5, color: 'var(--stone, #8a7f77)', marginTop: 4 }}>{d.xpEnNivel} / {d.xpParaSiguiente} XP para Nivel {d.nivel + 1}</div>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: P.cream, border: '0.5px solid ' + P.border, borderRadius: 20, padding: '4px 11px', fontSize: 12, color: P.dark, fontWeight: 600, whiteSpace: 'nowrap' }}>
+          Nivel <b style={{ color: P.gold }}>{d.nivel}</b> · {d.titulo}
         </div>
-      </SafeSvg>
+      </div>
 
-      <SafeSvg lbl="radar">
-        <Radar valores={d.radar} col={{ gold: cssVar('--gold', '#c69a6d'), border: cssVar('--border', '#e8ddd4'), stone: cssVar('--stone', '#8a7f77') }} />
-      </SafeSvg>
-
-      <SafeSvg lbl="pills">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
-          <div style={pill}><b style={pillB}>{d.pills.sesiones}</b>sesiones</div>
-          <div style={pill}><b style={pillB}>{d.pills.musculoFav}</b>músculo + usado</div>
-          <div style={pill}><b style={pillB}>{progTxt}</b>{progSub}</div>
-          <div style={pill}><b style={pillB}>{d.pills.racha} 🔥</b>sem. seguidas</div>
+      {/* Barra de XP */}
+      <div style={{ marginTop: 10 }}>
+        <div style={{ height: 7, background: P.cream, borderRadius: 5, overflow: 'hidden', border: '0.5px solid ' + P.border }}>
+          <div style={{ height: '100%', width: clamp(pct, 2, 100) + '%', background: P.gold }} />
         </div>
-      </SafeSvg>
+        <div style={{ fontSize: 10.5, color: P.stone, marginTop: 4 }}>{d.xpEnNivel} / {d.xpParaSiguiente} XP para Nivel {d.nivel + 1}</div>
+      </div>
+
+      {/* Radar como barras (sin SVG) */}
+      <div style={{ marginTop: 12 }}>
+        {EJES.map(e => {
+          const v = Math.max(0, Math.min(100, d.radar[e] || 0));
+          return (
+            <div key={e} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <div style={{ width: 82, fontSize: 10.5, color: P.stone, flexShrink: 0 }}>{e}</div>
+              <div style={{ flex: 1, height: 9, background: P.cream, borderRadius: 5, overflow: 'hidden', border: '0.5px solid ' + P.border }}>
+                <div style={{ height: '100%', width: v + '%', background: P.gold }} />
+              </div>
+              <div style={{ width: 26, textAlign: 'right', fontSize: 10.5, fontWeight: 700, color: P.dark, flexShrink: 0 }}>{v}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Pills */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
+        <div style={pill}><b style={pillB}>{d.pills.sesiones}</b>sesiones</div>
+        <div style={pill}><b style={pillB}>{d.pills.musculoFav}</b>músculo + usado</div>
+        <div style={pill}><b style={pillB}>{progTxt}</b>{progSub}</div>
+        <div style={pill}><b style={pillB}>{d.pills.racha}</b>sem. seguidas</div>
+      </div>
     </div>
   );
 }
