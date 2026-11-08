@@ -16,6 +16,28 @@ import { parseDriveLink } from '../utils/drive';
 import { resumenSaldo, venceDeLote, familiaLabel, nuevoLote, PAQUETES_DEFAULT } from '../utils/creditos';
 import { REGIMENES_FISCALES, USOS_CFDI, CFDI_DEFAULT } from '../data/catalogosCFDI';
 
+// Red de seguridad: si algo dentro truena, muestra el error en vez de dejar la pantalla
+// en blanco (un error sin capturar en React desmonta toda la app = pantalla blanca).
+class RutinaBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err, info) { try { console.error('Rutina crash:', err, info); } catch (e) {} }
+  render() {
+    if (this.state.err) {
+      const msg = (this.state.err && this.state.err.message) ? this.state.err.message : String(this.state.err);
+      return (
+        <div className="card">
+          <div style={{ fontSize: 13, color: 'var(--dark)', lineHeight: 1.5 }}>
+            No se pudo mostrar esta sección. Toma una captura de este mensaje y compártela con tu nutrióloga:
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--danger)', fontFamily: 'monospace', wordBreak: 'break-word' }}>{msg}</div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 /* Animación de un ejercicio: alterna sus 2 fotos (1.8 s por imagen, fundido 0.5 s). */
 function AnimEj({ imgs, size, fill }) {
   const [f, setF] = useState(0);
@@ -1456,7 +1478,7 @@ export default function PacienteDashboard() {
         )}
 
         {tab === 'rutina' && RUTINA_ON && (
-          <>
+          <RutinaBoundary>
             <button onClick={() => setTab('inicio')} style={{ background: '#fff', border: '0.5px solid var(--border)', color: 'var(--dark)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 14px', borderRadius: 8, marginBottom: 14 }}>← Atrás</button>
             <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--dark)', margin: '2px 4px 14px', fontFamily: 'var(--font)' }}>Mi rutina</h1>
             {!rutina ? (
@@ -1539,7 +1561,7 @@ export default function PacienteDashboard() {
                 </div>
               </div>
             )}
-          </>
+          </RutinaBoundary>
         )}
 
         {tab === 'facturacion' && factOn && (
