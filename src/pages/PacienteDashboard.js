@@ -1502,7 +1502,7 @@ export default function PacienteDashboard() {
               const dia = rutina.dias[idx] || rutina.dias[0];
               return (
                 <>
-                  <RutinaBoundary><Somatocarta porEjercicio={registros} rutina={rutina} titulo="Mi somatocarta" /></RutinaBoundary>
+                  <SafeBlock><Somatocarta porEjercicio={registros} rutina={rutina} titulo="Mi somatocarta" /></SafeBlock>
                   <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 2 }}>
                     {rutina.dias.map((d, i) => (
                       <button key={i} onClick={() => setRutDia(i)} style={{ whiteSpace: 'nowrap', padding: '8px 12px', border: '1px solid var(--border)', background: i === idx ? 'var(--dark)' : '#fff', color: i === idx ? '#fff' : 'var(--stone)', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>{d.dia || ('Día ' + (i + 1))}</button>
