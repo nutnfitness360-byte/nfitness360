@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 /* ============================================================
    NFITNESS 360 — Somatocarta del paciente (ficha tipo videojuego)
@@ -6,9 +6,9 @@ import React from 'react';
    registra (peso, reps, fecha) en registrosRutina.porEjercicio + la
    rutina aprobada (para músculo y días planeados). No pide datos nuevos.
 
-   NOTA Safari/WebKit: se evita SVG y se evita var(--x) dentro de estilos
-   (Safari lanzaba "The string contains invalid characters"). Los colores
-   se resuelven a HEX con getComputedStyle y el radar se dibuja con barras.
+   Dos vistas del radar, con botón para alternar: GRÁFICA (pentágono SVG)
+   o BARRAS (HTML). La preferencia se recuerda en el navegador.
+   Colores siempre resueltos a HEX (nunca var() en el SVG, por Safari).
    ============================================================ */
 
 const REF_FUERZA_1RM = 140;        // kg de 1RM estimado que marca 100 en "Fuerza"
@@ -75,7 +75,7 @@ function tituloNivel(n) {
   return 'Principiante';
 }
 
-// ===== Cálculo principal (igual que antes; es JS puro, no toca el DOM) =====
+// ===== Cálculo principal (JS puro; no toca el DOM) =====
 export function calcSomatocarta(porEjercicio, rutina) {
   const ejs = porEjercicio || {};
   const ids = Object.keys(ejs);
@@ -168,7 +168,7 @@ export function calcSomatocarta(porEjercicio, rutina) {
   };
 }
 
-// Resuelve la paleta de la marca a HEX (sin var() en estilos; Safari lo rechazaba).
+// Paleta de la marca resuelta a HEX (nunca var() en el SVG; Safari lo rechaza).
 function palette() {
   const def = { gold: '#c69a6d', stone: '#8a7f77', border: '#e8ddd4', cream: '#f6f1e8', card: '#ffffff', dark: '#1a1612', sage: '#9ab9ad' };
   try {
@@ -181,8 +181,65 @@ function palette() {
   } catch (e) { return def; }
 }
 
+// ===== Vista GRÁFICA: radar de pentágono (SVG, colores ya en hex) =====
+function puntoRadar(cx, cy, R, pct, i) {
+  const rad = (-90 + i * 72) * Math.PI / 180;
+  const r = (clamp(pct, 0, 100) / 100) * R;
+  return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+}
+function poligono(cx, cy, R, pct) {
+  return EJES.map((_, i) => puntoRadar(cx, cy, R, pct, i).map(n => n.toFixed(1)).join(',')).join(' ');
+}
+function RadarGrafica({ valores, col }) {
+  const border = col.border, gold = col.gold, stone = col.stone;
+  const cx = 110, cy = 104, R = 74, grid = [25, 50, 75, 100];
+  const dataPoly = EJES.map((e, i) => puntoRadar(cx, cy, R, valores[e] || 0, i).map(n => n.toFixed(1)).join(',')).join(' ');
+  const labelPos = EJES.map((e, i) => puntoRadar(cx, cy, R + 16, 100, i));
+  return (
+    <svg viewBox="0 0 220 208" style={{ width: '100%', maxWidth: 260, margin: '8px auto 0', display: 'block' }}>
+      <g fill="none" stroke={border} strokeWidth="1">
+        {grid.map((g, k) => <polygon key={k} points={poligono(cx, cy, R, g)} />)}
+      </g>
+      <g stroke={border} strokeWidth="1">
+        {EJES.map((e, i) => { const [x, y] = puntoRadar(cx, cy, R, 100, i); return <line key={i} x1={cx} y1={cy} x2={x} y2={y} />; })}
+      </g>
+      <polygon points={dataPoly} fill={gold} fillOpacity="0.24" stroke={gold} strokeWidth="2" />
+      {EJES.map((e, i) => { const [x, y] = puntoRadar(cx, cy, R, valores[e] || 0, i); return <circle key={i} cx={x} cy={y} r="2.6" fill={gold} />; })}
+      <g fontSize="9" fontWeight="700" fill={stone} textAnchor="middle">
+        {EJES.map((e, i) => { const [x, y] = labelPos[i]; return <text key={i} x={x} y={y + (i === 0 ? -1 : 3)}>{e}</text>; })}
+      </g>
+    </svg>
+  );
+}
+
+// ===== Vista BARRAS: una barra por eje (HTML) =====
+function RadarBarras({ valores, col }) {
+  return (
+    <div style={{ marginTop: 10 }}>
+      {EJES.map(e => {
+        const v = Math.max(0, Math.min(100, valores[e] || 0));
+        return (
+          <div key={e} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <div style={{ width: 82, fontSize: 10.5, color: col.stone, flexShrink: 0 }}>{e}</div>
+            <div style={{ flex: 1, height: 9, background: col.cream, borderRadius: 5, overflow: 'hidden', border: '0.5px solid ' + col.border }}>
+              <div style={{ height: '100%', width: v + '%', background: col.gold }} />
+            </div>
+            <div style={{ width: 26, textAlign: 'right', fontSize: 10.5, fontWeight: 700, color: col.dark, flexShrink: 0 }}>{v}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ===== Componente principal =====
 export default function Somatocarta({ porEjercicio, rutina, nombre, titulo }) {
+  const [vista, setVista] = useState(() => {
+    try { const v = localStorage.getItem('somato_vista'); return (v === 'barras' || v === 'grafica') ? v : 'grafica'; }
+    catch (e) { return 'grafica'; }
+  });
+  const cambiarVista = (v) => { setVista(v); try { localStorage.setItem('somato_vista', v); } catch (e) {} };
+
   let d;
   try { d = calcSomatocarta(porEjercicio, rutina); }
   catch (e) { try { console.error('Somatocarta calc error:', e); } catch (_) {} d = { hayDatos: false }; }
@@ -208,6 +265,7 @@ export default function Somatocarta({ porEjercicio, rutina, nombre, titulo }) {
   const progSub = prog.nombre ? String(prog.nombre).split(' ')[0] : 'fuerza 30 d';
   const pill = { background: P.cream, border: '0.5px solid ' + P.border, borderRadius: 10, padding: '7px 10px', fontSize: 10.5, color: P.stone, textAlign: 'center', flex: '1 1 72px' };
   const pillB = { display: 'block', color: P.dark, fontSize: 14, fontWeight: 800, lineHeight: 1.15 };
+  const segBtn = (on) => ({ background: on ? P.gold : 'transparent', color: on ? '#fff' : P.stone, border: 'none', padding: '4px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' });
 
   return (
     <div style={root}>
@@ -229,21 +287,18 @@ export default function Somatocarta({ porEjercicio, rutina, nombre, titulo }) {
         <div style={{ fontSize: 10.5, color: P.stone, marginTop: 4 }}>{d.xpEnNivel} / {d.xpParaSiguiente} XP para Nivel {d.nivel + 1}</div>
       </div>
 
-      {/* Radar como barras (sin SVG) */}
-      <div style={{ marginTop: 12 }}>
-        {EJES.map(e => {
-          const v = Math.max(0, Math.min(100, d.radar[e] || 0));
-          return (
-            <div key={e} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <div style={{ width: 82, fontSize: 10.5, color: P.stone, flexShrink: 0 }}>{e}</div>
-              <div style={{ flex: 1, height: 9, background: P.cream, borderRadius: 5, overflow: 'hidden', border: '0.5px solid ' + P.border }}>
-                <div style={{ height: '100%', width: v + '%', background: P.gold }} />
-              </div>
-              <div style={{ width: 26, textAlign: 'right', fontSize: 10.5, fontWeight: 700, color: P.dark, flexShrink: 0 }}>{v}</div>
-            </div>
-          );
-        })}
+      {/* Botón para alternar Gráfica / Barras */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+        <div style={{ display: 'inline-flex', border: '0.5px solid ' + P.border, borderRadius: 8, overflow: 'hidden' }}>
+          <button type="button" onClick={() => cambiarVista('grafica')} style={segBtn(vista === 'grafica')}>Gráfica</button>
+          <button type="button" onClick={() => cambiarVista('barras')} style={segBtn(vista === 'barras')}>Barras</button>
+        </div>
       </div>
+
+      {/* Radar: gráfica o barras según la preferencia */}
+      {vista === 'grafica'
+        ? <RadarGrafica valores={d.radar} col={P} />
+        : <RadarBarras valores={d.radar} col={P} />}
 
       {/* Pills */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
