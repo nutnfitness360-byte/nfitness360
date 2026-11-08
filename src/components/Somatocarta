@@ -224,6 +224,18 @@ function Radar({ valores, col }) {
   );
 }
 
+// Blindaje por sección: si una parte truena (p. ej. en Safari), muestra un marcador chiquito
+// con su etiqueta en vez de tumbar toda la somatocarta. Sirve para diagnosticar cuál falla.
+class SafeSvg extends React.Component {
+  constructor(props) { super(props); this.state = { err: false }; }
+  static getDerivedStateFromError() { return { err: true }; }
+  componentDidCatch(e) { try { console.error('Somatocarta sección:', e); } catch (x) {} }
+  render() {
+    if (this.state.err) return <div style={{ fontSize: 9, color: '#bbb', padding: '2px 0' }}>· {this.props.lbl || ''} ·</div>;
+    return this.props.children;
+  }
+}
+
 // ===== Componente principal =====
 export default function Somatocarta({ porEjercicio, rutina, nombre, titulo }) {
   let d;
@@ -255,33 +267,39 @@ export default function Somatocarta({ porEjercicio, rutina, nombre, titulo }) {
 
   return (
     <div style={root}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-        <div>
-          <div style={head}>{titulo || 'Somatocarta'}</div>
-          {nombre ? <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--dark, #1a1612)' }}>{nombre}</div> : null}
+      <SafeSvg lbl="nivel">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+          <div>
+            <div style={head}>{titulo || 'Somatocarta'}</div>
+            {nombre ? <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--dark, #1a1612)' }}>{nombre}</div> : null}
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--cream, #f6f1e8)', border: '0.5px solid var(--border, #e8ddd4)', borderRadius: 20, padding: '4px 11px', fontSize: 12, color: 'var(--dark, #1a1612)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            🏋️ Nivel <b style={{ color: 'var(--gold, #c69a6d)' }}>{d.nivel}</b> · {d.titulo}
+          </div>
         </div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--cream, #f6f1e8)', border: '0.5px solid var(--border, #e8ddd4)', borderRadius: 20, padding: '4px 11px', fontSize: 12, color: 'var(--dark, #1a1612)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-          🏋️ Nivel <b style={{ color: 'var(--gold, #c69a6d)' }}>{d.nivel}</b> · {d.titulo}
+      </SafeSvg>
+
+      <SafeSvg lbl="xp">
+        <div style={{ marginTop: 10 }}>
+          <div style={{ height: 7, background: 'var(--cream, #f1e9df)', borderRadius: 5, overflow: 'hidden', border: '0.5px solid var(--border, #e8ddd4)' }}>
+            <div style={{ height: '100%', width: clamp(pct, 2, 100) + '%', background: 'linear-gradient(90deg, var(--gold, #c69a6d), var(--sage, #9ab9ad))' }} />
+          </div>
+          <div style={{ fontSize: 10.5, color: 'var(--stone, #8a7f77)', marginTop: 4 }}>{d.xpEnNivel} / {d.xpParaSiguiente} XP para Nivel {d.nivel + 1}</div>
         </div>
-      </div>
+      </SafeSvg>
 
-      {/* Barra de XP */}
-      <div style={{ marginTop: 10 }}>
-        <div style={{ height: 7, background: 'var(--cream, #f1e9df)', borderRadius: 5, overflow: 'hidden', border: '0.5px solid var(--border, #e8ddd4)' }}>
-          <div style={{ height: '100%', width: clamp(pct, 2, 100) + '%', background: 'linear-gradient(90deg, var(--gold, #c69a6d), var(--sage, #9ab9ad))' }} />
+      <SafeSvg lbl="radar">
+        <Radar valores={d.radar} col={{ gold: cssVar('--gold', '#c69a6d'), border: cssVar('--border', '#e8ddd4'), stone: cssVar('--stone', '#8a7f77') }} />
+      </SafeSvg>
+
+      <SafeSvg lbl="pills">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
+          <div style={pill}><b style={pillB}>{d.pills.sesiones}</b>sesiones</div>
+          <div style={pill}><b style={pillB}>{d.pills.musculoFav}</b>músculo + usado</div>
+          <div style={pill}><b style={pillB}>{progTxt}</b>{progSub}</div>
+          <div style={pill}><b style={pillB}>{d.pills.racha} 🔥</b>sem. seguidas</div>
         </div>
-        <div style={{ fontSize: 10.5, color: 'var(--stone, #8a7f77)', marginTop: 4 }}>{d.xpEnNivel} / {d.xpParaSiguiente} XP para Nivel {d.nivel + 1}</div>
-      </div>
-
-      <Radar valores={d.radar} col={{ gold: cssVar('--gold', '#c69a6d'), border: cssVar('--border', '#e8ddd4'), stone: cssVar('--stone', '#8a7f77') }} />
-
-      {/* Pills */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
-        <div style={pill}><b style={pillB}>{d.pills.sesiones}</b>sesiones</div>
-        <div style={pill}><b style={pillB}>{d.pills.musculoFav}</b>músculo + usado</div>
-        <div style={pill}><b style={pillB}>{progTxt}</b>{progSub}</div>
-        <div style={pill}><b style={pillB}>{d.pills.racha} 🔥</b>sem. seguidas</div>
-      </div>
+      </SafeSvg>
     </div>
   );
 }
