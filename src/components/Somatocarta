@@ -187,22 +187,34 @@ function poligono(cx, cy, R, pct) {
   return EJES.map((_, i) => puntoRadar(cx, cy, R, pct, i).map(n => n.toFixed(1)).join(',')).join(' ');
 }
 
-function Radar({ valores }) {
+// Resuelve una variable CSS a su valor fijo (hex). WebTab/Safari no parsea bien var()
+// DENTRO de los atributos de un SVG; por eso los colores del radar se pasan ya resueltos.
+function cssVar(name, fallback) {
+  try {
+    var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+    v = (v || '').trim();
+    return v || fallback;
+  } catch (e) { return fallback; }
+}
+
+function Radar({ valores, col }) {
+  const C = col || {};
+  const border = C.border || '#e8ddd4', gold = C.gold || '#c69a6d', stone = C.stone || '#8a7f77';
   const cx = 110, cy = 104, R = 74;
   const grid = [25, 50, 75, 100];
   const dataPoly = EJES.map((e, i) => puntoRadar(cx, cy, R, valores[e] || 0, i).map(n => n.toFixed(1)).join(',')).join(' ');
   const labelPos = EJES.map((e, i) => puntoRadar(cx, cy, R + 16, 100, i));
   return (
     <svg viewBox="0 0 220 208" style={{ width: '100%', maxWidth: 260, margin: '6px auto 0', display: 'block' }}>
-      <g fill="none" stroke="var(--border, #e8ddd4)" strokeWidth="1">
+      <g fill="none" stroke={border} strokeWidth="1">
         {grid.map((g, k) => <polygon key={k} points={poligono(cx, cy, R, g)} />)}
       </g>
-      <g stroke="var(--border, #e8ddd4)" strokeWidth="1">
+      <g stroke={border} strokeWidth="1">
         {EJES.map((e, i) => { const [x, y] = puntoRadar(cx, cy, R, 100, i); return <line key={i} x1={cx} y1={cy} x2={x} y2={y} />; })}
       </g>
-      <polygon points={dataPoly} fill="var(--gold, #c69a6d)" fillOpacity="0.24" stroke="var(--gold, #c69a6d)" strokeWidth="2" />
-      {EJES.map((e, i) => { const [x, y] = puntoRadar(cx, cy, R, valores[e] || 0, i); return <circle key={i} cx={x} cy={y} r="2.6" fill="var(--gold, #c69a6d)" />; })}
-      <g fontSize="9" fontWeight="700" fill="var(--stone, #8a7f77)" textAnchor="middle" style={{ fontFamily: 'inherit' }}>
+      <polygon points={dataPoly} fill={gold} fillOpacity="0.24" stroke={gold} strokeWidth="2" />
+      {EJES.map((e, i) => { const [x, y] = puntoRadar(cx, cy, R, valores[e] || 0, i); return <circle key={i} cx={x} cy={y} r="2.6" fill={gold} />; })}
+      <g fontSize="9" fontWeight="700" fill={stone} textAnchor="middle" style={{ fontFamily: 'inherit' }}>
         {EJES.map((e, i) => {
           const [x, y] = labelPos[i];
           return <text key={i} x={x} y={y + (i === 0 ? -1 : 3)}>{e}</text>;
@@ -261,7 +273,7 @@ export default function Somatocarta({ porEjercicio, rutina, nombre, titulo }) {
         <div style={{ fontSize: 10.5, color: 'var(--stone, #8a7f77)', marginTop: 4 }}>{d.xpEnNivel} / {d.xpParaSiguiente} XP para Nivel {d.nivel + 1}</div>
       </div>
 
-      <Radar valores={d.radar} />
+      <Radar valores={d.radar} col={{ gold: cssVar('--gold', '#c69a6d'), border: cssVar('--border', '#e8ddd4'), stone: cssVar('--stone', '#8a7f77') }} />
 
       {/* Pills */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
