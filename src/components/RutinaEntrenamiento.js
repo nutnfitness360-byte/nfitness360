@@ -217,27 +217,58 @@ export default function RutinaEntrenamiento({ patient, onBack, onGuardChange }) 
     if (rutina && estado) { setConfirmRegen(true); return; }  // confirma con ventana propia antes de reemplazar
     ejecutarGeneracion();
   };
-  const ejecutarGeneracion = async () => {
-    setConfirmRegen(false);
-    const url = process.env.REACT_APP_APPSCRIPT_URL;
-    setGenBusy(true); setMsg('Generando rutina con IA… (puede tardar unos segundos)');
+  // Pide un LOTE de días al motor (petición corta). Timeout propio para no colgarse.
+  const pedirLote = async (url, nDias, consideraciones) => {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 55000);
     try {
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'generarRutina', objetivo: form.objetivo, nivel: form.nivel, dias: Number(form.dias), enfoque: form.enfoque, consideraciones: form.consideraciones }),
-        redirect: 'follow',
+        body: JSON.stringify({ action: 'generarRutina', objetivo: form.objetivo, nivel: form.nivel, dias: nDias, enfoque: form.enfoque, consideraciones }),
+        redirect: 'follow', signal: ctrl.signal,
       });
-      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
-      if (data.ok && data.rutina && Array.isArray(data.rutina.dias)) {
-        setRutina(data.rutina);
-        setEstado('borrador');
-        setMsg('Borrador generado por IA. Revísalo, ajústalo y apruébalo.');
-        marcarSucio();
-      } else {
-        setMsg('No se pudo generar: ' + (data.error || 'error del servidor.'));
-      }
+      clearTimeout(to);
+      let data; try { data = JSON.parse(await res.text()); } catch (_) { data = null; }
+      if (data && data.ok && data.rutina && Array.isArray(data.rutina.dias)) return data.rutina.dias;
+      throw new Error((data && data.error) ? data.error : 'respuesta no válida del servidor');
     } catch (e) {
-      setMsg('No se pudo generar: ' + (e && e.message ? e.message : 'error'));
+      clearTimeout(to);
+      throw (e && e.name === 'AbortError') ? new Error('la generación tardó demasiado') : e;
+    }
+  };
+
+  // Generación POR LOTES: en vez de una sola petición larga (que el navegador aborta con
+  // "Load failed" cuando son muchos días), se piden 2 días por vez y se van uniendo. Así
+  // cada petición es corta y la rutina se arma completa.
+  const LOTE_DIAS = 2;
+  const ejecutarGeneracion = async () => {
+    setConfirmRegen(false);
+    const url = process.env.REACT_APP_APPSCRIPT_URL;
+    const total = Math.max(1, Number(form.dias) || 1);
+    setGenBusy(true);
+    setMsg('Generando rutina con IA… (día 1 de ' + total + ')');
+    try {
+      let dias = [];
+      while (dias.length < total) {
+        const pedir = Math.min(LOTE_DIAS, total - dias.length);
+        const focosPrevios = dias.map(d => d && d.foco).filter(Boolean);
+        const cons = (form.consideraciones ? form.consideraciones.trim() + '. ' : '')
+          + 'Genera exactamente ' + pedir + ' día(s) de entrenamiento.'
+          + (focosPrevios.length ? ' Ya existen estos días (NO los repitas; complementa con otros grupos musculares): ' + focosPrevios.join('; ') + '.' : '');
+        setMsg('Generando rutina con IA… (día ' + (dias.length + 1) + ' de ' + total + ')');
+        const nuevos = await pedirLote(url, pedir, cons);
+        if (!nuevos || !nuevos.length) break;
+        dias = dias.concat(nuevos);
+      }
+      if (!dias.length) { setMsg('No se pudo generar: el servidor no devolvió días.'); return; }
+      // Renumera los días (Día 1, Día 2, …) por si los lotes los numeraron desde 1.
+      dias = dias.slice(0, total).map((d, i) => ({ ...d, dia: 'Día ' + (i + 1) }));
+      setRutina({ dias });
+      setEstado('borrador');
+      setMsg('Borrador generado por IA (' + dias.length + ' días). Revísalo, ajústalo y apruébalo.');
+      marcarSucio();
+    } catch (e) {
+      setMsg('No se pudo generar: ' + (e && e.message ? e.message : 'error') + '. Intenta de nuevo o con menos días.');
     } finally {
       setGenBusy(false);
     }
