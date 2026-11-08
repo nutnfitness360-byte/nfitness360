@@ -44,6 +44,14 @@ class RutinaBoundary extends React.Component {
   }
 }
 
+// Boundary chico: si lo de adentro truena, no rompe la página — simplemente no lo muestra.
+class SafeBlock extends React.Component {
+  constructor(props) { super(props); this.state = { err: false }; }
+  static getDerivedStateFromError() { return { err: true }; }
+  componentDidCatch(e) { try { console.error('SafeBlock:', e); } catch (x) {} }
+  render() { return this.state.err ? null : this.props.children; }
+}
+
 /* Animación de un ejercicio: alterna sus 2 fotos (1.8 s por imagen, fundido 0.5 s). */
 function AnimEj({ imgs, size, fill }) {
   const [f, setF] = useState(0);
@@ -1494,7 +1502,7 @@ export default function PacienteDashboard() {
               const dia = rutina.dias[idx] || rutina.dias[0];
               return (
                 <>
-                  <Somatocarta porEjercicio={registros} rutina={rutina} titulo="Mi somatocarta" />
+                  <SafeBlock><Somatocarta porEjercicio={registros} rutina={rutina} titulo="Mi somatocarta" /></SafeBlock>
                   <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 2 }}>
                     {rutina.dias.map((d, i) => (
                       <button key={i} onClick={() => setRutDia(i)} style={{ whiteSpace: 'nowrap', padding: '8px 12px', border: '1px solid var(--border)', background: i === idx ? 'var(--dark)' : '#fff', color: i === idx ? '#fff' : 'var(--stone)', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>{d.dia || ('Día ' + (i + 1))}</button>
