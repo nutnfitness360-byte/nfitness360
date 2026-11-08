@@ -19,17 +19,23 @@ import { REGIMENES_FISCALES, USOS_CFDI, CFDI_DEFAULT } from '../data/catalogosCF
 // Red de seguridad: si algo dentro truena, muestra el error en vez de dejar la pantalla
 // en blanco (un error sin capturar en React desmonta toda la app = pantalla blanca).
 class RutinaBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { err: null }; }
+  constructor(props) { super(props); this.state = { err: null, stack: '' }; }
   static getDerivedStateFromError(err) { return { err }; }
-  componentDidCatch(err, info) { try { console.error('Rutina crash:', err, info); } catch (e) {} }
+  componentDidCatch(err, info) {
+    try { console.error('Rutina crash:', err, info); } catch (e) {}
+    // El "component stack" nombra el componente exacto que falló (para diagnosticar).
+    var st = (info && info.componentStack) ? String(info.componentStack).trim().split('\n').slice(0, 6).join('\n') : '';
+    this.setState({ stack: st });
+  }
   render() {
     if (this.state.err) {
       const msg = (this.state.err && this.state.err.message) ? this.state.err.message : String(this.state.err);
       return (
         <div className="card">
           <div style={{ fontSize: 13, color: 'var(--dark)', lineHeight: 1.5 }}>
-            No se pudo mostrar esta sección. Toma una captura de este mensaje y compártela con tu nutrióloga:
+            No se pudo mostrar esta sección. Toma una captura de TODO este recuadro y compártela con tu nutrióloga:
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--danger)', fontFamily: 'monospace', wordBreak: 'break-word' }}>{msg}</div>
+            {this.state.stack ? <pre style={{ marginTop: 8, fontSize: 10.5, color: 'var(--stone)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{this.state.stack}</pre> : null}
           </div>
         </div>
       );
