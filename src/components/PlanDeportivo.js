@@ -196,7 +196,7 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
       const filename = 'Plan deportivo ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt + '.pdf';
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'saveDeportivo', marca: (process.env.REACT_APP_MARCA || ''),patient: patient.nombre, correo: (patient.correo || ''), filename, html }),
+        body: JSON.stringify({ action: 'saveDeportivo', marca: (process.env.REACT_APP_MARCA || (typeof window !== 'undefined' && /aretia|sistemanutricio/i.test(window.location.hostname) ? 'aretia' : '')),patient: patient.nombre, correo: (patient.correo || ''), filename, html }),
         redirect: 'follow',
       });
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
