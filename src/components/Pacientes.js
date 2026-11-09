@@ -627,7 +627,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
       const filename = `Recomendacion_${(sel.nombre || 'paciente').replace(/[^\w-]+/g, '_')}_${fechaImp}.pdf`;
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'saveRecomendaciones', patient: sel.nombre || 'Paciente', correo: sel.correo || '', filename, html }),
+        body: JSON.stringify({ action: 'saveRecomendaciones', marca: (process.env.REACT_APP_MARCA || ''),patient: sel.nombre || 'Paciente', correo: sel.correo || '', filename, html }),
         redirect: 'follow',
       });
       let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: 'Respuesta no válida del servidor.' }; }
