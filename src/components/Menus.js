@@ -858,7 +858,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
       const filename = baseNombre + '.pdf';
       const res = await fetchIA(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'savePlan', patient: patient.nombre, correo: (patient.correo || ''), filename, html }), redirect: 'follow',
+        body: JSON.stringify({ action: 'savePlan', marca: (process.env.REACT_APP_MARCA || ''),patient: patient.nombre, correo: (patient.correo || ''), filename, html }), redirect: 'follow',
       }, 180000);
       let data; try { data = JSON.parse(await res.text()); } catch (_) { data = { ok: false, error: 'Respuesta no válida del servidor.' }; }
       if (data.ok && data.link) {
@@ -874,7 +874,7 @@ export default function Menus({ patient, onBack, initialMenus = null, onGuardCha
             const baseEq = 'Tabla de equivalencias ' + String(patient.nombre || 'paciente').trim() + ' ' + fechaTxt;
             const resEq = await fetchIA(url, {
               method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ action: 'savePlan', patient: patient.nombre, correo: (patient.correo || ''), filename: baseEq + '.pdf', html: htmlEq, enviarCorreo: false }), redirect: 'follow',
+              body: JSON.stringify({ action: 'savePlan', marca: (process.env.REACT_APP_MARCA || ''),patient: patient.nombre, correo: (patient.correo || ''), filename: baseEq + '.pdf', html: htmlEq, enviarCorreo: false }), redirect: 'follow',
             }, 180000);
             let dEq; try { dEq = JSON.parse(await resEq.text()); } catch (_) { dEq = { ok: false }; }
             if (dEq.ok && dEq.link) archivosNuevos.push({ nombre: baseEq, fecha: new Date().toISOString().slice(0, 10), link: dEq.link });
