@@ -657,7 +657,7 @@ export default function PacienteDashboard() {
               if (c && !c.eventId) {
                 const r2 = await fetch(url, {
                   method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                  body: JSON.stringify({ action: 'crearCita', paciente: c.pacienteNombre, correo: c.pacienteEmail, telefono: c.pacienteTelefono || '', fecha: c.fecha, hora: c.hora, dur: c.dur, tipoNombre: c.tipoNombre, online: c.online, objetivo: c.objetivo, notas: c.notas }), redirect: 'follow',
+                  body: JSON.stringify({ action: 'crearCita', marca: (process.env.REACT_APP_MARCA || ''),paciente: c.pacienteNombre, correo: c.pacienteEmail, telefono: c.pacienteTelefono || '', fecha: c.fecha, hora: c.hora, dur: c.dur, tipoNombre: c.tipoNombre, online: c.online, objetivo: c.objetivo, notas: c.notas }), redirect: 'follow',
                 });
                 let d2; try { d2 = JSON.parse(await r2.text()); } catch (_) { d2 = null; }
                 if (d2 && d2.eventId) { try { await updateDoc(doc(db, 'citas', citaId), { eventId: d2.eventId }); } catch (e) {} }
@@ -771,7 +771,7 @@ export default function PacienteDashboard() {
       const res = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         // enviarCorreo=false -> el backend guarda y comparte el PDF, pero NO manda el correo.
-        body: JSON.stringify({ action: 'saveRecomendaciones', patient: nombrePac, correo: (expediente?.correo || user?.email || '').toLowerCase(), filename, html, enviarCorreo: !!enviar }),
+        body: JSON.stringify({ action: 'saveRecomendaciones', marca: (process.env.REACT_APP_MARCA || ''),patient: nombrePac, correo: (expediente?.correo || user?.email || '').toLowerCase(), filename, html, enviarCorreo: !!enviar }),
         redirect: 'follow',
       });
       let d; try { d = JSON.parse(await res.text()); } catch (_) { d = { ok: false, error: 'Respuesta no válida del servidor.' }; }
@@ -798,7 +798,7 @@ export default function PacienteDashboard() {
           await fetch(url, {
             method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
-              action: 'cancelarCita',
+              action: 'cancelarCita', marca: (process.env.REACT_APP_MARCA || ''),
               eventId: c.eventId || '',
               correo: (c.pacienteEmail || user.email || '').toLowerCase(),
               paciente: c.pacienteNombre || nombre,
