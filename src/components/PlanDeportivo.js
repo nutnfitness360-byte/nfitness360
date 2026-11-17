@@ -4,6 +4,7 @@ import { db } from '../firebase/config';
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { selloDueno, cargarPerfilPdf } from '../utils/multiTenant';
 import { buildDeportivoHTML } from '../report/deportivoHTML';
+import { calcularProtocolo, fmtMin } from '../utils/calcPlanDeportivo';
 
 /* ============================================================
    NFITNESS 360 — Plan deportivo (alto rendimiento)
@@ -14,10 +15,9 @@ import { buildDeportivoHTML } from '../report/deportivoHTML';
    ============================================================ */
 
 const MODALIDADES = ['Maratón', 'Medio maratón', '10K', '15K', '21K', 'Hyrox', 'Triatlón', 'Trail', 'Otro'];
-const SUPLEMENTOS = ['', 'Gel', 'Gomitas', 'Bebida deportiva', 'Barrita', 'Dátiles', 'Otro'];
 const CAFEINA = ['', 'Sí', 'No'];
 
-const nuevaEstacion = () => ({ punto: '', hidratacion: '', suplemento: '', marca: '', cantidad: '', cafeina: '', notas: '', img: '' });
+const nuevaEstacion = () => ({ punto: '', puntoSub: '', hidratacion: '', suplemento: '', marca: '', cantidad: '', cafeina: '', notas: '', img: '' });
 const nuevaDistancia = () => ({
   tipo: 'distancia', titulo: '', eje: 'km',
   cenaPrevia: '', electrolitos: false,
@@ -28,10 +28,14 @@ const nuevaDistancia = () => ({
 const nuevaCarga = () => ({
   tipo: 'carga', dias: '2',
   comidas: {
-    desayuno: { ind: '', eq: '' }, comida: { ind: '', eq: '' },
-    cena: { ind: '', eq: '' }, snacks: { ind: '', eq: '' },
+    desayuno: { ind: 'Rico en carbohidratos 1–2 días previos (hot cakes, pan francés, huevo, jugo, bowl de fruta y yogur) para ir recargando el combustible. Bajo en proteína, grasa y verdura (fibra).', eq: '5 cereales / 2 proteínas / 1 fruta', img: '' },
+    comida: { ind: 'Rica en carbohidratos (pasta, arroz, gohan, wrap, baguette), baja en proteína, sin mucha verdura ni fibra. No fritos, empanizados, irritantes ni crudos.', eq: '4-5 cereales / 3 proteínas / 1 grasa', img: '' },
+    cena: { ind: 'Que siga rica en carbohidratos los días de carga. Evitar salsas picantes/cremosas, alcohol y frijoles.', eq: '5 cereales / 2 proteínas / 1 fruta', img: '' },
+    snacks: { ind: 'Barritas de avena bajas en fibra, fruta, dátiles, pan con maní o cajeta.', eq: '', img: '' },
   },
-  hidratacion: '', evitar: '', notas: '',
+  hidratacion: 'Mínimo 2 L de agua al día + tragos de electrolitos (Gatorade, Electrolit, Gatorlyte, Nuun) cada 15–20 min durante toda la carga.',
+  evitar: 'Fritos, empanizados, irritantes, pescados o mariscos crudos, alcohol, salsas picantes o cremosas, frijoles.',
+  notas: '',
 });
 
 // Comprime la imagen antes de guardarla. Conserva transparencia si es PNG/WebP.
@@ -67,6 +71,8 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
   const [dragIdx, setDragIdx] = useState(''); // "pIdx:eIdx" de la estación con drag encima
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfLink, setPdfLink] = useState('');
+  const [banco, setBanco] = useState([]);      // banco de productos deportivos (public/productos-deportivos.json)
+  const [calcMsg, setCalcMsg] = useState({});  // mensaje de la calculadora, por página
   const cargadoRef = useRef(false);
   const dirtyRef = useRef(false);
 
@@ -98,6 +104,16 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
     if (onGuardChange) onGuardChange(requestExit);
     return () => { if (onGuardChange) onGuardChange(null); };
   }, [onGuardChange, requestExit]);
+
+  // Carga el banco de productos deportivos (una vez).
+  useEffect(() => {
+    let vivo = true;
+    fetch('/productos-deportivos.json')
+      .then(r => r.json())
+      .then(j => { if (vivo) setBanco(Array.isArray(j) ? j : (j.productos || [])); })
+      .catch(() => { if (vivo) setBanco([]); });
+    return () => { vivo = false; };
+  }, []);
 
   // ---- Helpers de edición ----
   const setCompCampo = (k, v) => { setComp(c => ({ ...c, [k]: v })); marcarSucio(); };
@@ -133,6 +149,58 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
       return { ...p, estaciones: est.length ? est : [nuevaEstacion()] };
     }));
     marcarSucio();
+  };
+
+  // ---- Calculadora de fueling: corre el motor y AUTOLLENA las estaciones (editables) ----
+  const calcularEstaciones = (pi) => {
+    const p = paginas[pi];
+    if (!p) return;
+    const sel = p.productosSel || [];
+    // Por defecto el sistema usa TODO el banco; la selección es un filtro opcional.
+    const prods = sel.length ? (banco || []).filter(x => sel.includes(x.id)) : (banco || []).slice();
+    if (!prods.length) { setCalcMsg(m => ({ ...m, [pi]: 'No hay banco de productos disponible.' })); return; }
+    const cfg = {
+      carbos_toma: p.carbos_toma,
+      duracion_min: p.duracion_min, distancia_km: p.distancia_km, ritmo_min_km: p.ritmo_min_km,
+      modo: p.eje === 'tiempo' ? 'tiempo' : 'km',
+      intervalo: p.intervalo,
+      liquido_ml_h: p.liquido_ml_h, sodio_mg_h: p.sodio_mg_h,
+      cafeina: p.cafeina ? { usar: true } : null,
+    };
+    const r = calcularProtocolo(cfg, prods);
+    if (r.error) { setCalcMsg(m => ({ ...m, [pi]: r.error })); return; }
+    const uniq = (a) => a.filter((v, i) => v && a.indexOf(v) === i);
+    const tomas = (r.checkpoints || []).map(cp => {
+      const objs = cp.productos.map(it => prods.find(x => x.id === it.id)).filter(Boolean);
+      const cat = uniq(objs.map(o => o.cat || ''));                                         // categoría(s) reales
+      const mt = uniq(objs.map(o => (o.marca && o.marca !== '—') ? o.marca : (o.cat || ''))); // marca si hay; si no, el tipo
+      const km = cp.km != null ? ('km ' + cp.km) : '';
+      const t = cp.minuto != null ? fmtMin(cp.minuto) : '';
+      const prim = objs[0];
+      return {
+        punto: km || t, puntoSub: km ? t : '',
+        hidratacion: cp.liquido_ml ? (cp.liquido_ml + ' ml') : '',
+        suplemento: cat.join(' + '),
+        marca: mt.join(' + '),
+        cantidad: cp.productos.map(x => x.cant + '× ' + x.nombre).join(' + ') + (cp.carbos_real ? ' · ' + cp.carbos_real + ' g' : ''),
+        cafeina: cp.cafeina ? 'Sí' : '',
+        notas: '', img: (prim && prim.img) || '',
+      };
+    });
+    // Círculo de salida (0) y de meta (bandera), como en la referencia. Editables.
+    const salida = { punto: '0', puntoSub: 'salida', hidratacion: (p.bebida || ''), suplemento: '', marca: '', cantidad: '', cafeina: '', notas: '', img: '' };
+    const metaPunto = p.eje === 'km'
+      ? (p.distancia_km ? (p.distancia_km + 'K') : (p.titulo || 'Meta'))
+      : (r.resumen && r.resumen.duracion_min ? fmtMin(r.resumen.duracion_min) : (p.titulo || 'Meta'));
+    const meta = { punto: metaPunto, puntoSub: '', hidratacion: '', suplemento: '', marca: '', cantidad: '', cafeina: '', notas: '', img: '' };
+    setPagina(pi, { estaciones: [salida, ...tomas, meta] });
+    const s = r.resumen;
+    const cargar = (s.productos || []).map(x => x.unidades + '× ' + x.nombre).join(', ');
+    setCalcMsg(m => ({ ...m, [pi]:
+      `${s.n_checkpoints} tomas · ${s.carbos_toma} g por toma · total ${s.carbos_total} g` +
+      (s.carbos_h_equiv != null ? ` · ≈ ${s.carbos_h_equiv} g/h` : '') +
+      (cargar ? ' · Cargar: ' + cargar : '') +
+      (r.avisos && r.avisos.length ? ' · ⚠ ' + r.avisos.join(' | ') : '') }));
   };
 
   const cargarImagen = async (pi, ei, file) => {
@@ -286,6 +354,9 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
                 </Field>
               </div>
 
+              {/* Calculadora de fueling (motor): autollena las estaciones */}
+              <CalculadoraFueling p={p} pi={pi} banco={banco} setPagina={setPagina} onCalcular={() => calcularEstaciones(pi)} msg={calcMsg[pi]} />
+
               <div style={S.grid}>
                 <Field label="Cena previa (PM)" full>
                   <textarea style={S.area} rows={2} value={p.cenaPrevia} onChange={e => setPagina(pi, { cenaPrevia: e.target.value })} placeholder="Rica en carbos, sin grasa, poca verdura y proteína…" />
@@ -311,12 +382,8 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
                   <div style={S.estGrid}>
                     <Field label={p.eje === 'km' ? 'Punto (km)' : 'Punto (tiempo)'}><input style={S.input} value={est.punto} onChange={e => setEstacion(pi, ei, { punto: e.target.value })} placeholder={p.eje === 'km' ? '6K' : '30min'} /></Field>
                     <Field label="Hidratación"><input style={S.input} value={est.hidratacion} onChange={e => setEstacion(pi, ei, { hidratacion: e.target.value })} placeholder="150ml agua + 150ml bebida" /></Field>
-                    <Field label="Suplemento">
-                      <select style={S.input} value={est.suplemento} onChange={e => setEstacion(pi, ei, { suplemento: e.target.value })}>
-                        {SUPLEMENTOS.map(s => <option key={s} value={s}>{s || '—'}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Marca"><input style={S.input} value={est.marca} onChange={e => setEstacion(pi, ei, { marca: e.target.value })} placeholder="GU / SIS…" /></Field>
+                    <Field label="Suplemento/alimento"><input style={S.input} value={est.suplemento} onChange={e => setEstacion(pi, ei, { suplemento: e.target.value })} placeholder="Gel / Papilla / Fruta…" /></Field>
+                    <Field label="Marca o tipo"><input style={S.input} value={est.marca} onChange={e => setEstacion(pi, ei, { marca: e.target.value })} placeholder="GU / Fruta / Natural…" /></Field>
                     <Field label="Cantidad"><input style={S.input} value={est.cantidad} onChange={e => setEstacion(pi, ei, { cantidad: e.target.value })} placeholder="1 gel / 6-8 gomitas" /></Field>
                     <Field label="Cafeína">
                       <select style={S.input} value={est.cafeina} onChange={e => setEstacion(pi, ei, { cafeina: e.target.value })}>
@@ -444,6 +511,82 @@ function Field({ label, children, full }) {
 }
 function Chip({ on, onClick, children }) {
   return <button type="button" onClick={onClick} style={{ ...S.chip, ...(on ? S.chipOn : {}) }}>{children}</button>;
+}
+
+const DIALES = [15, 20, 25, 30, 40];
+const CAT_LABEL = { Gel: 'Geles', Gomita: 'Gomitas deportivas', Barra: 'Barras / waffles', Golosina: 'Golosinas', Bebida: 'Bebidas', Papilla: 'Papilla / pouch', Fruta: 'Fruta', Natural: 'Comida natural' };
+const CAT_ORDER = ['Gel', 'Gomita', 'Barra', 'Golosina', 'Bebida', 'Papilla', 'Fruta', 'Natural'];
+
+// Panel de la calculadora de fueling dentro de cada página de distancia.
+function CalculadoraFueling({ p, pi, banco, setPagina, onCalcular, msg }) {
+  const dialOtro = p.carbos_toma != null && p.carbos_toma !== '' && !DIALES.includes(Number(p.carbos_toma));
+  const todos = (banco || []).map(x => x.id);
+  // Por defecto (productosSel sin definir) se consideran TODOS seleccionados.
+  const sel = p.productosSel == null ? todos : p.productosSel;
+  const toggle = (id) => {
+    const base = p.productosSel == null ? todos : p.productosSel;
+    setPagina(pi, { productosSel: base.includes(id) ? base.filter(x => x !== id) : [...base, id] });
+  };
+  const porCat = {};
+  (banco || []).forEach(x => { const c = x.cat || 'Otro'; (porCat[c] = porCat[c] || []).push(x); });
+  const cats = CAT_ORDER.filter(c => porCat[c]).concat(Object.keys(porCat).filter(c => !CAT_ORDER.includes(c)));
+  return (
+    <div style={{ background: '#fff', border: '1px dashed var(--gold)', borderRadius: 10, padding: '12px 12px', margin: '2px 0 12px' }}>
+      <div style={S.subTitle2}>⚡ Calculadora de fueling (opcional)</div>
+      <div style={S.estGrid}>
+        <Field label="Carbohidratos por toma (g)">
+          <select style={S.input} value={dialOtro ? 'otro' : String(p.carbos_toma != null && p.carbos_toma !== '' ? p.carbos_toma : 25)}
+            onChange={e => setPagina(pi, { carbos_toma: e.target.value === 'otro' ? (p.carbos_toma || '') : Number(e.target.value) })}>
+            {DIALES.map(v => <option key={v} value={v}>{v} g</option>)}
+            <option value="otro">Otro…</option>
+          </select>
+        </Field>
+        {dialOtro && <Field label="g por toma (libre)"><input style={S.input} inputMode="numeric" value={p.carbos_toma} onChange={e => setPagina(pi, { carbos_toma: e.target.value })} placeholder="g" /></Field>}
+        <Field label={p.eje === 'km' ? 'Cada cuántos km' : 'Cada cuántos min'}>
+          <input style={S.input} inputMode="numeric" value={p.intervalo || ''} onChange={e => setPagina(pi, { intervalo: e.target.value })} placeholder={p.eje === 'km' ? '5' : '30'} />
+        </Field>
+      </div>
+      <div style={S.estGrid}>
+        <Field label="Duración (min)"><input style={S.input} inputMode="numeric" value={p.duracion_min || ''} onChange={e => setPagina(pi, { duracion_min: e.target.value })} placeholder="o usa distancia + ritmo" /></Field>
+        <Field label="Distancia (km)"><input style={S.input} inputMode="decimal" value={p.distancia_km || ''} onChange={e => setPagina(pi, { distancia_km: e.target.value })} placeholder="21" /></Field>
+        <Field label="Ritmo (min/km)"><input style={S.input} inputMode="decimal" value={p.ritmo_min_km || ''} onChange={e => setPagina(pi, { ritmo_min_km: e.target.value })} placeholder="6" /></Field>
+      </div>
+      <div style={S.estGrid}>
+        <Field label="Líquido / hora (ml, opc.)"><input style={S.input} inputMode="numeric" value={p.liquido_ml_h || ''} onChange={e => setPagina(pi, { liquido_ml_h: e.target.value })} placeholder="600" /></Field>
+        <Field label="Sodio / hora (mg, opc.)"><input style={S.input} inputMode="numeric" value={p.sodio_mg_h || ''} onChange={e => setPagina(pi, { sodio_mg_h: e.target.value })} placeholder="500" /></Field>
+        <Field label="Cafeína">
+          <label style={{ ...S.check, margin: '6px 0 0' }}><input type="checkbox" checked={!!p.cafeina} onChange={e => setPagina(pi, { cafeina: e.target.checked })} /> Sugerir en la 2ª mitad</label>
+        </Field>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+        <div style={{ ...S.label, margin: 0, maxWidth: '60%' }}>El sistema arma la propuesta solo con <b>todos</b> estos alimentos. Quita los que no apliquen o deja solo algunos (opcional):</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button type="button" style={{ ...S.chip, padding: '5px 10px', fontSize: 11.5 }} onClick={() => setPagina(pi, { productosSel: todos })}>Todos</button>
+          <button type="button" style={{ ...S.chip, padding: '5px 10px', fontSize: 11.5 }} onClick={() => setPagina(pi, { productosSel: [] })}>Ninguno</button>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+        {cats.map(c => (
+          <div key={c}>
+            <div style={{ fontSize: 10.5, color: 'var(--stone)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>{CAT_LABEL[c] || c}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {porCat[c].map(x => (
+                <button key={x.id} type="button" onClick={() => toggle(x.id)} style={{ ...S.chip, ...(sel.includes(x.id) ? S.chipOn : {}), padding: '5px 10px', fontSize: 11.5 }}>
+                  {x.nombre} <span style={{ opacity: 0.7 }}>{x.carbos_g}g{x.cafeina_mg ? ' ☕' : ''}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        {(!banco || !banco.length) && <div style={{ fontSize: 11.5, color: 'var(--stone)' }}>Banco de productos no disponible (revisa que public/productos-deportivos.json exista).</div>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+        <button type="button" style={S.saveBtn} onClick={onCalcular}>⚡ Calcular estaciones</button>
+        {msg && <span style={{ fontSize: 11.5, color: 'var(--stone)', lineHeight: 1.4 }}>{msg}</span>}
+      </div>
+      <div style={{ fontSize: 10.5, color: 'var(--stone)', marginTop: 6 }}>Al calcular se llenan las estaciones de abajo con una propuesta; puedes editarlas a mano.</div>
+    </div>
+  );
 }
 
 const S = {
