@@ -1,6 +1,4 @@
 import { FONT_CSS, LOGO, NUTRI_NOMBRE, NUTRI_LINEA2 } from './reporteHTML';
-// Instancia Fitmeal: paleta del PDF deportivo en colores de marca.
-const ES_FITMEAL_D = (process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() === 'fitmeal';
 
 /* ============================================================
    NFITNESS 360 — PDF del plan deportivo (alto rendimiento)
@@ -12,13 +10,49 @@ const ES_FITMEAL_D = (process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() ==
    nada de flexbox complejo.
    ============================================================ */
 
-const CREAM = ES_FITMEAL_D ? '#FBF7FA' : '#F2ECE3';
-const TAN = ES_FITMEAL_D ? '#BA007C' : '#CDA788';
-const INK = ES_FITMEAL_D ? '#32363A' : '#1a1612';
-const SOFT = ES_FITMEAL_D ? '#46414B' : '#4a443e';
-const STONE = ES_FITMEAL_D ? '#7C7A85' : '#8a7d70';
-const META = ES_FITMEAL_D ? '#86085D' : '#7d7368';
-const LINE = ES_FITMEAL_D ? '#EAD9E4' : '#e0d6cb';
+/* ---- Paleta del PDF EN COLORES DE CADA MARCA ----
+   Prioridad: 1) REACT_APP_BRAND_COLORS (la instancia define sus colores) →
+   2) mapa por instancia conocida (por nombre o por hostname) →
+   3) default (arena, estilo de la referencia / Natalia). */
+function parseBrandColors_(raw) {
+  if (!raw) return null;
+  try {
+    var o = JSON.parse(String(raw).replace(/%23/g, '#'));
+    return (o && typeof o === 'object') ? o : null;
+  } catch (e) { return null; }
+}
+var PAL_DEFAULT = { CREAM: '#F2ECE3', TAN: '#CDA788', INK: '#1a1612', SOFT: '#4a443e', STONE: '#8a7d70', META: '#7d7368', LINE: '#e0d6cb', ACCENT: '#CDA788' };
+var PAL_MARCA = {
+  fitmeal: { CREAM: '#FBF7FA', TAN: '#BA007C', INK: '#32363A', SOFT: '#46414B', STONE: '#7C7A85', META: '#86085D', LINE: '#EAD9E4', ACCENT: '#BA007C' },
+  aretia:  { CREAM: '#EFF2F7', TAN: '#E0913F', INK: '#16202E', SOFT: '#3A4656', STONE: '#64726B', META: '#1E3A5F', LINE: '#E1E8F1', ACCENT: '#E0913F' },
+};
+function hostMarca_() {
+  try {
+    var h = ((typeof window !== 'undefined' && window.location && window.location.hostname) || '').toLowerCase();
+    if (/aretia|sistemanutricio/.test(h)) return 'aretia';
+    if (/fitmeal/.test(h)) return 'fitmeal';
+  } catch (e) {}
+  return '';
+}
+function resolvePalette_() {
+  var bc = parseBrandColors_(process.env.REACT_APP_BRAND_COLORS);
+  if (bc && bc['--gold']) {
+    return {
+      CREAM: bc['--cream'] || PAL_DEFAULT.CREAM,
+      TAN: bc['--gold'],
+      INK: bc['--ink'] || PAL_DEFAULT.INK,
+      SOFT: bc['--stone'] || PAL_DEFAULT.SOFT,
+      STONE: bc['--stone'] || PAL_DEFAULT.STONE,
+      META: bc['--pine'] || bc['--dark'] || PAL_DEFAULT.META,
+      LINE: bc['--line'] || bc['--border'] || PAL_DEFAULT.LINE,
+      ACCENT: bc['--gold'],
+    };
+  }
+  var m = (process.env.REACT_APP_MARCA_NOMBRE || '').toLowerCase() || hostMarca_();
+  return PAL_MARCA[m] || PAL_DEFAULT;
+}
+var _P = resolvePalette_();
+var CREAM = _P.CREAM, TAN = _P.TAN, INK = _P.INK, SOFT = _P.SOFT, STONE = _P.STONE, META = _P.META, LINE = _P.LINE, ACCENT = _P.ACCENT;
 
 const esc = (v) => String(v == null ? '' : v)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -58,20 +92,23 @@ const banderaCuadros = () => {
     <table class="flagbody">${filas}</table>`;
 };
 
-// Una estación de la línea de tiempo (columna): círculo, imagen, textos.
+// Una estación de la línea de tiempo (columna): círculo (km grande + tiempo chico), imagen, textos.
 const estacionCell = (est, esMeta) => {
-  const supl = [est.suplemento, est.marca].filter(Boolean).join(' ');
   const cant = est.cantidad ? esc(est.cantidad) : '';
-  const caf = est.cafeina === 'Sí' ? ' · cafeína' : '';
+  const chip = est.suplemento ? `<span class="schip">${esc(est.suplemento)}</span>` : '';
+  const caf = est.cafeina === 'Sí' ? `<div class="cafline"><span class="caf">Cafeína</span></div>` : '';
   const img = est.img
-    ? `<div class="prodwrap"><img src="${est.img}" class="prod"/></div>`
+    ? `<div class="prodwrap"><img src="${esc(est.img)}" class="prod"/></div>`
     : `<div class="prodwrap"></div>`;
+  const sub = (!esMeta && est.puntoSub) ? `<span class="csmall">${esc(est.puntoSub)}</span>` : '';
+  const oneCls = (esMeta || !est.puntoSub) ? ' one' : '';
   const circle = esMeta
-    ? `<div class="metawrap">${banderaCuadros()}<div class="circle meta">${esc(est.punto || 'Meta')}</div></div>`
-    : `<div class="circle">${esc(est.punto || '')}</div>`;
+    ? `<div class="metawrap">${banderaCuadros()}<div class="circle meta one"><span class="cbig">${esc(est.punto || 'Meta')}</span></div></div>`
+    : `<div class="circle${oneCls}"><span class="cbig">${esc(est.punto || '')}</span>${sub}</div>`;
   const lineas = [
     est.hidratacion ? `<div class="hyd">${esc(est.hidratacion)}</div>` : '',
-    supl ? `<div class="supl">${esc(supl)}${cant ? ' · ' + cant : ''}${caf}</div>` : (cant ? `<div class="supl">${cant}${caf}</div>` : ''),
+    (chip || cant) ? `<div class="supl">${chip}${cant}</div>` : '',
+    caf,
     est.notas ? `<div class="enota">${esc(est.notas)}</div>` : '',
   ].join('');
   return `<td class="stcell">${circle}${img}<div class="sttext">${lineas}</div></td>`;
@@ -94,7 +131,6 @@ function paginaDistancia(comp, p, perfil) {
     : '';
   const antes = [
     p.preWorkout ? esc(p.preWorkout) : '',
-    p.bebida ? esc(p.bebida) : '',
     p.hidratacion ? '<b>Hidratación:</b> ' + esc(p.hidratacion) : '',
   ].filter(Boolean).join(' · ');
   const panelAntes = antes
@@ -118,33 +154,59 @@ function paginaDistancia(comp, p, perfil) {
   </div>`;
 }
 
-// ---------------- Página de CARGA DE CARBOHIDRATOS ----------------
-function comidaBox(label, m) {
-  if (!m) m = {};
-  const tag = /desayuno/i.test(label) ? 'AM' : /cena/i.test(label) ? 'AM/PM' : /snack/i.test(label) ? 'AM/PM' : 'PM';
-  const img = m.img ? `<div class="cbimg"><img src="${m.img}"/></div>` : '';
-  const ind = m.ind ? `<div class="cbind">${esc(m.ind)}</div>` : '';
-  const eq = m.eq ? `<div class="cbeq">${esc(m.eq)}</div>` : '';
-  if (!m.ind && !m.eq && !m.img) return '';
-  return `<div class="cbox"><div class="cbhead">${esc(label)} <span class="tag">${tag}</span></div>${img}${ind}${eq}</div>`;
-}
-
+// ---------------- Página de CARGA DE CARBOHIDRATOS (rueda, fondo oscuro de marca) ----------------
 function paginaCarga(comp, p, perfil) {
   const c = p.comidas || {};
-  const left = [comidaBox('Desayuno', c.desayuno), comidaBox('Snacks', c.snacks)].filter(Boolean).join('');
-  const right = [comidaBox('Comida', c.comida), comidaBox('Cena', c.cena)].filter(Boolean).join('');
-  const hid = p.hidratacion ? `<div class="cline"><b>Hidratación:</b> ${esc(p.hidratacion)}</div>` : '';
-  const evi = p.evitar ? `<div class="cline"><b>Evitar:</b> ${esc(p.evitar)}</div>` : '';
-  const notas = p.notas ? `<div class="cline"><b>Notas:</b> ${esc(p.notas)}</div>` : '';
+  const lg = (perfil && perfil.logo) || LOGO;
+  const diasTxt = (p.dias || '') + ' ' + (p.dias === '1' ? 'día' : 'días') + ' de carga';
 
-  return `<div class="page">
-    <div class="chead">CARGA DE CARBOHIDRATOS <span class="csub">${esc(p.dias || '')} ${(p.dias === '1') ? 'día' : 'días'}</span></div>
-    <table class="cgrid"><tr>
-      <td class="ccol">${left}</td>
-      <td class="cring"><div class="ringwrap"><img src="${(perfil && perfil.logo) || LOGO}" class="ringlogo"/></div></td>
-      <td class="ccol">${right}</td>
+  // Bloque de texto de una sección (al margen)
+  const blk = (label, tag, ind, eq) => {
+    if (!ind && !eq) return '';
+    return `<div class="cblk"><div class="cbh">${esc(label)} <span class="tag">${tag}</span></div>`
+      + (ind ? `<div class="cbd">${esc(ind)}</div>` : '')
+      + (eq ? `<div class="cbq">${esc(eq)}</div>` : '')
+      + `</div>`;
+  };
+  // Círculo de foto sobre el aro (usa la imagen si existe; si no, queda el aro)
+  const pc = (pos, img, tag, tagPos) => {
+    const inner = img ? `<img src="${esc(img)}" class="cpimg"/>` : '';
+    return `<div class="cpc" style="${pos}">${inner}</div>`
+      + (tag ? `<div class="cpt" style="${tagPos}">${tag}</div>` : '');
+  };
+
+  const der = [
+    blk('Desayuno', 'AM', c.desayuno && c.desayuno.ind, c.desayuno && c.desayuno.eq),
+    p.hidratacion ? blk('Hidratación', 'AM', p.hidratacion, '') : '',
+    blk('Comidas', 'PM', c.comida && c.comida.ind, c.comida && c.comida.eq),
+  ].filter(Boolean).join('');
+  const izq = [
+    blk('Cena', 'PM', c.cena && c.cena.ind, c.cena && c.cena.eq),
+    blk('Snacks', 'AM/PM', c.snacks && c.snacks.ind, c.snacks && c.snacks.eq),
+  ].filter(Boolean).join('');
+
+  const circles =
+    pc('top:20px;left:210px', c.desayuno && c.desayuno.img, 'AM', 'top:12px;left:300px') +
+    pc('top:151px;left:391px', null, 'AM', 'top:150px;left:500px') +
+    pc('top:364px;left:322px', c.comida && c.comida.img, 'PM', 'top:468px;left:430px') +
+    pc('top:364px;left:98px', c.cena && c.cena.img, 'PM', 'top:468px;left:84px') +
+    pc('top:151px;left:29px', c.snacks && c.snacks.img, 'AM/PM', 'top:150px;left:2px');
+
+  const foot = [p.evitar ? 'Evitar: ' + esc(p.evitar) : '', p.notas ? esc(p.notas) : ''].filter(Boolean).join(' · ');
+
+  return `<div class="page dark">
+    <div class="ctitle"><div class="ct1">CARGA DE<br/>CARBOHIDRATOS</div><div class="ct2">${esc(diasTxt)}</div></div>
+    <table class="cgrid2"><tr>
+      <td class="ccol2">${izq}</td>
+      <td class="cwheelcell">
+        <div class="cwheel">
+          <div class="cring2"><div class="cmedal"><img src="${lg}" class="cringlogo"/></div></div>
+          ${circles}
+        </div>
+      </td>
+      <td class="ccol2">${der}</td>
     </tr></table>
-    ${hid}${evi}${notas}
+    ${foot ? `<div class="cfoot">${foot}</div>` : ''}
     ${cornerBlock(perfil)}
   </div>`;
 }
@@ -191,8 +253,8 @@ body{font-family:'Montserrat','Helvetica Neue',Arial,sans-serif;color:${INK};-we
 /* Encabezado de distancia */
 .dhead{width:100%;border-collapse:collapse;}
 .dtitle{vertical-align:top;width:34%;}
-.dt1{font-size:26px;font-weight:800;letter-spacing:1px;line-height:1;}
-.dt2{font-size:26px;font-weight:800;color:${TAN};line-height:1.05;}
+.dt1{font-size:26px;font-weight:800;letter-spacing:1px;line-height:1;color:${INK};}
+.dt2{font-size:26px;font-weight:800;color:${ACCENT};line-height:1.05;}
 .deje{font-size:10px;color:${STONE};margin-top:4px;}
 .nada{display:inline-block;background:${TAN};color:#fff;font-size:9px;font-weight:800;letter-spacing:1px;padding:2px 8px;border-radius:8px;margin-left:6px;}
 .dpanels{vertical-align:top;}
@@ -204,14 +266,20 @@ body{font-family:'Montserrat','Helvetica Neue',Arial,sans-serif;color:${INK};-we
 .timeline{width:100%;border-collapse:collapse;margin-top:6mm;}
 .stcell{vertical-align:top;text-align:center;padding:0 2px;}
 .arrow{vertical-align:middle;color:#b5a893;font-size:22px;font-weight:700;width:16px;padding-bottom:70px;}
-.circle{width:80px;height:80px;border-radius:50%;background:${TAN};color:#fff;font-size:22px;font-weight:800;text-align:center;line-height:80px;margin:0 auto;}
+.circle{width:84px;height:84px;border-radius:50%;background:${TAN};color:#fff;text-align:center;margin:0 auto;}
+.circle .cbig{display:block;font-size:19px;font-weight:800;line-height:1;padding-top:25px;}
+.circle .csmall{display:block;font-size:10px;font-weight:700;opacity:0.92;line-height:1.1;margin-top:3px;}
+.circle.one .cbig{padding-top:33px;}
 .circle.meta{background:${META};}
 .metawrap{position:relative;}
 .prodwrap{width:52px;height:52px;margin:9px auto 6px;}
 .prod{max-width:52px;max-height:52px;display:block;margin:0 auto;}
 .sttext{font-size:8.5px;color:${SOFT};line-height:1.3;}
 .hyd{font-weight:700;}
-.supl{margin-top:2px;}
+.supl{margin-top:3px;}
+.schip{display:inline-block;font-size:7.5px;font-weight:800;letter-spacing:0.3px;color:#fff;background:${ACCENT};border-radius:4px;padding:1px 5px;margin-right:4px;}
+.cafline{margin-top:3px;}
+.caf{display:inline-block;font-size:8px;font-weight:700;color:${META};border:0.5px solid ${META};border-radius:999px;padding:1px 7px;}
 .enota{margin-top:2px;color:${STONE};}
 
 /* Bandera a cuadros (fuera del círculo) */
@@ -225,21 +293,27 @@ body{font-family:'Montserrat','Helvetica Neue',Arial,sans-serif;color:${INK};-we
 .ppost{font-size:10px;color:${SOFT};margin-top:8mm;}
 .pnota{font-size:9.5px;color:${STONE};margin-top:5px;}
 
-/* Carga de carbohidratos */
-.chead{font-size:15px;font-weight:800;letter-spacing:2px;color:${STONE};}
-.csub{color:${TAN};}
-.cgrid{width:100%;border-collapse:collapse;margin-top:4mm;}
-.ccol{width:33%;vertical-align:middle;}
-.cring{width:34%;text-align:center;vertical-align:middle;}
-.ringwrap{width:150px;height:150px;border-radius:50%;border:16px solid ${META};margin:0 auto;text-align:center;}
-.ringlogo{width:96px;margin-top:22px;}
-.cbox{background:#fff;border:0.5px solid ${LINE};border-radius:10px;padding:9px 11px;margin:6px 4px;}
-.cbhead{font-size:11px;font-weight:800;color:${INK};}
-.cbimg{margin:5px 0;}
-.cbimg img{max-width:60px;max-height:44px;display:block;}
-.cbind{font-size:9px;color:${SOFT};line-height:1.4;margin-top:3px;}
-.cbeq{font-size:9px;color:${INK};font-weight:700;margin-top:3px;}
-.cline{font-size:9.5px;color:${SOFT};margin-top:5px;}
+/* Carga de carbohidratos — rueda en fondo oscuro de marca */
+.page.dark{background:${INK};color:${CREAM};}
+.dark .tag{background:${ACCENT};color:${INK};}
+.ctitle{margin-bottom:3mm;}
+.ct1{font-size:31px;font-weight:800;letter-spacing:2px;line-height:1.05;color:${CREAM};}
+.ct2{font-size:13px;font-weight:700;letter-spacing:2px;color:${ACCENT};margin-top:5px;text-transform:uppercase;}
+.cgrid2{width:100%;border-collapse:collapse;}
+.ccol2{width:29%;vertical-align:middle;}
+.cblk{margin-bottom:9mm;}
+.cbh{font-size:13.5px;font-weight:800;letter-spacing:0.4px;color:${CREAM};text-transform:uppercase;}
+.cbd{font-size:11.5px;color:${CREAM};line-height:1.45;margin-top:3px;}
+.cbq{font-size:11px;color:${ACCENT};font-weight:700;margin-top:3px;}
+.cwheelcell{width:42%;text-align:center;vertical-align:middle;}
+.cwheel{position:relative;width:540px;height:540px;margin:0 auto;}
+.cring2{position:absolute;top:80px;left:80px;width:380px;height:380px;border-radius:50%;border:16px solid ${STONE};}
+.cmedal{position:absolute;top:79px;left:79px;width:190px;height:190px;border-radius:50%;background:${CREAM};text-align:center;}
+.cringlogo{width:118px;margin-top:66px;}
+.cpc{position:absolute;width:120px;height:120px;border-radius:50%;border:4px solid ${ACCENT};background:${META};overflow:hidden;}
+.cpimg{width:100%;height:100%;object-fit:cover;display:block;}
+.cpt{position:absolute;background:${ACCENT};color:${INK};border-radius:999px;padding:2px 9px;font-size:9.5px;font-weight:800;}
+.cfoot{position:absolute;left:14mm;right:14mm;bottom:9mm;text-align:center;font-size:10.5px;color:${STONE};line-height:1.45;}
 
 /* Esquina firma */
 .corner{position:absolute;bottom:8mm;left:14mm;border-collapse:collapse;}
