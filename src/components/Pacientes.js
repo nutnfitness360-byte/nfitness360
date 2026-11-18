@@ -19,6 +19,8 @@ import { apegoPorPeriodo } from '../utils/apego';
 
 // Función nueva oculta mientras se prueba: solo aparece donde REACT_APP_RUTINA_IA=true.
 const RUTINA_ON = String(process.env.REACT_APP_RUTINA_IA || '').toLowerCase() === 'true';
+// Plan deportivo (alto rendimiento): visible por defecto; se apaga por instancia con REACT_APP_DEPORTIVO=false.
+const DEPORTIVO_ON = String(process.env.REACT_APP_DEPORTIVO || 'true').toLowerCase() !== 'false';
 
 /* ===== utilidades ===== */
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -991,7 +993,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
     if (sub === 'menus') {
       return <Menus key={menuReabrir ? ('h-' + (menuReabrir.fecha || '') + (menuReabrir.nombre || '')) : 'actual'} patient={sel} onBack={volver} initialMenus={menuReabrir} onGuardChange={registerGuard} />;
     }
-    if (sub === 'deportivo') {
+    if (sub === 'deportivo' && DEPORTIVO_ON) {
       return <PlanDeportivo patient={sel} onBack={volver} onGuardChange={registerGuard} />;
     }
     if (sub === 'rutina' && RUTINA_ON) {
@@ -1560,7 +1562,8 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
             )}
           </div>
 
-          {/* Plan deportivo (alto rendimiento) */}
+          {/* Plan deportivo (alto rendimiento) — oculto salvo REACT_APP_DEPORTIVO!=false */}
+          {DEPORTIVO_ON && (
           <div className="card" style={panel === 'deportivo' ? S.panelOpen : S.panel}>
             <button style={S.panelHead} onClick={() => setPanel(p => p === 'deportivo' ? null : 'deportivo')}>
               <span style={S.panelTitle}>Plan deportivo <span style={{ fontWeight: 400, color: 'var(--stone)', fontSize: 12 }}>(alto rendimiento)</span></span>
@@ -1580,6 +1583,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
               </div>
             )}
           </div>
+          )}
 
           {/* Rutina de entrenamiento (gimnasio · IA) — oculto salvo REACT_APP_RUTINA_IA=true */}
           {RUTINA_ON && (
