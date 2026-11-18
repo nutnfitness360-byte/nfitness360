@@ -69,6 +69,12 @@ export default function LoginPage() {
   const portadaSubtitulo = process.env.REACT_APP_PORTADA_SUBTITULO || (esSistemaNutricio
     ? 'Del plan al resultado: reserva tus consultas, confírmalas y da seguimiento a tu plan.'
     : 'Este es tu portal para reservar tus consultas, confirmarlas y dar seguimiento a tu plan.');
+  // Lema opcional por instancia (frase de marca). Si REACT_APP_LEMA existe, se muestra
+  // en la portada EN LUGAR del titulo. Fuente opcional REACT_APP_LEMA_FONT (p. ej. "Elyaris"):
+  // se carga desde /<Fuente>.ttf en public/. Vacio en las demas instancias -> no cambia nada.
+  const lema = (process.env.REACT_APP_LEMA || '').trim();
+  const lemaFontName = (process.env.REACT_APP_LEMA_FONT || '').replace(/[^A-Za-z0-9 _-]/g, '').trim();
+  const lemaFamily = lemaFontName ? ("'" + lemaFontName + "','Playfair Display',Georgia,serif") : "'Playfair Display',Georgia,serif";
   const [puerta, setPuerta] = useState('paciente'); // nutri | paciente
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -231,6 +237,7 @@ export default function LoginPage() {
     grid2: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(258px, 1fr))', gap: 30, alignItems: 'center' },
     lLogo: { height: 42, width: 'auto', objectFit: 'contain', marginBottom: 16 },
     lHead: { color: 'var(--cream)', fontSize: 23, fontWeight: 700, lineHeight: 1.2, textAlign: 'left' },
+    lLema: { color: 'var(--cream)', fontSize: 30, fontWeight: 400, lineHeight: 1.22, textAlign: 'left', margin: '2px 0 0', fontFamily: lemaFamily },
     lSub: { color: '#B7ABA2', fontSize: 12.5, lineHeight: 1.55, margin: '12px 0 20px', textAlign: 'left', maxWidth: 300 },
     lStepsLbl: { color: 'var(--nav-accent)', fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', marginBottom: 13, textAlign: 'left' },
     lStep: { display: 'flex', gap: 11, alignItems: 'flex-start', marginBottom: 13, textAlign: 'left' },
@@ -285,6 +292,9 @@ export default function LoginPage() {
     return (
       <div style={{ ...S.wrap, alignItems: 'flex-start', paddingTop: 'calc(env(safe-area-inset-top, 0px) + clamp(1.5rem, 5vh, 3.5rem))', paddingBottom: '2.5rem' }}>
         <div style={S.landingBox}>
+          {lema && lemaFontName && (
+            <style>{"@font-face{font-family:'" + lemaFontName + "';src:url('/" + lemaFontName + ".ttf') format('truetype');font-display:swap;}"}</style>
+          )}
           <div style={S.grid2}>
 
             {/* Columna izquierda: mensaje + pasos */}
@@ -304,7 +314,9 @@ export default function LoginPage() {
                   </svg>
                 )
                 : (logoSrc ? <img src={logoSrc} alt="" style={{ ...S.lLogo, height: 'auto', width: 'auto', maxHeight: esSistemaNutricio ? 88 : S.lLogo.height, maxWidth: 260 }} /> : null)}
-              <div style={S.lHead}>{portadaTitulo}</div>
+              {lema
+                ? <div style={S.lLema}>{lema}</div>
+                : <div style={S.lHead}>{portadaTitulo}</div>}
               <div style={S.lSub}>{portadaSubtitulo}</div>
               <div style={S.lStepsLbl}>CÓMO AGENDAR</div>
               <div style={S.lStep}>
