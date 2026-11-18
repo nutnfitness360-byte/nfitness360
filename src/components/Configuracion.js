@@ -5,6 +5,7 @@ import { db } from '../firebase/config';
 import { HORARIO_DEFAULT, MODALIDADES, franjasDe, SERVICIOS_DEFAULT } from './Agenda';
 import { useBranding, DEFAULT_COLORS, aplicarColores } from '../context/BrandingContext';
 import { useTheme, ES_FITMEAL } from '../context/ThemeContext';
+import { TEMAS_ON, TEMAS, aplicarTema } from '../utils/temas';
 import { useAuth } from '../context/AuthContext';
 import { MULTI_NUTRI, slugDeNombre, linkNutri, selloDueno, filtroDueno } from '../utils/multiTenant';
 import { PAQUETES_DEFAULT, FAMILIAS } from '../utils/creditos';
@@ -99,7 +100,7 @@ function comprimirSuplemento(file) {
 }
 
 export default function Configuracion() {
-  const { logo, colors } = useBranding();
+  const { logo, colors, tema: temaSistema } = useBranding();
   const { tema, setTema, temaDisponible } = useTheme();
   const { esAdmin, user, nutriDueno } = useAuth();
   // Facturación visible también para la cuenta de pruebas (para demos/presentación),
@@ -465,7 +466,7 @@ export default function Configuracion() {
 
   return (
     <>
-      <Seccion titulo={temaDisponible ? 'Marca y apariencia' : 'Marca'} n={1 + (temaDisponible ? 1 : 0)} defaultOpen>
+      <Seccion titulo={(temaDisponible || TEMAS_ON) ? 'Marca y apariencia' : 'Marca'} n={1 + (temaDisponible ? 1 : 0)} defaultOpen>
       <div className="card" style={{ maxWidth: 760 }}>
       <div className="card-title">Configuración de marca</div>
       <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 22, lineHeight: 1.5 }}>
@@ -494,7 +495,7 @@ export default function Configuracion() {
         {(logo === '' ) ? <button style={B.ghost} onClick={() => guardar({ logo: null })} disabled={busy}>Usar logo por defecto</button> : null}
       </div>
 
-      {!BRANDING_LOCKED && (
+      {!BRANDING_LOCKED && !TEMAS_ON && (
         <div>
           {/* COLORES */}
           <div style={B.label}>Colores</div>
@@ -515,6 +516,40 @@ export default function Configuracion() {
       )}
       {msg ? <span style={{ fontSize: 12.5, color: 'var(--stone)', display: 'block', marginTop: 10 }}>{msg}</span> : null}
       </div>
+      {TEMAS_ON && (
+        <div className="card" style={{ maxWidth: 760 }}>
+          <div className="card-title">Tema del sistema</div>
+          <div style={{ fontSize: 12.5, color: 'var(--stone)', marginBottom: 16, lineHeight: 1.5 }}>
+            Elige la paleta de colores de todo el sistema (tu panel, el portal del paciente y la portada). Aplica para todos.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px,1fr))', gap: 12 }}>
+            {Object.keys(TEMAS).map((k) => {
+              const t = TEMAS[k];
+              const activo = (temaSistema || 'bosque') === k;
+              return (
+                <button key={k} type="button" disabled={busy}
+                  onClick={() => { aplicarTema(k); guardar({ tema: k }); }}
+                  style={{
+                    textAlign: 'left', cursor: 'pointer', borderRadius: 12, padding: 14,
+                    background: '#fff', fontFamily: 'var(--font)',
+                    border: activo ? '2px solid var(--gold)' : '1px solid var(--border)',
+                    boxShadow: activo ? '0 4px 14px rgba(0,0,0,0.06)' : 'none',
+                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <span style={{ display: 'inline-flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                      <span style={{ width: 20, height: 22, background: t.swatch }} />
+                      <span style={{ width: 20, height: 22, background: t.swatch2 }} />
+                    </span>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--dark)' }}>{t.nombre}</span>
+                    {activo && <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Activo</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--stone)', lineHeight: 1.4 }}>{t.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {temaDisponible && (
         <div className="card" style={{ maxWidth: 760 }}>
           <div className="card-title">Apariencia</div>

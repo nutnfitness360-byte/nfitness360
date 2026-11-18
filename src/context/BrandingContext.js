@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { TEMAS_ON, TEMA_DEFAULT, aplicarTema } from '../utils/temas';
 
 // Colores base del sistema (coinciden con :root en styles.css).
 // Los valores por defecto son los de Nfitness 360: así, si una instancia no
@@ -37,6 +38,9 @@ function _envBrandColors() {
 }
 const BASE_COLORS = { ...DEFAULT_COLORS, ..._envBrandColors() };
 
+// Tema del sistema (opt-in): aplica el tema por defecto al cargar (anti-destello).
+if (TEMAS_ON) { try { aplicarTema(TEMA_DEFAULT); } catch (_) {} }
+
 // Aplica un set de colores a las variables CSS de :root (recolorea la app en vivo).
 export function aplicarColores(colors) {
   if (!colors) return;
@@ -64,6 +68,7 @@ export function BrandingProvider({ children }) {
   // logo: undefined = sin configurar (usa el logo por defecto) · '' = quitado · string = imagen cargada
   const [logo, setLogo] = useState(undefined);
   const [colors, setColors] = useState(BASE_COLORS);
+  const [tema, setTemaState] = useState(TEMAS_ON ? TEMA_DEFAULT : null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'config', 'branding'), snap => {
@@ -72,12 +77,13 @@ export function BrandingProvider({ children }) {
       const c = { ...BASE_COLORS, ...(d.colors || {}) };
       setColors(c);
       aplicarColores(c);
+      if (TEMAS_ON) { const tk = d.tema || TEMA_DEFAULT; setTemaState(tk); aplicarTema(tk); }
     }, () => { /* sin acceso a la config → se usan los valores por defecto */ });
     return unsub;
   }, []);
 
   return (
-    <BrandingContext.Provider value={{ logo, colors }}>
+    <BrandingContext.Provider value={{ logo, colors, tema }}>
       {children}
     </BrandingContext.Provider>
   );

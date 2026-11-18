@@ -528,7 +528,7 @@ export default function NutriDashboard() {
                         <div key={s.tipo} style={D.svcRow}>
                           <span style={{ flex: 1, fontSize: 13, color: 'var(--dark)' }}>{s.tipo}</span>
                           <span style={{ fontSize: 12, color: 'var(--stone)', width: 70, textAlign: 'right' }}>{s.n} citas</span>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--dark)', width: 90, textAlign: 'right', fontFamily: 'Montserrat, sans-serif' }}>{money(s.ingreso)}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--dark)', width: 90, textAlign: 'right', fontFamily: 'var(--font)' }}>{money(s.ingreso)}</span>
                         </div>
                       ))}
                   </div>
@@ -546,7 +546,7 @@ export default function NutriDashboard() {
                   {semBtn('rojo', '+45 días')}
                   {cuenta.sinplan > 0 && semBtn('sinplan', 'sin plan')}
                 </div>
-                <div style={D.retPct}><b style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 26, fontWeight: 800 }}>{pctRetencion}%</b> de retención <span style={{ color: 'var(--stone)' }}>(de pacientes con plan)</span></div>
+                <div style={D.retPct}><b style={{ fontFamily: 'var(--font)', fontSize: 26, fontWeight: 800 }}>{pctRetencion}%</b> de retención <span style={{ color: 'var(--stone)' }}>(de pacientes con plan)</span></div>
                 <div style={{ marginTop: 10, maxHeight: 220, overflowY: 'auto' }}>
                   {retencion.length === 0
                     ? <div className="empty-state">Aún no hay pacientes registrados.</div>
@@ -570,7 +570,7 @@ export default function NutriDashboard() {
                   : objetivos.map((o, i) => (
                     <div key={i} style={{ marginBottom: 11 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--dark)', marginBottom: 4 }}>
-                        <span>{o.obj}</span><span style={{ fontWeight: 700, fontFamily: 'Montserrat, sans-serif' }}>{o.n}</span>
+                        <span>{o.obj}</span><span style={{ fontWeight: 700, fontFamily: 'var(--font)' }}>{o.n}</span>
                       </div>
                       <div style={D.barTrack}><div style={{ ...D.barFill, width: (o.n / maxObj * 100) + '%' }} /></div>
                     </div>
@@ -600,7 +600,7 @@ export default function NutriDashboard() {
 
       {novePopup && NOVEDADES[0] && (
         <div onClick={() => { setNovePopup(false); marcarNovedadesVistas(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(15,25,40,0.55)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 440, overflow: 'hidden', boxShadow: '0 24px 70px rgba(0,0,0,0.35)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', fontFamily: 'Montserrat, sans-serif' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 440, overflow: 'hidden', boxShadow: '0 24px 70px rgba(0,0,0,0.35)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font)' }}>
             <div style={{ background: 'var(--dark)', color: '#fff', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 11 }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 2l2.4 6.9L21 9.3l-5.4 4.3L17.6 21 12 16.9 6.4 21l2-7.4L3 9.3l6.6-.4z"/></svg>
               <div><div style={{ fontSize: 17, fontWeight: 800 }}>¡Novedades del sistema!</div><div style={{ fontSize: 11.5, color: '#9FB8D4', marginTop: 2 }}>{NOVEDADES[0].fecha}</div></div>
@@ -614,8 +614,8 @@ export default function NutriDashboard() {
               ))}
             </div>
             <div style={{ padding: '14px 20px 18px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-              <button onClick={() => { setNovePopup(false); marcarNovedadesVistas(); goTab('novedades'); }} style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif' }}>Ver todas</button>
-              <button onClick={() => { setNovePopup(false); marcarNovedadesVistas(); }} style={{ background: 'var(--dark)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif' }}>Entendido</button>
+              <button onClick={() => { setNovePopup(false); marcarNovedadesVistas(); goTab('novedades'); }} style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Ver todas</button>
+              <button onClick={() => { setNovePopup(false); marcarNovedadesVistas(); }} style={{ background: 'var(--dark)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>Entendido</button>
             </div>
           </div>
         </div>
@@ -626,24 +626,24 @@ export default function NutriDashboard() {
 }
 
 const D = {
-  saludo: { fontSize: 30, fontWeight: 800, color: 'var(--dark)', margin: '4px 4px 16px', fontFamily: 'Montserrat, sans-serif', letterSpacing: 0.2 },
+  saludo: { fontSize: 30, fontWeight: 800, color: 'var(--dark)', margin: '4px 4px 16px', fontFamily: 'var(--font)', letterSpacing: 0.2 },
   grid2: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14, marginBottom: 14 },
   cardHeadRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 10 },
-  linkBtn: { background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif' },
-  pendInput: { flex: 1, padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 9, fontSize: 13, fontFamily: 'Montserrat, sans-serif', background: '#fff', color: 'var(--dark)' },
+  linkBtn: { background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' },
+  pendInput: { flex: 1, padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 9, fontSize: 13, fontFamily: 'var(--font)', background: '#fff', color: 'var(--dark)' },
   addBtn: { width: 38, border: 'none', borderRadius: 9, background: 'var(--gold)', color: '#fff', fontSize: 20, fontWeight: 700, cursor: 'pointer', lineHeight: 1 },
   pendRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '0.5px solid var(--border)' },
   check: { width: 22, height: 22, borderRadius: 6, border: '1.5px solid var(--gold)', background: '#fff', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 800, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 },
   checkOn: { background: 'var(--gold)' },
   pendDel: { background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 18, cursor: 'pointer', lineHeight: 1, flexShrink: 0 },
-  pendEditIn: { flex: 1, fontSize: 13.5, color: 'var(--dark)', fontFamily: 'Montserrat, sans-serif', border: '1px solid var(--gold)', borderRadius: 6, padding: '5px 7px', background: '#fff' },
+  pendEditIn: { flex: 1, fontSize: 13.5, color: 'var(--dark)', fontFamily: 'var(--font)', border: '1px solid var(--gold)', borderRadius: 6, padding: '5px 7px', background: '#fff' },
   pendEdit: { background: 'transparent', border: 'none', color: 'var(--stone)', fontSize: 14, cursor: 'pointer', lineHeight: 1, flexShrink: 0 },
   preciosBox: { background: 'var(--cream)', borderRadius: 10, padding: '12px 14px', marginBottom: 14 },
   precioRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' },
-  precioInput: { width: 90, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, fontFamily: 'Montserrat, sans-serif', textAlign: 'right', background: '#fff', color: 'var(--dark)' },
+  precioInput: { width: 90, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, fontFamily: 'var(--font)', textAlign: 'right', background: '#fff', color: 'var(--dark)' },
   finTop: { display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 },
   finBig: { flex: 1, minWidth: 130, background: 'var(--cream)', borderRadius: 12, padding: '14px 16px' },
-  finBigNum: { fontSize: 24, fontWeight: 800, color: 'var(--dark)', fontFamily: 'Montserrat, sans-serif', lineHeight: 1.15 },
+  finBigNum: { fontSize: 24, fontWeight: 800, color: 'var(--dark)', fontFamily: 'var(--font)', lineHeight: 1.15 },
   finBigLbl: { fontSize: 11, color: 'var(--stone)', marginTop: 4, fontWeight: 600 },
   svcRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '0.5px solid var(--border)' },
   semaforo: { display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 10 },

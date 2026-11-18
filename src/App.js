@@ -7,6 +7,7 @@ import NutriDashboard from './pages/NutriDashboard';
 import PacienteDashboard from './pages/PacienteDashboard';
 import { TerminosGate } from './components/TerminosModal';
 import './styles.css';
+import { aplicarFuentes } from './utils/fuentes';
 
 // Marca por INSTANCIA: variable de entorno REACT_APP_MARCA → respaldo por dominio
 // (sistemanutricio/aretia) → Natalia por defecto. Natalia: sin variable y en su dominio
@@ -71,6 +72,7 @@ function aplicarMarcaPorDominio() {
 // Ejecutar de inmediato al cargar el bundle (antes del render de React) para que la
 // paleta Aretia ya esté aplicada en el primer pintado y NO haya destello de color.
 aplicarMarcaPorDominio();
+aplicarFuentes();
 
 function AppContent() {
   const { user, role, loading } = useAuth();
