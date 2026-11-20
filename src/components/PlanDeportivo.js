@@ -296,7 +296,7 @@ export default function PlanDeportivo({ patient, onBack, onGuardChange }) {
 
       <div style={S.eyebrow}>PLAN DEPORTIVO</div>
       <h2 style={S.h2}>Alto rendimiento</h2>
-      <div style={S.note}>Captura el plan de la competencia. Agrega una página por cada distancia y las de carga de carbohidratos que necesite el paciente; todas se unirán en un solo PDF (diseño en la siguiente etapa).</div>
+      <div style={S.note}>Captura el plan de la competencia. Agrega una página por cada distancia y las de carga de carbohidratos que necesite el paciente; todas se unirán en un solo PDF.</div>
 
       {/* 1 · Datos de la competencia */}
       <div style={S.card}>

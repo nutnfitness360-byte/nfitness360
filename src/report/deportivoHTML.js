@@ -116,25 +116,55 @@ const estacionCell = (est, esMeta) => {
 
 const flechaCell = () => `<td class="arrow">&rsaquo;</td>`;
 
+// Tiempo (min) de una estacion: 0 en la salida, o parseando "H:MM" de puntoSub o punto.
+function estMin_(est) {
+  if (!est) return null;
+  if (String(est.punto) === '0' || String(est.puntoSub || '').toLowerCase() === 'salida') return 0;
+  const parse = (s) => { const m = /^\s*(\d+):(\d{1,2})\s*$/.exec(String(s == null ? '' : s)); return m ? (parseInt(m[1], 10) * 60 + parseInt(m[2], 10)) : null; };
+  const a = parse(est.puntoSub); if (a != null) return a;
+  const b = parse(est.punto); if (b != null) return b;
+  return null;
+}
+function fmtHM_(min) { const h = Math.floor(min / 60), m = min % 60; return h + ':' + (m < 10 ? '0' : '') + m; }
+
+// Celda entre dos estaciones: ticks de hidratacion segun la frecuencia (min); si no, una flecha.
+function gapCell_(a, b, freq, cant) {
+  const t1 = estMin_(a), t2 = estMin_(b);
+  if (freq > 0 && t1 != null && t2 != null && t2 > t1) {
+    const items = [];
+    for (let k = Math.floor(t1 / freq) + 1; k * freq < t2; k++) {
+      const tm = k * freq;
+      items.push(`<td class="htk"><div class="htt">${fmtHM_(tm)}</div><div class="htmk"></div>${cant ? `<div class="htv">${cant}</div>` : ''}</td>`);
+    }
+    if (items.length) return `<td class="gapcell"><table class="htks"><tr>${items.join('')}</tr></table></td>`;
+  }
+  return `<td class="gapcell"><div class="arrowbig">&rsaquo;</div></td>`;
+}
+
 // ---------------- Página de DISTANCIA ----------------
 function paginaDistancia(comp, p, perfil) {
   const ests = Array.isArray(p.estaciones) ? p.estaciones : [];
+  const _freq = parseInt(p.hidFreq, 10);
+  const _cant = p.hidCantidad ? esc(p.hidCantidad) : '';
   const cols = [];
   ests.forEach((e, i) => {
     const esMeta = i === ests.length - 1;
     cols.push(estacionCell(e, esMeta));
-    if (i < ests.length - 1) cols.push(flechaCell());
+    if (i < ests.length - 1) cols.push(gapCell_(e, ests[i + 1], _freq, _cant));
   });
 
   const panelCena = p.cenaPrevia
     ? `<div class="ipanel"><span class="ihead">CENA PREVIA <span class="tag">PM</span></span>${esc(p.cenaPrevia)}${p.electrolitos ? ' · electrolitos' : ''}</div>`
     : '';
-  const antes = [
-    p.preWorkout ? esc(p.preWorkout) : '',
-    p.hidratacion ? '<b>Hidratación:</b> ' + esc(p.hidratacion) : '',
-  ].filter(Boolean).join(' · ');
+  const antes = p.preWorkout ? esc(p.preWorkout) : '';
   const panelAntes = antes
     ? `<div class="ipanel"><span class="ihead">ANTES DE LA DISTANCIA <span class="tag">AM</span></span>${antes}</div>`
+    : '';
+  // Hidratacion en su propio recuadro: frecuencia + cantidad + producto (compat con el campo viejo).
+  const hidResumen = [p.hidFreq ? ('Cada ' + esc(p.hidFreq) + ' min') : '', p.hidCantidad ? esc(p.hidCantidad) : ''].filter(Boolean).join(' · ');
+  const hidProd = p.hidProducto ? esc(p.hidProducto) : (p.hidratacion ? esc(p.hidratacion) : '');
+  const panelHid = (hidResumen || hidProd)
+    ? `<div class="ipanel hydbox"><span class="ihead">HIDRATACIÓN <span class="tag">EN RUTA</span></span>${hidResumen ? '<span class="hfreq">' + hidResumen + '</span>' : ''}${hidResumen && hidProd ? ' — ' : ''}${hidProd}</div>`
     : '';
   const nadaNuevo = p.nadaNuevo ? `<span class="nada">NADA NUEVO</span>` : '';
   const notas = p.notas ? `<div class="pnota"><b>Notas:</b> ${esc(p.notas)}</div>` : '';
@@ -144,7 +174,7 @@ function paginaDistancia(comp, p, perfil) {
   return `<div class="page">
     <table class="dhead"><tr>
       <td class="dtitle"><div class="dt1">DISTANCIA</div><div class="dt2">${esc(p.titulo || '')}</div><div class="deje">${ejeTxt} ${nadaNuevo}</div></td>
-      <td class="dpanels">${panelCena}${panelAntes}</td>
+      <td class="dpanels">${panelCena}${panelAntes}${panelHid}</td>
     </tr></table>
 
     <table class="timeline"><tr>${cols.join('')}</tr></table>
@@ -158,7 +188,7 @@ function paginaDistancia(comp, p, perfil) {
 function paginaCarga(comp, p, perfil) {
   const c = p.comidas || {};
   const lg = (perfil && perfil.logo) || LOGO;
-  const diasTxt = (p.dias || '') + ' ' + (p.dias === '1' ? 'día' : 'días') + ' de carga';
+  const diasTxt = '-' + (p.dias || '') + ' ' + (p.dias === '1' ? 'día' : 'días') + ' de carga';
 
   // Bloque de texto de una sección (al margen)
   const blk = (label, tag, ind, eq) => {
@@ -292,6 +322,16 @@ body{font-family:'Montserrat','Helvetica Neue',Arial,sans-serif;color:${INK};-we
 
 .ppost{font-size:10px;color:${SOFT};margin-top:8mm;}
 .pnota{font-size:9.5px;color:${STONE};margin-top:5px;}
+.hydbox{border:1px solid ${TAN};}
+.hfreq{color:${TAN};font-weight:700;}
+/* Ticks de hidratacion entre estaciones */
+.gapcell{vertical-align:top;text-align:center;padding:0 2px;}
+.arrowbig{color:#b5a893;font-size:22px;font-weight:700;padding-top:32px;}
+.htks{border-collapse:collapse;margin:30px auto 0;}
+.htks td.htk{text-align:center;padding:0 4px;vertical-align:top;}
+.htt{font-size:8px;font-weight:700;color:${INK};}
+.htmk{width:1.5px;height:12px;background:${TAN};margin:3px auto;}
+.htv{font-size:7.5px;color:${STONE};}
 
 /* Carga de carbohidratos — rueda en fondo oscuro de marca */
 .page.dark{background:${INK};color:${CREAM};}
