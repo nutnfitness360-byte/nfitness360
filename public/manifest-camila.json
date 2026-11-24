@@ -1,0 +1,13 @@
+{
+  "short_name": "Camila Ayala",
+  "name": "Camila Ayala · Nutrición",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0E482E",
+  "background_color": "#ECE3D8",
+  "icons": [
+    { "src": "camila-icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "camila-icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "camila-icon-maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}
