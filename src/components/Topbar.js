@@ -46,7 +46,7 @@ export default function Topbar({ role, user, onPerfil }) {
 
   return (
     <div className="topbar">
-      <div style={(LOGO_CLARO || ES_NUTRIALEGO_TB) ? { display: 'flex', flexDirection: 'column', alignItems: 'center' } : undefined}>
+      <div className={LOGO_CLARO ? 'topbar-brand' : undefined} style={(LOGO_CLARO || ES_NUTRIALEGO_TB) ? { display: 'flex', flexDirection: 'column', alignItems: 'center' } : undefined}>
         {(LOGO_CLARO && !logoDia) ? (
           <img src={LOGO_CLARO} alt="" style={{ height: LOGO_ALT, width: 'auto', display: 'block' }} />
         ) : (ES_NUTRIALEGO_TB && !logoDia) ? (
