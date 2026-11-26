@@ -1075,7 +1075,7 @@ export default function Pacientes({ onRegisterExitGuard, resetToList }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div className="card-title" style={{ margin: 0 }}>Pregúntale a la IA sobre este paciente</div>
-              <span style={{ background: '#fff', border: '1px solid var(--gold)', color: 'var(--gold)', borderRadius: 7, fontSize: 10, fontWeight: 800, padding: '2px 7px', letterSpacing: '0.3px' }}>IA ✦</span>
+              <span style={{ background: '#fff', border: '1px solid var(--gold)', color: 'var(--gold)', borderRadius: 7, fontSize: 10, fontWeight: 800, padding: '2px 7px', letterSpacing: '0.3px', whiteSpace: 'nowrap', flexShrink: 0 }}>IA ✦</span>
             </div>
             <span style={{ background: 'rgba(154,185,173,0.18)', border: '1px solid #cfe0d8', color: '#3E6B5B', borderRadius: 999, fontSize: 9.5, fontWeight: 800, padding: '2px 8px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>solo usa el expediente</span>
           </div>
