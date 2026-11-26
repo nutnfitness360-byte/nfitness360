@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 
 /**
  * TerminosModal.js
  * ------------------------------------------------------------------
  * Aceptación obligatoria de Términos y Condiciones + Aviso de Privacidad
- * la PRIMERA vez que la nutrióloga entra a la plataforma.
+ * la PRIMERA vez que el usuario (nutrióloga O paciente) entra a la plataforma.
  *
  *  - Muestra una ventana bloqueante (no se puede cerrar) hasta que acepta.
  *  - Guarda la aceptación en Firestore, en su doc de "suscriptores/<correo>",
  *    con versión y fecha/hora. Ya no vuelve a aparecer.
+ *  - Guarda TAMBIÉN un historial completo (terminosHistorial): cada aceptación
+ *    { version, fechaISO, rol } se AGREGA (no se sobrescribe) → respaldo legal
+ *    del clickwrap: qué versión aceptó cada quién y cuándo, a lo largo del tiempo.
+ *  - El paciente ve el Aviso de Privacidad del paciente (URL propia por instancia);
+ *    la nutrióloga ve los Términos + Aviso de la suscripción.
  *  - Si algún día actualizas los términos, sube VERSION_TERMINOS y el modal
  *    vuelve a salir UNA vez para que acepten la versión nueva.
  *
@@ -29,13 +34,17 @@ const URL_TERMINOS =
   process.env.REACT_APP_URL_TERMINOS || 'https://aretia.mx/terminos.html';
 const URL_PRIVACIDAD =
   process.env.REACT_APP_URL_PRIVACIDAD || 'https://aretia.mx/terminos.html#p1';
+// Aviso de privacidad ESPECÍFICO del paciente (titular de datos de salud). Si la
+// instancia no lo define, cae al Aviso general (URL_PRIVACIDAD) para no romper nada.
+const URL_AVISO_PACIENTE =
+  process.env.REACT_APP_URL_AVISO_PACIENTE || URL_PRIVACIDAD;
 const MARCA = process.env.REACT_APP_MARCA_NOMBRE || 'Aretia';
 
 /* ================================================================
    GATE — envuelve el dashboard y decide si mostrar el modal
    ================================================================ */
 export function TerminosGate({ children }) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [estado, setEstado] = useState('cargando'); // 'cargando' | 'ok' | 'pendiente'
 
   useEffect(() => {
@@ -64,12 +73,20 @@ export function TerminosGate({ children }) {
   async function handleAceptar() {
     const email = (user && user.email ? user.email : '').toLowerCase();
     if (email) {
+      const ahora = new Date().toISOString();
       await setDoc(
         doc(db, 'suscriptores', email),
         {
+          // Estado vigente (lo que lee la compuerta para no volver a preguntar):
           terminosAceptados: true,
           terminosVersion: VERSION_TERMINOS,
-          terminosFechaISO: new Date().toISOString(),
+          terminosFechaISO: ahora,
+          // Historial completo (NO se sobrescribe): respaldo legal del clickwrap.
+          terminosHistorial: arrayUnion({
+            version: VERSION_TERMINOS,
+            fechaISO: ahora,
+            rol: role || '',
+          }),
         },
         { merge: true }
       );
@@ -80,7 +97,7 @@ export function TerminosGate({ children }) {
   return (
     <>
       {children}
-      {estado === 'pendiente' && <TerminosModal onAceptar={handleAceptar} />}
+      {estado === 'pendiente' && <TerminosModal onAceptar={handleAceptar} rol={role} />}
     </>
   );
 }
@@ -88,9 +105,14 @@ export function TerminosGate({ children }) {
 /* ================================================================
    MODAL (presentación)
    ================================================================ */
-export function TerminosModal({ onAceptar }) {
+export function TerminosModal({ onAceptar, rol }) {
   const [marcado, setMarcado] = useState(false);
   const [guardando, setGuardando] = useState(false);
+
+  // El paciente (titular de datos) ve SU aviso de privacidad; la nutrióloga ve
+  // los Términos + Aviso de la suscripción.
+  const esPaciente = String(rol || '').toLowerCase() !== 'nutriologa';
+  const urlAvisoPac = URL_AVISO_PACIENTE;
 
   // Bloquea el scroll del fondo y evita cerrar con ESC (es obligatorio).
   useEffect(() => {
@@ -129,17 +151,27 @@ export function TerminosModal({ onAceptar }) {
           Antes de continuar
         </h2>
 
-        <p style={estilos.texto}>
-          Para usar {MARCA} necesitas leer y aceptar nuestros{' '}
-          <a href={URL_TERMINOS} target="_blank" rel="noopener noreferrer" style={estilos.link}>
-            Términos y Condiciones
-          </a>{' '}
-          y nuestro{' '}
-          <a href={URL_PRIVACIDAD} target="_blank" rel="noopener noreferrer" style={estilos.link}>
-            Aviso de Privacidad
-          </a>
-          . Solo tienes que hacerlo esta vez.
-        </p>
+        {esPaciente ? (
+          <p style={estilos.texto}>
+            Para usar {MARCA} necesitas leer y aceptar nuestro{' '}
+            <a href={urlAvisoPac} target="_blank" rel="noopener noreferrer" style={estilos.link}>
+              Aviso de Privacidad
+            </a>
+            . Solo tienes que hacerlo esta vez.
+          </p>
+        ) : (
+          <p style={estilos.texto}>
+            Para usar {MARCA} necesitas leer y aceptar nuestros{' '}
+            <a href={URL_TERMINOS} target="_blank" rel="noopener noreferrer" style={estilos.link}>
+              Términos y Condiciones
+            </a>{' '}
+            y nuestro{' '}
+            <a href={URL_PRIVACIDAD} target="_blank" rel="noopener noreferrer" style={estilos.link}>
+              Aviso de Privacidad
+            </a>
+            . Solo tienes que hacerlo esta vez.
+          </p>
+        )}
 
         <label style={estilos.check}>
           <input
@@ -149,7 +181,9 @@ export function TerminosModal({ onAceptar }) {
             style={estilos.checkbox}
           />
           <span>
-            He leído y acepto los Términos y Condiciones y el Aviso de Privacidad de {MARCA}.
+            {esPaciente
+              ? `He leído y acepto el Aviso de Privacidad de ${MARCA}.`
+              : `He leído y acepto los Términos y Condiciones y el Aviso de Privacidad de ${MARCA}.`}
           </span>
         </label>
 
